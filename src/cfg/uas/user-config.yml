@@ -1,0 +1,216 @@
+---
+# This is (eventually) to be the SINGULAR SOURCE OF TRUTH of app deployment configs
+# More static configuration should be handled with compose.yml files and .launch files
+
+# Position of reference frame of the camera array. Corresponds to field of view
+# See airplane diagram:
+# Port     Starbrd
+#       _
+#      /^\
+#    x | | x
+# <==Û=| |=Û==>
+#      | |
+#      \ /
+#     <<V>>
+#[ L] [ C ] [R ] Fields of View
+#
+# {left, right, center, NONE} use NONE with ROLE=NONE
+
+
+# Camera information and configuration:
+parameters:
+  max_frame_rate: 1.5 # fps - this has nothing to do with gui frame rate
+file_formats:
+  rgb: jpg
+  uv: jpg
+  ir: tif
+  evt: json
+  ins: json
+master_host: uas0
+verbosity: 9
+hosts:
+  nuvo0:
+    fov: center
+    enabled: true
+  nuvo1:
+    fov: left
+    enabled: true
+  nuvo2:
+    fov: right
+    enabled: true
+channels:
+  - ir
+  - rgb
+  - uv
+interfaces:
+  # map channels to ethernet interface names
+  # this is gonna usurp the locations mapping
+  rgb: pci_btm
+  ir: mobo_top
+  uv: mobo_btm
+locations:
+    # this maps a DEV_ID to a specific FOV. Use this section
+    # to swap which physical cameras map to software FOV
+  center:
+    ir: ir_n0
+    rgb: rgb_n0
+    uv: uv_n0
+  left:
+    ir: ir_n1
+    rgb: rgb_n1
+    uv: uv_n1
+  right:
+    ir: ir_n2
+    rgb: rgb_n2
+    uv: uv_n2
+
+enabled:
+  center:
+    ir: true
+    rgb: true
+    uv: true
+  left:
+    ir: true
+    rgb: true
+    uv: true
+  right:
+    ir: true
+    rgb: true
+    uv: true
+
+# This is configuration information for each physical device
+# `ir_n0` is a DEV_ID. This is an abstract label and has no absolute correlation
+# with FOV. This makes it easy and less error-prone to reroute camera defs
+devices:
+# === === === === cooled FLIR cameras === === === ===
+  ir_n0:
+    model: flir_a6750
+    mac: 00:11:1c:02:40:46
+    prefer_ip: '192.168.1.50'
+    ip_mode: fixed
+  ir_n1:
+    model: flir_a6750
+    mac: 00:11:1c:01:ec:f7
+    prefer_ip: '192.168.1.51'
+    ip_mode: fixed
+  ir_n2:
+    model: flir_a6750
+    mac: 00:11:1c:01:c8:5b
+    prefer_ip: '192.168.1.52'
+    ip_mode: fixed
+
+# === === === === IR "backup" cameras === === === ===
+
+  ir_nb0:
+    model: flir_a645
+    mac: 00:11:1c:00:e6:d1
+    prefer_ip: '192.168.1.53'
+    ip_mode: dhcp
+  ir_nb1:
+    model: flir_a645
+    mac: 00:11:1c:00:bf:6a
+    prefer_ip: '192.168.1.54'
+    ip_mode: dhcp
+  ir_nb2:
+    model: flir_a645
+    mac: 00:11:1c
+    prefer_ip: '192.168.1.55'
+    ip_mode: dhcp
+# === === === === rgb prosilica cameras === === === ===
+  rgb_n0:
+    label: PORT
+    model: allied_gt6600_rgb
+    mac: '00:0f:31:02:37:6c'
+    prefer_ip: '192.168.4.40'
+    guid: 145260
+    ip_mode: fixed
+  rgb_n1:
+    label: unknown
+    model: allied_gt6600_rgb
+    mac: '00:0f:31:02:c2:8d'
+    guid: 180877
+    prefer_ip: '192.168.4.41'
+    ip_mode: fixed
+  rgb_n2:
+    model: allied_gt6600_rgb
+    label: CENTER
+    mac: '00:0f:31:02:c2:8c'
+    guid: 180876
+    prefer_ip: '192.168.4.42'
+    ip_mode: fixed
+
+# === === === === uv prosilica cameras === === === ===
+  uv_n0:
+    label: unknown
+    model: allied_gt4907_uv
+    mac: '00:0f:31:03:64:5a'
+    guid: 222298
+    prefer_ip: '192.168.2.60'
+    ip_mode: linklocal
+
+  uv_n1:
+    label: unknown
+    model: allied_gt4907_uv
+    mac: '00:0f:31:03:65:d0'
+    guid: 222672
+    prefer_ip: '192.168.2.61'
+    ip_mode: linklocal
+  uv_n2:
+    label: unknown
+    model: allied_gt4907_uv
+    mac: '00:0f:31:03:64:26'
+    guid: 222246
+    prefer_ip: '192.168.2.62'
+    ip_mode: linklocal
+
+# This defines information about the actual camera devices, based on model name
+models:
+  flir_a6750:
+    mfgr: flir
+    nic_mfgr: pleora
+    mac_prefix: 00:11:1c
+    spectrum: ir
+    specs:
+      width: 640
+      height: 512
+  flir_645:
+    mfgr: flir
+    nic_mfgr: ''
+    mac_prefix: ''
+    spectrum: ir
+    specs:
+      width: 640
+      height: 480
+  allied_gt6600_rgb:
+    # last 3 nybbles of MAC is GUID, i.e. 02:c2:8c = 0x02c28c = 180876
+    mfgr: allied vision
+    nic_mfgr: ''
+    mac_prefix: '00:0f:31'
+    spectrum: rgb
+    specs:
+      width: 6576
+      height: 4384
+  allied_gt4907_uv:
+    mfgr: allied vision
+    nic_mfgr: ''
+    mac_prefix: '00:0f:31'
+    spectrum: uv
+    specs:
+      width: 4864
+      height: 3232
+
+# expert configs
+
+# launch params - get passed to roslaunch
+launch:
+  cam:
+    rgb:
+      GainMode: Manual
+      GainValue: 3
+
+    uv:
+      GainMode: Manual
+      GainValue: 3
+
+
+...

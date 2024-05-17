@@ -1,0 +1,21 @@
+[Unit]
+Description=Daemon for parsing AVX GPS time output and comparing with NTP
+After=network.target
+
+[Service]
+Type=simple
+#User=user
+#Group=user
+# I wish I had a better way to locate this process
+# /home/user/.local/lib/python3.6/site-packages/gsof_utils/cfg/avx_time.service
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/virtualenvs/kamera3/bin/python3 /home/user/.local/lib/python3.6/site-packages/gsof_utils/avx_time.py --host 192.168.88.255 --port 12344 --ntphost 192.168.88.99
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill $MAINPID
+Restart=always
+# not strictly necessary
+#StandardOutput=journal+console
+#StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

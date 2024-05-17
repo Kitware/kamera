@@ -1,0 +1,6 @@
+[Desktop Entry]
+Exec=bash -c 'kamera.run'
+Name=kamera
+Terminal=true
+Type=Application
+Name[en_US]=kamera.desktop

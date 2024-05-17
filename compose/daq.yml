@@ -1,0 +1,26 @@
+---
+## Bring up the core nodes (aside from roscore)
+version: '3.7'
+services:
+  daq:
+    container_name: daq
+    image: "gitlab.kitware.com:4567/noaa_uav/noaa_kamera/kamera/${ROS_DISTRO}:${TAG_KAMERA_DAQ:-latest}"
+    tty: true
+    devices:
+      - "${MCC_DAQ}:${MCC_DAQ}"
+    environment:
+      REDIS_HOST: "${REDIS_HOST}"
+      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      NODE_HOSTNAME: "${NODE_HOSTNAME}"
+      MCC_DAQ: "${MCC_DAQ}"
+    dns:
+      - "${KAMERA_DNS_IP}"
+    dns_search:
+      - kamera.systems
+    network_mode: host
+    volumes:
+      - "${KAMERA_DIR}:/root/noaa_kamera"
+    entrypoint: ["/bin/tini", "--"]
+    command: ["/entry/daq.sh"]
+    restart: always
+...

@@ -1,0 +1,45 @@
+---
+## container configuration for GUI
+version: '3.7'
+services:
+## =========================== gui =============================
+  gui:
+    container_name: gui
+    image: gitlab.kitware.com:4567/noaa_uav/noaa_kamera/final/gui:latest
+    tty: true
+    environment:
+      REDIS_HOST: "${REDIS_HOST}"
+      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      ROS_IP: "${ROS_IP:-}"
+      ROS_HOSTNAME: "${ROS_HOSTNAME:-}"
+      DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
+      GUI_CFG_DIR: /home/user/.config/kamera/gui
+      DISPLAY: "${DISPLAY}"
+      QT_X11_NO_MITSHM: "1"
+      START_IN_SHELL: "${START_IN_SHELL}"
+    dns:
+      - "${KAMERA_DNS_IP}"
+    dns_search:
+      - kamera.systems
+    network_mode: host
+    volumes:
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+      - "/mnt/flight_data:/mnt/flight_data"
+      - "/home/user/kw/noaa_kamera:/home/user/kamera_ws"
+      - "${PWD}/src:/home/user/noaa_kamera/src:ro"
+      - "save-gui:/home/user/.config/kamera/gui"
+      - "${HOME}/.ssh:/home/user/.ssh"
+    entrypoint: ["/bin/tini", "--"]
+    command: ["/entry/gui.sh"]
+
+volumes:
+  save-gui:
+    name: save-gui
+    labels:
+      com.kitware.description: "Persistence for saved data from GUI, e.g. config state"
+    driver: local
+    driver_opts:
+      type: none
+      o: "bind,uid=1000"
+      device: "${HOME}/.config/kamera/gui"
+...

@@ -1,0 +1,7 @@
+# Filter by disk name (optional)
+string disk_name
+
+---
+# Response from system call
+string stdout
+string stderr

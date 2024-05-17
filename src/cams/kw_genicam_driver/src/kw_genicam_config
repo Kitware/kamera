@@ -1,0 +1,11 @@
+#
+# Config file for genicam driver
+#
+
+block dynamic_brightness
+
+  type = ros_dynamic_config
+
+  ros_dynamic_config:topic = camera_brightness
+
+endblock

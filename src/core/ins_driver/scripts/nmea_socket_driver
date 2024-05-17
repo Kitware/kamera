@@ -1,0 +1,269 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# Software License Agreement (BSD License)
+#
+# Copyright (c) 2016, Rein Appeldoorn
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above
+#    copyright notice, this list of conditions and the following
+#    disclaimer in the documentation and/or other materials provided
+#    with the distribution.
+#  * Neither the names of the authors nor the names of their
+#    affiliated organizations may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+# COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+# ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+import os
+import socket
+import sys
+import rospy
+from libnmea_navsat_driver.gsof import (parse_gsof_stream, maybe_gsof,
+                                        separate_nmea, GsofInsDispatch,
+                                        GsofEventDispatch, GsofSpoofEventDispatch)
+from msgdispatch.archive import ArchiveSchemaDispatch
+from nexus.archiver_core import ArchiverBase
+from libnmea_navsat_driver.stream_archive import dumpbuf, enumerate_packets
+import libnmea_navsat_driver.driver
+
+# from vprint import aprint
+# from vprint.base256 import b256encode
+
+
+def netcat(hostname, port, content):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((hostname, port))
+    # s.sendall(content)
+    s.shutdown(socket.SHUT_WR)
+    while 1:
+        data = s.recv(1024)
+        if data == "":
+            break
+        print("Received: {}".format(repr(data)))
+    print("Connection closed.")
+    s.close()
+
+
+class DummyDriver(object):
+    def add_sentence(self, sentence, frame_id, *args, **kwargs):
+        print('{:5d}: {}'.format(frame_id, sentence))
+
+
+def loginfo(msg, *args, **kwargs):
+    # rospy.loginfo(msg, *args, **kwargs)
+    print('info: {}'.format(msg))
+
+
+def logwarn(msg, *args, **kwargs):
+    # rospy.loginfo(msg, *args, **kwargs)
+    print('warn: {}'.format(msg))
+
+
+def logerr(msg, *args, **kwargs):
+    # rospy.loginfo(msg, *args, **kwargs)
+    print('err : {}'.format(msg))
+
+
+class FailedToInitNmeaClient(Exception):
+    def __init__(self, msg=None, host='', port=0, exc=None):
+        # type: (str, str, int, Exception) -> None
+        """
+        Error for failing to initially connect to NMEA server. This is extra
+        bad, so we want to handle this outside regular socket errors
+        :param msg: custom error message
+        """
+        if msg is None:
+            msg = ('Failed to initialize NMEA socket client on host {}:{}'
+                  ''.format(host, port))
+        if exc is not None:
+            msg += '\nOriginal exception: {}'.format(exc)
+        super(FailedToInitNmeaClient, self).__init__(msg)
+
+
+def gen_packets(host, port, buffer_size=4096, timeout=2.0):
+    # type: (str, int, int, float) -> str
+    """
+        Packet generator for streaming data from NMEA service
+    :param host:
+    :param port:
+    :param buffer_size:
+    :param timeout:
+
+    Args:
+        host: hostname of NMEA device
+        port: port of NMEA device
+        buffer_size: recv() buffer size
+        timeout: socket timeout
+
+    Yields:
+        NMEA data strings
+    """
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        rospy.loginfo('Accessing {}:{}'.format(host, port))
+        sock.connect((host, port))
+        sock.settimeout(timeout)
+        rospy.loginfo('Connected to {}:{}'.format(host, port))
+
+        while True:
+            try:
+                yield sock.recv(buffer_size).strip()
+
+            except socket.error as exc:
+                logerr(
+                    "Caught exception socket.error during recv: %s" % exc)
+
+    except socket.error as exc:
+        logerr('Critical failure in initualization of host {}:{}'.format(host, port))
+        raise FailedToInitNmeaClient(host=host, port=port, exc=exc)
+
+    finally:
+        sock.close()
+
+
+class AvxClient(object):
+
+    def __init__(self):
+        self._data_mount_point = rospy.get_param('/data_mount_point', '/mnt/kamera')
+        self._project = 'default2019'
+        self._flight = 'fl00'
+        self.archiver = ArchiverBase()
+
+    def run(self, host, port, buffer_size=4096, timeout=2.0):
+        driver = libnmea_navsat_driver.driver.RosNMEADriver()
+        GsofInsDispatch.add_publisher('/gis/ins')
+        GsofEventDispatch.add_publisher('/gis/event')
+        # GsofSpoofEventDispatch.add_publisher('/gis/event') # todo
+
+        # recv-loop: When we're connected, keep receiving stuff until that fails
+        for rawdata in gen_packets(host, port):
+            if rospy.is_shutdown():
+                break
+
+            # todo: optionally archive stream
+            dumpbuf(self.archiver.get_ins_path(), rawdata)
+
+            nmea_list, gsof_data = separate_nmea(rawdata)
+            #aprint(nmea_list)
+            # aprint(str(len(gsof_data)) + '[' + b256encode(gsof_data) + ']')
+
+            if nmea_list:
+                for nmea in nmea_list:
+                    driver.add_sentence(nmea)
+
+            if maybe_gsof(gsof_data):
+                dispatches = parse_gsof_stream(gsof_data)
+                #aprint(dispatch.msg)
+                for d in dispatches:
+                    # print(d)
+                    d.publish()
+
+
+                # evt = GsofSpoofEventDispatch()
+                # evt.publish()
+
+
+            # ignoring NMEA for now
+    @staticmethod
+    def replay(path_to_data):
+        print('REPLAY MODE')
+        with open(path_to_data, 'rb') as fp:
+            raw_stream = fp.read()
+
+        GsofEventDispatch.add_publisher('/gis/event')
+        GsofInsDispatch.add_publisher('/gis/ins')
+        # recv-loop: When we're connected, keep receiving stuff until that fails
+        for i, rawdata in enumerate_packets(raw_stream):
+            if rospy.is_shutdown():
+                break
+            print(i, len(rawdata))
+            # todo: optionally archive stream
+
+            nmea_list, gsof_data = separate_nmea(rawdata)
+            # aprint(nmea_list)
+            # aprint(str(len(gsof_data)) + '[' + b256encode(gsof_data) + ']')
+
+            if maybe_gsof(gsof_data):
+                dispatches = parse_gsof_stream(gsof_data)
+                # aprint(dispatch.msg)
+                for d in dispatches:
+                    # print(d)
+                    d.publish()
+                continue
+
+
+    @staticmethod
+    def spoof(frequency=5):
+        import time
+        period = 1.0 / frequency
+        rospy.logwarn('Going into event spoof mode!')
+        GsofSpoofEventDispatch.add_publisher('/gis/event')
+        while not rospy.is_shutdown():
+            dispatch = GsofSpoofEventDispatch()
+            dispatch.publish()
+            time.sleep(period)
+            # rospy.loginfo(str(dispatch))
+
+    def update_schema(self, msg):
+        # type: (ArchiveSchemaDispatch) -> None
+        rospy.loginfo('Set schema: \n{}'.format(str(msg)))
+        self._project = msg.project
+        self._flight = msg.flight
+
+    def rawfile_template(self):
+
+        return os.path.join(self.basepath, self._project, self._flight, 'ins.dat')
+
+    @property
+    def basepath(self):
+        """
+        This is the root path all other subdirectories stem from.
+        :return:
+        """
+        return self._data_mount_point
+
+
+
+
+if __name__ == '__main__':
+    rospy.init_node('nmea_socket_driver')
+    try:
+        host = rospy.get_param('~ip', '0.0.0.0')
+        port = rospy.get_param('~port', 10110)
+        buffer_size = rospy.get_param('~buffer_size', 4096)
+        timeout = rospy.get_param('~timeout_sec', 2)
+        spoof = rospy.get_param('~spoof')
+        replay_path = rospy.get_param('~replay')
+    except KeyError as e:
+        rospy.logerr("Parameter %s not found" % e)
+        sys.exit(1)
+
+
+    client = AvxClient()
+    if spoof > 0 :
+        client.spoof(spoof)
+    elif replay_path:
+        client.replay(replay_path)
+    else:
+        client.run(host, port, buffer_size, timeout)
+

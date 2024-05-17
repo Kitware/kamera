@@ -1,0 +1,98 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import os
+import errno
+import socket
+import sys
+import time
+from functools import partial
+
+import serial
+
+import rospy
+import std_msgs.msg
+
+ros_immediate = rospy.Duration(nsecs=1)
+
+class Rate(object):
+    def __init__(self, rate=5.0):
+        self.rate = rate
+
+    def set_rate(self, msg):
+        self.rate = msg.data
+
+    @property
+    def period(self):
+        return 1.0 / self.rate
+
+
+def cb_set_pin(timer_event=None, ser=None, pin='dtr', val=False):
+    # type: (rospy.TimerEvent, serial.Serial, str, bool) -> None
+    if ser is None:
+        raise RuntimeError("No serial object")
+
+    setattr(ser, pin, val)
+
+
+def cb_send_pulse(timer_event=None, ser=None, pin='dtr', duration=0.05):
+    # type: (rospy.TimerEvent, serial.Serial, str, float) -> None
+    """
+    Send a pulse to the pin
+    :param timer_event:
+    :param ser: Serial interface object
+    :param pin: pin to use, must be RTS or DTR
+    :param duration: Length of pulse in seconds
+    :return:
+    """
+
+    setattr(ser, pin, True)
+    rospy.logdebug('On')
+    cb_off = partial(cb_set_pin, ser=ser, pin=pin, val=False)
+    rospy.Timer(rospy.Duration(nsecs=int(duration*1e9)), cb_off, oneshot=True)
+
+
+
+def trigger_serial(ser, pulse_frequency=2.0, spin_frequency=1000, pin='dtr'):
+    """Use this to send a pulse via RTS pin"""
+    import time
+    pulse_rate = Rate(pulse_frequency)
+    spin_rate = Rate(spin_frequency)
+    pulse_duration = 0.05
+    pulse = False
+    trigger_sub = rospy.Subscriber('/daq/trigger_freq',
+                                   std_msgs.msg.Float64,
+                                   pulse_rate.set_rate)
+    while not rospy.is_shutdown():
+        rospy.Timer(ros_immediate,
+                    partial(cb_send_pulse, ser=ser, pin=pin, duration=pulse_duration),
+                    oneshot=True)
+        rospy.sleep(pulse_rate.period)
+
+
+if __name__ == '__main__':
+    rospy.init_node('daq')
+    try:
+
+        buffer_size = rospy.get_param('~buffer_size', 4096)
+        timeout = rospy.get_param('~timeout_sec', 2)
+        spoof = rospy.get_param('spoof_rate', 0) or rospy.get_param('~spoof')
+
+    except KeyError as e:
+        rospy.logerr("Parameter %s not found" % e)
+        sys.exit(1)
+
+
+    pulse_tty = os.environ.get('DAQ_TTY', None)
+    try:
+        ser = serial.Serial(pulse_tty)
+    except Exception as exc:
+        ser = None
+        print('Unable to find tty: {}'.format(pulse_tty))
+
+    if ser: #  dude, gross. but it should work.
+        print('Serial connected: {}'.format(ser.name))
+        trigger_serial(ser)
+        sys.exit(0)
+
+

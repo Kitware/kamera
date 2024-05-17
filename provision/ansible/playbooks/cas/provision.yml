@@ -1,0 +1,194 @@
+## Playbook for provisioning NOAA KAMERA systems
+## Use the admin account for these
+
+- hosts: all
+  vars:
+    nvidia_driver_version: 535
+    linux_distro: ubuntu20.04
+    ros_distro: noetic
+    ros_package: perception
+    ansible_user: user
+    sys_packages: [
+                    'apt-transport-https', 'gnupg-agent', # secure socket / signing
+                    'software-properties-common', # add/manage PPAs
+                    'build-essential', # Basic build tools
+                    'ca-certificates', 'lsb-release', # Necessary certificate signing
+                    'nfs-common', # Needed for NAS mount
+                    'tmux', 'zsh', # shell tools
+                    'mosh', # SSH tools
+                    'git', # vcs
+                    'vim', # editor
+                    'rubygems', # tmuxinator
+                    'supervisor', # startup tools
+                    'curl', 'wget', # http / download
+                    'htop', # process monitor
+                    'tree', 'mc', # explore filesystem
+                    'traceroute', 'net-tools', 'iftop', # IP layer tools
+                    'nmap', 'arp-scan', 'netdiscover', 'iftop', 'ethtool', # Network layer tools
+                    'dnsutils', # dig
+                    'lm-sensors', # utilities for /dev and hardware sensors/fans
+                    'jq', # json query, used for configs
+                    'chrony', 'gpsd', # For NTP sheduling
+                    'pps-tools', 'linuxptp', # PTP tools
+                    'dnsutils', # DNS tools
+                    'openssh-server', # For ssh key use
+                    'redis-server', 'redis-tools', # Redis tools
+                    'ubuntu-drivers-common', # For hardware drivers
+                    'python3-pip' # Pip goodness
+                    ]
+    ros_packages: [
+                   'ros-noetic-rc-genicam-driver',
+                   'ros-noetic-rc-genicam-camera',
+                   'ros-noetic-rqt-image-view',
+                   'python3-catkin-tools'
+                  ]
+    pip_packages: [
+                  ]
+
+  pre_tasks:
+    - shell: uname -s
+      ignore_errors: yes
+      register: uname_s
+
+    - shell: uname -m
+      ignore_errors: yes
+      register: uname_m
+
+    - name: Install aptitude
+      become: True
+      apt: name=aptitude state=present
+
+    - name: Fully Update System
+      become: True
+      become_user: root
+      apt: update_cache=True upgrade=full
+
+    - name: Add nvidia-drivers apt repository
+      become: True
+      apt_repository:
+        repo: ppa:graphics-drivers/ppa
+        state: present
+      tags:
+        - nuvo
+
+    - name: Install "nvidia-driver-{{ nvidia_driver_version }}"
+      become: True
+      apt:
+        name: "nvidia-driver-{{ nvidia_driver_version }}"
+        state: present
+        update_cache: yes
+      tags:
+        - nuvo
+
+    - name: Add ROS repository apt-key
+      become: True
+      apt_key:
+        url: "https://raw.githubusercontent.com/ros/rosdistro/master/ros.key"
+        state: present
+
+    - name: Add ROS repository
+      become: True
+      apt_repository:
+        repo: "deb http://packages.ros.org/ros/ubuntu {{ ansible_lsb.codename }} main"
+        state: present
+
+    - name: Install ROS
+      become: True
+      apt:
+        pkg: "ros-{{ ros_distro }}-{{ ros_package }}"
+        state: present
+
+    - name: Add ros setup sourcing to .bashrc
+      become: True
+      lineinfile:
+        path: /home/{{ ansible_user }}/.bashrc
+        state: present
+        line: "source /opt/ros/{{ ros_distro }}/setup.bash"
+
+    - name: Install required system packages
+      become: True
+      apt: name={{ sys_packages }}
+
+    - name: Install docker and enable service
+      become: True
+      shell: curl https://get.docker.com | sh && systemctl --now enable docker
+
+    - name: Update apt and install docker compose plugin
+      become: True
+      apt: update_cache=yes name=docker-compose-plugin state=latest
+
+    - name: Get nvidia-docker key
+      become: True
+      shell: |
+        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey -o /usr/share/keyrings/nvidia-container-toolkit-keyring
+        gpg --dearmor /usr/share/keyrings/nvidia-container-toolkit-keyring
+        curl -s -L https://nvidia.github.io/libnvidia-container/{{ linux_distro }}/libnvidia-container.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+      tags:
+        - nuvo
+
+    - name: Update apt and install nvidia-docker2
+      become: True
+      apt: update_cache=yes name=nvidia-docker2 state=latest
+      tags:
+        - nuvo
+
+    - name: Install Docker Module for Python (for Ansible)
+      pip:
+        name: docker
+        executable: pip3
+        extra_args: --user
+
+    - name: Restart Docker Service
+      become: True
+      service:
+        name: docker
+        state: restarted
+
+    - name: Ensure group "docker" exists
+      become: True
+      group:
+        name: docker
+        state: present
+
+    - name: Ensure group "dialout" exists
+      become: True
+      group:
+        name: dialout
+        state: present
+      tags:
+        - base
+        - nuvo
+
+    - name: "Add the user {{ ansible_user }} to group 'docker' and 'dialout'"
+      become: True
+      become_user: root
+      user:
+        name: "{{ ansible_user }}"
+        groups: ['user', 'docker', 'dialout',  'sudo']
+
+  tasks:
+    - name: Install required ros packages
+      become: True
+      apt: name={{ ros_packages }}
+
+    - name: Install tmuxinator
+      become: True
+      shell: gem install tmuxinator -v 1.1.5
+
+    - name: Install yq
+      become: True
+      get_url:
+        url: "https://github.com/mikefarah/yq/releases/download/2.4.0/yq_{{ uname_s.stdout }}_amd64"
+        dest: /usr/local/bin/yq
+        mode: '0755'
+
+    - name: Install pip packages
+      become: True
+      pip:
+        name: "{{ pip_packages }}"
+        state: latest
+        executable: pip3
+
+          #    - name: Reboot system
+          #      become: True
+          #      reboot:

@@ -1,0 +1,16 @@
+# Playbook for properly configuring individual systems
+- hosts: all
+  tasks:
+    - name: Make nuvo images
+      command:
+        chdir: "{{ kamera_dir }}"
+        cmd: make build-nuvo
+
+    - name: Make viame images
+      command:
+        chdir: "{{ kamera_dir }}"
+        cmd: make build-viame
+
+    - name: Clean dangling images
+      command:
+        cmd: docker system prune -f

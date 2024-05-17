@@ -1,0 +1,15 @@
+[Unit]
+Description=KAMERA Flight Summary Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=user
+Group=user
+ExecStart=/home/user/kw/postflight_scripts/scripts/create_flight_summary_redis.py
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill $MAINPID
+Restart=always
+
+[Install]
+WantedBy=kamera.target

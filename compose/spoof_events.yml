@@ -1,0 +1,25 @@
+---
+## Bring up the core nodes (aside from roscore)
+version: '3.7'
+services:
+  spoof_events:
+    container_name: spoof_events
+    image: gitlab.kitware.com:4567/noaa_uav/noaa_kamera/kamera/${ROS_DISTRO}:latest
+    tty: true
+    devices:
+      - "${PULSE_TTY}:${PULSE_TTY}"
+    environment:
+      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      NODE_HOSTNAME: "${NODE_HOSTNAME}"
+      DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
+    dns:
+      - "${KAMERA_DNS_IP}"
+    dns_search:
+      - kamera.systems
+    network_mode: host
+    volumes:
+      - "/mnt:/mnt"
+      - "${KAMERA_DIR}:/root/noaa_kamera"
+    entrypoint: [ "/bin/tini", "--" ]
+    command: ["/entry/spoof_events.sh"]
+...

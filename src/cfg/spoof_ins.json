@@ -1,0 +1,22 @@
+{
+  "acceleration_x": 0.111,
+  "acceleration_y": 0.222,
+  "acceleration_z": 0.333,
+  "align_status": 0,
+  "altitude": 111,
+  "angular_rate_x": 0.111,
+  "angular_rate_y": 0.222,
+  "angular_rate_z": 0.333,
+  "gnss_status": 0,
+  "heading": 17.716,
+  "latitude": 35.1592248,
+  "longitude": -98.451035,
+  "north_velocity": 72.000,
+  "east_velocity": 23.000,
+  "down_velocity": -11.000,
+  "pitch": 8.429,
+  "roll": 0.0314159,
+  "time": 1615994576.517207,
+  "total_speed": 76.38,
+  "track_angle": 0.0
+}

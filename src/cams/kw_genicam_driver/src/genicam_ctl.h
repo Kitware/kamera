@@ -1,0 +1,8 @@
+//
+// Created by Michael McDermott on 1/27/21.
+//
+
+#ifndef KW_GENICAM_DRIVER_GENICAM_CTL_H
+#define KW_GENICAM_DRIVER_GENICAM_CTL_H
+
+#endif //KW_GENICAM_DRIVER_GENICAM_CTL_H

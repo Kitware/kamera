@@ -1,0 +1,38 @@
+---
+## container configuration for viame interactive building
+# use compose v2 to use runtime config
+version: '2.4'
+
+services:
+## ========================== viame =============================
+  detector:
+    container_name: "viame-${CAM_FOV}"
+    image: "gitlab.kitware.com:4567/noaa_uav/noaa_kamera/final/viame-kamera:${TAG_VIAME_KAMERA:-latest}"
+    tty: true
+    environment:
+      REDIS_HOST: "${REDIS_HOST}"
+      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      NODE_HOSTNAME: "${NODE_HOSTNAME:-}"
+      ROS_IP: "${ROS_IP:-}"
+      PRODUCER_HOST: "${PRODUCER_HOST:-}"
+      DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
+      PIPEFILE: "${PIPEFILE}"
+    dns:
+      - "${KAMERA_DNS_IP}"
+    dns_search:
+      - kamera.systems
+    network_mode: host
+    volumes:
+      - "/mnt/data:/mnt/data"
+      - "/mnt/flight_data:/mnt/flight_data"
+      - "${PWD}/src:${PROJ_DIR}/src:ro"
+      - "${PWD}/src/run_scripts/entry:/entry:ro"
+    entrypoint: ["/tini", "--"]
+    restart: on-failure
+    command: ["/entry/viame.sh"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+...

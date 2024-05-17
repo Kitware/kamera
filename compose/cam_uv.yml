@@ -1,0 +1,28 @@
+---
+## Auxiliary node to attach to master
+version: '3.7'
+services:
+  ## =========================== headless nodes =============================
+  cam_uv:
+    container_name: "cam-uv-${CAM_FOV}"
+    image: "gitlab.kitware.com:4567/noaa_uav/noaa_kamera/kamera/${ROS_DISTRO}:${TAG_CAM_UV:-latest}"
+    tty: true
+    environment:
+      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      REDIS_HOST: "${REDIS_HOST}"
+      ROS_DISTRO: "noetic"
+      NODE_HOSTNAME: "${NODE_HOSTNAME}"
+      CAM_MODE: "uv"
+      CAM_FOV: "${CAM_FOV}"
+    dns:
+      - "${KAMERA_DNS_IP}"
+    dns_search:
+      - kamera.systems
+    network_mode: host
+    volumes:
+      - "/mnt:/mnt"
+      - "${KAMERA_DIR}:/root/noaa_kamera"
+    entrypoint: ["/bin/tini", "--"]
+    command: ["/entry/cam_prosilica.sh", "uv"]
+    restart: always
+...

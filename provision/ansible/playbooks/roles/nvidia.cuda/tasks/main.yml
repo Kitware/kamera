@@ -1,0 +1,54 @@
+---
+- name: Add NVIDIA repository apt-key
+  apt_key:
+    url: "{{ cuda_apt_key }}"
+    state: present
+
+- name: Check if {{ cuda_repo_package }} is installed
+  command: dpkg-query -W {{ cuda_repo_package }}
+  register: cuda_repo_package_check
+  failed_when: cuda_repo_package_check.rc > 1
+  changed_when: cuda_repo_package_check.rc == 1
+
+- name: Download {{ cuda_repo_deb_url }}
+  get_url:
+    url="{{ cuda_repo_deb_url }}"
+    dest="/tmp/{{ cuda_repo_package }}.deb"
+  when: cuda_repo_package_check.rc == 1
+
+- name: Install {{ cuda_repo_package }}
+  apt: deb="/tmp/{{ cuda_repo_package }}.deb"  update_cache=True
+  become: true
+  become_user: root
+  when: cuda_repo_package_check.rc == 1
+
+- name: Install NVIDIA Driver Version {{ cuda_nvidia_driver_version }}
+  become: true
+  become_user: root
+  apt: name=nvidia-driver-{{ cuda_nvidia_driver_version }} update_cache=True
+
+- name: Pin NVIDIA Driver Version
+  become: true
+  become_user: root
+  when: cuda_pin_versions
+  dpkg_selections:
+    name: nvidia-driver-{{ cuda_nvidia_driver_version }}
+    selection: hold
+
+- name: Install Cuda-Driver Version {{ cuda_driver_version }}
+  become: true
+  become_user: root
+  apt: name=cuda-drivers={{ cuda_driver_version }} update_cache=True
+
+- name: Pin Cuda Driver Version
+  become: true
+  become_user: root
+  when: cuda_pin_versions
+  dpkg_selections:
+    name: cuda-drivers
+    selection: hold
+
+- name: Install CUDA Packages
+  become: True
+  become_user: root
+  apt: name={{ cuda_package }} update_cache=True

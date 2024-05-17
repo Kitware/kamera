@@ -1,0 +1,277 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# Software License Agreement (BSD License)
+#
+# Copyright (c) 2016, Rein Appeldoorn
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above
+#    copyright notice, this list of conditions and the following
+#    disclaimer in the documentation and/or other materials provided
+#    with the distribution.
+#  * Neither the names of the authors nor the names of their
+#    affiliated organizations may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+# COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+# ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+import os
+import errno
+import socket
+from socket import error as socket_error
+import sys
+import time
+import struct
+import serial
+import datetime
+
+import redis
+import rospy
+import std_msgs.msg
+from libnmea_navsat_driver.gsof import (parse_gsof_stream, maybe_gsof, separate_nmea, GsofInsDispatch,
+                                        GsofEventDispatch, GsofSpoofEventDispatch, GsofSpoofInsDispatch,
+                                        GsofEvtSpoofer, GsofHeader, parse_gsof)
+
+from custom_msgs.msg import Stat
+from msgdispatch.archive import ArchiveSchemaDispatch
+from nexus.archiver_core import ArchiverBase
+from libnmea_navsat_driver.stream_archive import dumpbuf, enumerate_packets
+# import libnmea_navsat_driver.driver
+from kamcore.datatypes import ToDictMxn, TryIntoAttrMxn, DefaultInitializer, _Stamp, _Header
+from roskv.impl.redis_envoy import RedisEnvoy, redis_encode
+
+
+# from vprint import aprint
+# from vprint.base256 import b256encode
+
+
+def rospy_spin(delay=1.0):
+    """
+    Blocks until ROS node is shutdown. Yields activity to other threads.
+    @raise ROSInitException: if node is not in a properly initialized state
+    """
+
+    if not rospy.core.is_initialized():
+        raise rospy.exceptions.ROSInitException("client code must call rospy.init_node() first")
+    rospy.logdebug("node[%s, %s] entering spin(), pid[%s]", rospy.core.get_caller_id(), rospy.core.get_node_uri(),
+             os.getpid())
+    try:
+        while not rospy.core.is_shutdown():
+            rospy.rostime.wallsleep(delay)
+            # rospy.loginfo('spin')
+            # print('.', end='')
+    except KeyboardInterrupt:
+        rospy.logdebug("keyboard interrupt, shutting down")
+        rospy.core.signal_shutdown('keyboard interrupt')
+
+
+class DummyDriver(object):
+    def add_sentence(self, sentence, frame_id, *args, **kwargs):
+        print('{:5d}: {}'.format(frame_id, sentence))
+
+
+def loginfo(msg, *args, **kwargs):
+    # rospy.loginfo(msg, *args, **kwargs)
+    print('info: {}'.format(msg))
+
+
+def logwarn(msg, *args, **kwargs):
+    # rospy.loginfo(msg, *args, **kwargs)
+    print('warn: {}'.format(msg))
+
+
+def logerr(msg, *args, **kwargs):
+    # rospy.loginfo(msg, *args, **kwargs)
+    print('err : {}'.format(msg))
+
+
+class Rate(object):
+    def __init__(self, rate=5):
+        self.rate = rate
+
+    def set_rate(self, msg):
+        self.rate = msg.data
+
+    @property
+    def period(self):
+        return 1.0 / self.rate
+
+class FailedToInitInsDriver(Exception):
+    def __init__(self, msg=None, host='', port=0, exc=None):
+        # type: (str, str, int, Exception) -> None
+        """
+        Error for failing to initially connect to NMEA server. This is extra
+        bad, so we want to handle this outside regular socket errors
+        :param msg: custom error message
+        """
+        if msg is None:
+            msg = ('Failed to initialize INS socket client on host {}:{}'
+                  '\n Is the INS connected?'.format(host, port))
+        if exc is not None:
+            msg += '\nOriginal exception: {}'.format(exc)
+        super(FailedToInitInsDriver, self).__init__(msg)
+
+
+class AvxSpoofClient(object):
+
+    def __init__(self):
+        redis_host = os.environ.get('REDIS_HOST', 'nuvo0')
+        self.envoy = RedisEnvoy(redis_host, client_name='ins')
+
+        print('redis established, term: {}'.format(self.envoy.get('term')))
+        self._data_mount_point = rospy.get_param('/data_mount_point', '/mnt/ins_default')
+        self._host = rospy.get_param('/host_center', '/nuvo0')
+        self._project = 'default2019'
+        self._flight = 'fl00'
+        self.archiver = ArchiverBase()
+        self.evt_spoofer = GsofEvtSpoofer()
+
+        namespace = rospy.get_name()
+        namespace = self._host
+        self.archiver.advertise_services(namespace=namespace)
+        rospy.loginfo('Namespace: {}'.format(namespace))
+
+    def cb_trig_pub(self, header):
+        event_arrived = rospy.Time.now()
+        fake_packet = self.evt_spoofer.next_packet()
+        header = GsofHeader(fake_packet)
+        dispatch = parse_gsof(header, fake_packet)
+        dispatch.msg.sys_time = event_arrived
+        dispatch.publish()
+        ins_dispatch = GsofSpoofInsDispatch()
+        ins_dispatch.publish()
+
+    def run(self, host, port, buffer_size=4096, timeout=2.0):
+        # disabling NMEA driver cause it's janky and running both binary and NMEA really confuses the parser
+        # driver = libnmea_navsat_driver.driver.RosNMEADriver()
+        GsofInsDispatch.add_publisher('/ins')
+        GsofEventDispatch.add_publisher('/event')
+        # GsofSpoofEventDispatch.add_publisher('event') # todo
+        # recv-loop: When we're connected, keep receiving stuff until that fails
+        counter = 0
+        for rawdata in gen_packets(host, port):
+            event_arrived = rospy.Time.now()
+            if rospy.is_shutdown():
+                break
+
+            raw_ins_path = self.archiver.get_raw_ins_path()
+            if not (counter % 500):
+                rospy.loginfo('Ins path: {}'.format(raw_ins_path))
+            counter += 1
+
+            # todo: optionally archive stream
+#            dumpbuf(raw_ins_path, rawdata)
+
+            nmea_list, gsof_data = separate_nmea(rawdata)
+            #aprint(nmea_list)
+            # aprint(str(len(gsof_data)) + '[' + b256encode(gsof_data) + ']')
+
+            # if nmea_list:
+            #     for nmea in nmea_list:
+            #         driver.add_sentence(nmea)
+            dispatches = []
+            if maybe_gsof(gsof_data):
+                try:
+                    dispatches = parse_gsof_stream(gsof_data)
+                except struct.error as err:
+                    rospy.logerr("Gsof parse error: {}".format(err))
+                except Exception as err:
+                    rospy.logerr("Some other exception in parsing: {}".format(err))
+                #aprint(dispatch.msg)
+                for d in dispatches:
+                    # print(d)
+                    d.msg.sys_time = event_arrived
+                    d.publish()
+#                    dumpbuf(self.archiver.get_raw_ins_path(field=d.label), d.buf)
+
+
+                # evt = GsofSpoofEventDispatch()
+                # evt.publish()
+
+
+            # ignoring NMEA for now
+
+
+if __name__ == '__main__':
+    rospy.init_node('ins_socket_driver')
+    allow_serial_ins_spoof = int(os.environ.get('ALLOW_SERIAL_INS_SPOOF', 0) or 0)
+    try:
+        host = rospy.get_param('~ip', '0.0.0.0')
+        port = rospy.get_param('~port', 10110)
+        buffer_size = rospy.get_param('~buffer_size', 4096)
+        timeout = rospy.get_param('~timeout_sec', 2)
+        # spoof = rospy.get_param('spoof_rate', 0) or rospy.get_param('~spoof')
+        spoof_rate = max(int(os.environ.get('SPOOF_RATE', 0) or 0), 0)
+
+        replay_path = rospy.get_param('~replay')
+        retry = rospy.get_param('~retry', True)
+    except KeyError as e:
+        rospy.logerr("Parameter %s not found" % e)
+        sys.exit(1)
+
+    client = AvxSpoofClient()
+    pulse_tty = os.environ.get('PULSE_TTY', None)
+    if allow_serial_ins_spoof:
+        rospy.logwarn("ALLOW_SERIAL_INS_SPOOF ON. Serial-based spoof active")
+        try:
+            ser = serial.Serial(pulse_tty)
+        except Exception as exc:
+            ser = None
+            rospy.logerr('Unable to find tty: {}'.format(pulse_tty))
+            sys.exit(1)
+
+        if ser:
+            print('Serial connected: {}'.format(ser.name))
+            client.spoof_serial(ser)
+            sys.exit(0)
+
+    if spoof_rate > 0 :
+        rospy.logwarn("\nGlobal spoof enabled. \nSPOOF_RATE={:.3f}".format(spoof_rate))
+        print("SPOOOOOOOF: {:.2f}".format(spoof_rate))
+        client.spoof(spoof_rate)
+        sys.exit(0)
+    elif replay_path:
+        rospy.logwarn("\nReplay INS \nreplay_path={}".format(replay_path))
+        client.replay(replay_path)
+        sys.exit(0)
+
+    while not rospy.is_shutdown():
+        try:
+            client.run(host, port, buffer_size, timeout)
+
+        except FailedToInitInsDriver as err:
+            rospy.logerr('Failed to connect to INS: {}'.format(err))
+            if retry:
+                rospy.logwarn('Gracefully attempting to reconnect to INS...')
+                time.sleep(1)
+            else:
+                rospy.logerr('Gave up trying to connect to INS, terminating')
+                raise err
+        except socket_error as err:
+            rospy.logerr('Other socket error trying to connect to INS: {}'.format(err))
+            raise err
+        except (KeyboardInterrupt, SystemExit):
+            rospy.loginfo('User quitting')
+            sys.exit(130)
+        except Exception as err:
+            print(type(err))
+            #import pdb; pdb.set_trace()
+            rospy.logerr('Encountered exception, continuing: {}'.format(err))

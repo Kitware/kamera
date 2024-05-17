@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Simulate all cameras for all systems -->
+<launch>
+  <!-- Settings applied to all cameras -->
+  <arg name="frame_rate" default="4"/>
+
+  <include file="$(find sensor_simulator)/launch/simulate_cameras_one_sys.launch">
+    <arg name="sysidx" value="0"/>
+    <arg name="frame_rate" value="$(arg frame_rate)"/>
+  </include>
+  <include file="$(find sensor_simulator)/launch/simulate_cameras_one_sys.launch">
+    <arg name="sysidx" value="1"/>
+    <arg name="frame_rate" value="$(arg frame_rate)"/>
+  </include>
+  <include file="$(find sensor_simulator)/launch/simulate_cameras_one_sys.launch">
+    <arg name="sysidx" value="2"/>
+    <arg name="frame_rate" value="$(arg frame_rate)"/>
+  </include>
+</launch>

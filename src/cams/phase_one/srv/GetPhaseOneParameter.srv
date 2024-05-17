@@ -1,0 +1,12 @@
+# Description: Get the value of a PhaseOne parameter.
+
+# Name of the parameter
+string name
+
+---
+
+# Value of the parameter converted to a string
+string value
+
+# Return code
+string message

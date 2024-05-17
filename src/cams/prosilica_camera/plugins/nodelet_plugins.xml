@@ -1,0 +1,13 @@
+<library path="lib/libprosilica_nodelet">
+    <class name="prosilica_camera/ProsilicaNodelet" type="prosilica_camera::ProsilicaNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      A nodelet version of the prosilica camera driver
+    </description>
+</class>
+<class name="prosilica_camera/ViewServerNodelet" type="prosilica_camera::ViewServerNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Nodelet for displaying parts of images.
+    </description>
+  </class>
+</library>
+

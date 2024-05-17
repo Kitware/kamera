@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Launches testing node -->
+<launch>
+    <arg name="platform_ns" default="support"/>
+    <arg name="topic" default="daq"/>
+    <!-- -->
+    <group ns="$(arg platform_ns)">
+        <node name="testusb" pkg="mcc_daq" type="ctest-usb2408" respawn="false" output="screen">
+            <!-- Topic to publish on -->
+            <param name="topic" type="str" value="$(arg topic)"/>
+        </node>
+    </group>
+    <!-- end group $(arg platform_ns)" -->
+</launch>

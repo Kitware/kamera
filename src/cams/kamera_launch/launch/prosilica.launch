@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+    <!-- Namespace to publish in - defined by which bank of the camera array the camera belongs to -->
+    <arg name="sysidx" default="0"/>
+    <arg name="system_name" default="subsys$(arg sysidx)" />
+    <arg name="sys_namespace" default="/$(arg system_name)" />
+
+    <arg name="cameratype" default="rgb" doc="can be 'rgb' or 'uv'"/>
+    <arg name="namespace" default="$(arg sys_namespace)/$(arg cameratype)" />
+
+    <arg name="GainMode" default="Manual" doc="Enum {Auto, Manual} "/>
+    <arg name="GainValue" default="0" doc="Number 0-24ish to set gain intensity"/>
+    <!-- You can select the camera to open by its GUID or IP address. In some cases
+         if the camera is connected through a switch (not visible to ListCameras),
+         it may only be possible to open a camera by its fixed IP address.
+
+         For help configuring your camera or determining its IP address, see
+         http://www.ros.org/wiki/prosilica_camera/Tutorials.
+
+         By default, when neither argument is set, open the first camera found.
+         If both are set, open by IP address and verify the GUID matches.
+    -->
+
+    <!-- Settings for external sync (actual parameter names don't match driver
+    TriggerSelector: FrameStart
+    TriggerMode: On
+    TriggerSource: Line2
+    TriggerActivation: RisingEdge
+
+    ExposureMode: Timed
+    ExposureTimeAbs: 20000
+    ExposureAuto: Off
+    ExposureAutoTarget: 50
+    ExposureAutoMax: 50000
+
+    Stock available params:
+    trigger_mode, auto_exposure, exposure, auto_gain, gain,
+    auto_whitebalance, whitebalance_red, whitebalance_blue, binning_x,
+    binning_y, x_offset, y_offset, width, height, frame_id, trig_timestamp_topic
+    trig_rate, auto_adjust_stream_bytes_per_second, stream_bytes_per_second
+    exposure_auto_max, exposure_auto_target, gain_auto_max, gain_auto_target
+    -->
+    <arg name="guid" default=""/>
+    <arg name="ip" default=""/>
+
+    <!-- Trigger mode: 'streaming' or 'polled' -->
+    <arg name="trigger_mode" default="syncin2" doc="TriggerMode for Prosilica camera. See prosilica.launch"/>
+
+    <!-- Field-of-View (left/right/center) associated with this camera -->
+    <arg name="cam_fov" default="no_fov"/>
+    <arg name="frame_id" default="/$(arg cam_fov)/$(arg cameratype)"/>
+
+    <arg name="exposure_auto_max" default="0.1"/>
+    <arg name="exposure" default="0.01"/>
+    <arg name="norespawn" default="false"/>
+    <arg name="respawn"  value="true" unless="$(arg norespawn)"/>
+    <arg name="respawn"  value="false" if="$(arg norespawn)"/>
+
+  <group ns="$(arg namespace)">
+    <node pkg="nodelet"
+          type="nodelet"
+          name="prosilica_manager"
+          args="manager"
+          output="screen"/>
+
+    <node pkg="nodelet"
+          type="nodelet"
+          name="$(arg cameratype)_driver"
+          args="load prosilica_camera/ProsilicaNodelet prosilica_manager"
+          output="screen"
+          required="$(arg norespawn)"
+          respawn="$(arg respawn)">
+        <!-- underlying driver namespace shenanigans -->
+            <remap from="camera" to="$(arg cameratype)"/>
+
+            <param name="guid" type="str" value="$(arg guid)"/>
+            <param name="ip_address" type="str" value="$(arg ip)"/>
+            <param name="trigger_mode" value="$(arg trigger_mode)"/>
+            <param name="frame_id" value="$(arg frame_id)"/>
+            <param name="cam_chan" value="$(arg cameratype)" />
+            <param name="cam_fov" value="$(arg cam_fov)" />
+            <param name="respawn" value="$(arg respawn)" />
+
+            <param name="GainMode" type="str" value="$(arg GainMode)"/>
+            <param name="GainValue" type="int" value="$(arg GainValue)"/>
+            <!--<param name="exposure" value="$(arg exposure)" type="double"/>-->
+
+            <param name="exposure_auto_max" value="$(arg exposure_auto_max)" type="double"/>
+        </node>
+    </group>
+</launch>

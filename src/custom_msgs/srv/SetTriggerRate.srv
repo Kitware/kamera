@@ -1,0 +1,8 @@
+# Trigger rate [Hz].
+float64 rate
+
+---
+# Response
+
+# Indicates whether the action was successful.
+bool success

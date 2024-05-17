@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+    <arg name="system_name" default="sys0" />
+    <arg name="sys_namespace" default="/$(arg system_name)" />
+
+  <arg name="namespace" default="$(arg sys_namespace)/gige_scan" />
+
+  <arg name="node_name_suffix" default="" />
+  <arg name="info_verbosity" default="0" doc="Verbosity level for ROSINFO print statements. 0=all info silent" />
+
+  <!-- Connect to a camera by serial number, known IP address, manufacturer name, or username -->
+  <arg name="camera_serial" default="" />
+  <arg name="camera_ipv4" default="" />
+  <arg name="camera_username" default="" />
+  <arg name="camera_manufacturer" default="" />
+  <arg name="camera_mac" default="" />
+
+  <!-- Optionally display debug logging. -->
+  <arg name="debug" default="false" />
+
+  <group ns="$(arg namespace)">
+    <node pkg="kw_genicam_driver" type="gige_scan"
+          name="gige_scan_$(arg node_name_suffix)"
+          output="screen" >
+      <!-- Parameters here -->
+      <param name="info_verbosity" value="$(arg info_verbosity)" type="int"/>
+      <param name="camera_serial" value="$(arg camera_serial)" />
+      <param name="camera_ip_addr" value="$(arg camera_ipv4)" />
+      <param name="camera_username" value="$(arg camera_username)" />
+      <param name="camera_manufacturer" value="$(arg camera_manufacturer)" />
+      <param name="camera_mac" value="$(arg camera_mac)" />
+
+    </node>
+  </group>
+
+</launch>

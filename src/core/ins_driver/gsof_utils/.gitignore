@@ -1,0 +1,63 @@
+
+## ansible
+*.retry
+
+
+# virtual env
+venv
+.virtualenv
+
+# file dependencies
+deps
+
+
+# build tool junk
+cmake-build-debug
+.catkin_tools
+.cmake
+.config
+build
+devel
+logs
+
+# Distribution / packaging
+node_modules
+*.whl
+.Python
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+dist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+.cache
+*.pyc
+.python_history
+
+
+# junk from docker
+*ash_history
+.ros
+.dbus
+.local
+
+# ros output
+output
+
+# IDE
+**/.idea
+**/.vscode
+**/cmake-build-*
+**/.ipython

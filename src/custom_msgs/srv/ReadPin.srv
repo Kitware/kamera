@@ -1,0 +1,11 @@
+## Read a GPIO pin from a device
+
+# Pin to read
+int32 pin
+
+---
+# Response
+
+# reading from pin. use 1.0/0.0 for digital pins
+float64 value
+

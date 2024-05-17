@@ -1,0 +1,10 @@
+#!/usr/bin/env python
+
+import sys
+
+from rqt_sprokit_adapter.sprokit_adapter import SprokitAdapter
+from rqt_gui.main import Main
+
+plugin = 'rqt_sprokit_adapter.sprokit_adapter.SprokitAdapter'
+main = Main(filename=plugin)
+sys.exit(main.main(standalone=plugin,plugin_argument_provider=SprokitAdapter.add_arguments))

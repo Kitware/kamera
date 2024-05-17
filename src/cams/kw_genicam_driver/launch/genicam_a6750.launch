@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+    <arg name="sysidx" default="0"/>
+    <arg name="system_name" default="nuvo$(arg sysidx)" />
+    <arg name="sys_namespace" default="/$(arg system_name)" />
+
+  <arg name="cameratype" default="ir" doc="do not change"/>
+  <arg name="cam_fov" default="no_fov" doc="camera's field-of-view name"/>
+  <arg name="namespace" default="$(arg sys_namespace)/$(arg cameratype)" />
+
+  <arg name="node_name_suffix" default="" />
+  <arg name="info_verbosity" default="0" doc="Verbosity level for ROSINFO print statements. 0=all info silent" />
+
+  <arg name="firmware_mode" default="mono16" doc="Firmware mode (pixel encoding) to run in. This must match the
+      firmware type on the camera to connect to.
+      { mono8, mono16 }" />
+  <arg name="trigger_source" default="External" doc="Set source of trigger signal. This is the primary parameter for
+      setting how the frames are captured.
+      { Internal, External, Software, IRIG }" />
+  <arg name="ir_format" default="TemperatureLinear10mK" doc="Scaling format of output data.
+      { Radiometric, TemperatureLinear100mK, TemperatureLinear10mK }" />
+
+  <!--These parameters might be auto-set in the future -->
+  <arg name="trigger_mode" default="FreeRun" doc="Determines what behavior a trigger signal evokes.
+      Directly setting not recommended.
+      { FreeRun, TriggeredFreeRun, TriggeredSequence, TriggeredPresetAdvance }" />
+  <arg name="frame_sync_source" default="External" doc="Set source of frame sync.
+      Directly setting not recommended.
+      { Internal, External, Video }" />
+  <arg name="cam_type" default="6750" doc="Set model type of the FLIR camera.
+      Modifies how parameters are sent to the Genicam interface
+      { 6750, 6xx }" />
+  <!-- Connect to a camera by serial number, known IP address, manufacturer name, or username -->
+  <arg name="camera_serial" default="" />
+  <arg name="camera_ipv4" default="" />
+  <arg name="camera_username" default="" />
+  <arg name="camera_manufacturer" default="" />
+  <arg name="camera_mac" default="" />
+
+
+  <!-- Optional path to an an XML features file to initialize internal access
+       to the GenICam GenApi.  If not provided (blank string) we retrieve this
+       XML file from the camera itself. -->
+  <arg name="xmlFeatures_filepath" default="" />
+  <!-- If the auto-brightness feature is should be enabled. -->
+  <arg name="xmlFeatures_autoBrightness" default="false" />
+  <!-- Target level of the auto brightness feature.  0-255. -->
+  <arg name="xmlFeatures_autoBrightnessTarget" default="128" />
+  <!-- BalanceWhiteAuto:  0 - Off, 1 - On Demand, 2 - Periodic -->
+  <arg name="xmlFeatures_BalanceWhiteAuto" default="0" />
+  <!-- Number of image buffers to allocate on this machine.
+       These buffers are filled by the image acquisition process in the order
+       they are released as well as until available buffers are full. If there
+       are no more buffers available, received images are dropped until a
+       buffer is cleared. -->
+  <arg name="imageTransfer_numImageBuffers" default="1" />
+  <!-- Timeout in milliseconds to wait for the next image after starting the
+       image acquisition stream. -->
+  <arg name="nextImage_timeout" default="1000" />
+  <!-- Optionally percent of the output image to crop off from the top of the image. -->
+  <arg name="output_image_crop_top_row" default="-1" />
+  <!-- Optionally percent of the output image to crop off from the bottom of the image. -->
+  <arg name="output_image_crop_bot_row" default="-1" />
+  <!-- Frame ID string to set in outgoing messages. -->
+  <arg name="frame_id" default="/$(arg cam_fov)/$(arg cameratype)" />
+  <!-- Topic to output raw imagery from the camera. Imagery type depends on the
+       firmwar installed on the camera. -->
+  <arg name="output_topic_raw" default="image_raw" />
+  <!-- If the firmware installed (and mode) is bayer, optionally also debayer
+       the imagery and output it on this topic. This outputs BGR8 images. -->
+  <arg name="output_topic_debayer" default="" />
+  <arg name="output_frame_rate" default="3.0" doc="Framerate to access images from the camera. This actually sets an
+       acquisition rate on the camera itself."/>
+
+  <arg name="norespawn" default="true"/>
+  <arg name="respawn"  value="true" unless="$(arg norespawn)"/>
+  <arg name="respawn"  value="false" if="$(arg norespawn)"/>
+
+  <!-- Optionally display debug logging. -->
+  <arg name="debug" default="false" />
+  <env if="$(arg debug)"
+       name="ROSCONSOLE_CONFIG_FILE"
+       value="$(find kw_genicam_driver)/config/debug_rosconsole.conf" />
+
+  <group ns="$(arg namespace)">
+    <node pkg="kw_genicam_driver" type="a6750_driver_node"
+          name="kw_genicam_a6750_driver_node$(arg node_name_suffix)" output="screen"
+          required="$(arg norespawn)" respawn="$(arg respawn)">
+      <!-- Parameters here -->
+      <param name="info_verbosity" value="$(arg info_verbosity)" type="int"/>
+
+      <param name="firmware_mode" value="$(arg firmware_mode)" />
+      <param name="trigger_source" value="$(arg trigger_source)" />
+      <param name="ir_format" value="$(arg ir_format)" />
+
+      <param name="trigger_mode" value="$(arg trigger_mode)" />
+      <param name="frame_sync_source" value="$(arg frame_sync_source)" />
+      <param name="cam_type" value="$(arg cam_type)" type="string"/>
+
+      <param name="camera_serial" value="$(arg camera_serial)" />
+      <param name="camera_ip_addr" value="$(arg camera_ipv4)" />
+      <param name="camera_username" value="$(arg camera_username)" />
+      <param name="camera_manufacturer" value="$(arg camera_manufacturer)" />
+      <param name="camera_mac" value="$(arg camera_mac)" />
+
+
+      <param name="xmlFeatures_filepath" value="$(arg xmlFeatures_filepath)" />
+      <param name="xmlFeatures_autoBrightness" value="$(arg xmlFeatures_autoBrightness)" type="bool" />
+      <param name="xmlFeatures_autoBrightnessTarget" value="$(arg xmlFeatures_autoBrightnessTarget)" type="int" />
+      <param name="xmlFeatures_BalanceWhiteAuto" value="$(arg xmlFeatures_BalanceWhiteAuto)" type="int" />
+      <param name="imageTransfer_numImageBuffers" value="$(arg imageTransfer_numImageBuffers)" type="int" />
+      <param name="nextImage_timeout" value="$(arg nextImage_timeout)" type="int" />
+      <param name="output_image_crop_top_row" value="$(arg output_image_crop_top_row)" type="int" />
+      <param name="output_image_crop_bot_row" value="$(arg output_image_crop_bot_row)" type="int" />
+      <param name="frame_id" value="$(arg frame_id)" />
+      <param name="output_topic_raw" value="$(arg output_topic_raw)" />
+      <param name="output_topic_debayer" value="$(arg output_topic_debayer)" />
+      <param name="output_frame_rate" value="$(arg output_frame_rate)" type="double" />
+    </node>
+  </group>
+
+</launch>

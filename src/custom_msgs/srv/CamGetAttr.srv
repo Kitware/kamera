@@ -1,0 +1,14 @@
+# Get attribute from a camera
+string name
+
+---
+# Response
+
+# See PvApi.h. 0 if call succeed, enum val if err, e.g. can't find attribute
+int32 tPvErr
+
+# String-ified format of value
+string value
+
+# Type of the `value` field
+string dtype

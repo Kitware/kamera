@@ -1,0 +1,4 @@
+# Playbook to perform all steps of provisioning
+- import_playbook: provision.yml
+- import_playbook: configure.yml
+- import_playbook: build.yml

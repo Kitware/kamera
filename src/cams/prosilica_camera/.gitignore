@@ -1,0 +1,6 @@
+# ide junk
+.idea
+.vscode
+
+cfg/cpp
+src/prosilica_camera

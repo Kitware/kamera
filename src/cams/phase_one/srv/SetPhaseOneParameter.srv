@@ -1,0 +1,10 @@
+# Description: Set the values of PhaseOne parameters.
+
+# One or more PhaseOne <name>=<value> pair, separated by commas
+string parameters
+
+---
+
+# Return code
+string message
+

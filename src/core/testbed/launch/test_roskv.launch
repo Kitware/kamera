@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+
+  <arg name="info_verbosity" default="0" doc="Verbosity level for ROSINFO print statements. 0=all info silent" />
+  <!-- Optionally display debug logging. -->
+  <arg name="debug" default="false" />
+
+  <group ns="test">
+    <node pkg="testbed" type="test_roskv_node" required="true"
+          name="test_roskv" output="screen">
+    </node>
+  </group>
+
+</launch>

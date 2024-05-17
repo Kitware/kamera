@@ -1,0 +1,35 @@
+# The type of camera model.
+model_type: standard
+
+# Image dimensions
+image_width: 640
+image_height: 512
+
+# Focal length along the image's x-axis.
+fx: 1681.1171203185347
+
+# Focal length along the image's y-axis.
+fy: 1681.1171203185347
+
+# Principal point is located at (cx,cy).
+cx: 320.0
+cy: 256.0
+
+# Distortion coefficients following OpenCv's convention
+distortion_coefficients: [0.0, 0.0, 0.0, 0.0]
+
+# Quaternion specifying the orientation of the camera relative to the
+# navigation coordinate system. The quaternion represents a coordinate system
+# rotation that takes the navigation coordinate system and rotates it into the
+# camera coordinate system.
+camera_quaternion: [-0.00097259209895627372, -0.0042199309122074747, 0.70144572400044503, 0.7127097182789055, 1681.1171203185347]
+
+# Position of the camera's center of projection within the navigation
+# coordinate system.
+camera_position: [0, 0, 0]
+
+# Topic on which this camera's image is published
+image_topic: /support/camera/ir/image_raw
+
+# The frame_id embedded in the published image header.
+frame_id: /v4l_frame

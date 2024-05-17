@@ -1,0 +1,19 @@
+<launch>
+  <node pkg="nodelet"
+        type="nodelet" 
+        name="phase_one_manager"  
+        args="manager" 
+        output="screen"/>
+  <node pkg="nodelet" 
+        type="nodelet"
+        name="PhaseOneNodelet"
+        args="load phase_one/PhaseOneNodelet phase_one_manager" 
+        output="screen">
+  </node>
+  <node pkg="nodelet" 
+        type="nodelet"
+        name="ViewServerNodelet"
+        args="load phase_one/ViewServerNodelet phase_one_manager" 
+        output="screen">
+  </node>
+</launch>

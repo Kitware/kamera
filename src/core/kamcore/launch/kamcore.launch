@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <!--This is kind of deprecated since we can rosparam load from entrypoint -->
+  <arg name="sysidx" default="0"/>
+  <arg name="sys_namespace" default="/nuvo$(arg sysidx)"/>
+  <arg name="node_name" default="kamcore"/>
+  <group ns="/kamcore">
+    <node name="$(arg node_name)" pkg="kamcore" type="kamcore_node.py" respawn="true" output="screen">
+    </node>
+  </group>
+  <!-- end group sys_namespace -->
+</launch>

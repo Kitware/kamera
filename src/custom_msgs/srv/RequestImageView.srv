@@ -1,0 +1,61 @@
+# This service provides a view into imagery available on a remote system where
+# the overhead of transporting the full-resolution imagery is too expensive.
+# This service allows a downsampled or cropped version of the high-resolution
+# imagery to be requested.
+
+# The 3x3 homography that takes output-image coordinates and returns the
+# associated full-resolution image coordinates. This array will be of length 9,
+# where the homography matrix values is unraveled row by row.
+float64[] homography
+
+# Define the height and width of the returned image.
+int32 output_height
+int32 output_width
+
+# Interpolation algorithm: 0 - nearest neighbor, 1 - linear, 3 - cubic, 4 -
+# Lanczos4
+int8 interpolation
+
+# Indicates whether anti-aliasing should be done in cases where image
+# downsampling occurs. The additional processing on the image server required
+# for the anti-aliasing may substantially increase response latency in some
+# cases.
+bool antialias
+
+# Indicates whether to show saturated pixels as red
+bool show_saturated_pixels
+
+# Indicates whether to apply clahe to image
+bool apply_clahe
+
+# How aggressively to apply clahe
+int32 contrast_strength
+
+# Indicates which frame the image is being sent for (for caching purposes)
+string frame
+
+
+# Image header of most recently received image, or blank. Used to determine caching/
+# blocking behavior of imageview server.
+std_msgs/Header last_header
+
+# Don't wait, return response immediately
+# The default is to wait for image updates, so that the system doesn't free-run
+
+# normal priority image request
+uint8 RELEASE_NONE=0
+# release all threads at the barrier with negative signal
+uint8 RELEASE_INVALIDATE=1
+# release all threads at the barrier with positive signal
+uint8 RELEASE_ALL=2
+# release all threads at the barrier and return immediately
+uint8 RELEASE_NOWAIT=3
+uint8 release
+---
+# Response
+
+# Indicates whether the request was successfully serviced.
+bool success
+
+# Image.
+sensor_msgs/Image image

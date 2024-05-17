@@ -1,0 +1,18 @@
+# This service provides warping of a detection bounding boxes from a source 
+# image coordinate system to a destination image coordinate system.
+
+# List of detection bounding boxes to transform from the source frame_id to 
+# the destination frame_id.
+ImageSpaceDetectionList src_detections
+
+# Destination image coordinate system.
+string dst_frame_id
+---
+# Response
+
+# Indicates whether the inspection was successful.
+bool success
+
+# Defines the window that was actually inspected.
+ImageSpaceDetectionList dst_detections
+

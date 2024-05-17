@@ -1,0 +1,21 @@
+# Playbook for properly configuring individual systems
+- hosts: all
+  tasks:
+    - name: Clone kamera repo
+      git:
+        repo: "git@gitlab.kitware.com:noaa_uav/noaa_kamera.git"
+        dest: "{{ kamera_dir }}"
+        version: uas/develop
+        recursive: True
+        accept_hostkey: True
+        update: True
+        force: True
+
+    - name: Make kamera repo
+      command:
+        chdir: "{{ kamera_dir }}"
+        cmd: make docker-gui
+
+    - name: Clean dangling images
+      command:
+        cmd: docker system prune -f

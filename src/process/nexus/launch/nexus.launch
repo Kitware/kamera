@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <arg name="sysidx" default="0"/>
+  <arg name="system_name" default="nuvo0$(arg sysidx)" />
+  <arg name="sys_namespace" default="/$(arg system_name)"/>
+  <arg name="node_name" default="img_nexus"/>
+
+  <!-- Topic to receive RGB ROS Image messages on -->
+  <arg name="rgb_topic" default="rgb/image_raw"/>
+
+  <!-- Topic to receive IR ROS Image messages on -->
+  <arg name="ir_topic" default="ir/image_raw"/>
+
+  <!-- Topic to receive UV ROS Image messages on -->
+  <arg name="uv_topic" default="uv/image_raw"/>
+
+  <!-- Topic to publish ROS SynchronizedImages messages on -->
+  <arg name="out_topic" default="synched"/>
+
+  <!-- Time to wait after receiving one image for the other-modality images
+       to arrive (seconds) -->
+  <arg name="max_wait" default="0.9"/>
+
+
+  <arg name="verbosity" default="0" />
+
+
+  <group ns="$(arg sys_namespace)">
+    <node name="$(arg node_name)" pkg="nexus" type="nexus_node.py"
+          respawn="false" output="screen" required="true">
+      <param name="rgb_topic" value="$(arg rgb_topic)" type="str"/>
+      <param name="ir_topic" value="$(arg ir_topic)" type="str"/>
+      <param name="uv_topic" value="$(arg uv_topic)" type="str"/>
+      <param name="out_topic" value="$(arg out_topic)" type="str"/>
+      <param name="max_wait" value="$(arg max_wait)" type="double"/>
+      <param name="verbosity" value="$(arg verbosity)" type="int" />
+    </node>
+  </group>
+  <!-- end group sys_namespace -->
+</launch>

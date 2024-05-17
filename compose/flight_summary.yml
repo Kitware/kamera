@@ -1,0 +1,17 @@
+---
+## Core processes
+version: '3.7'
+services:
+  ## =========================== headless nodes =============================
+  flight_summary:
+    build:
+        context: ../src/kitware-ros-pkg/postflight_scripts
+        dockerfile: ./docker/Dockerfile
+    image: gitlab.kitware.com:4567/noaa_uav/noaa_kamera/postproc:latest
+    network_mode: host
+    tty: true
+    volumes:
+        - "/mnt:/mnt"
+        - "$PWD/src/kitware-ros-pkg/postflight_scripts:/src/postflight_scripts"
+        - "$PWD/src/run_scripts/entry:/entry"
+    entrypoint: ["/entry/postproc_summary.sh"]

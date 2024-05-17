@@ -1,0 +1,10 @@
+---
+# vars file for nvidia.cuda
+cuda_repo_package: cuda-repo-ubuntu1404
+cuda_repo_deb_url: http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_8.0.61-1_amd64.deb
+cuda_package: cuda-8.0
+
+# Nvidia Driver and Cuda Drivers must be compatible
+cuda_nvidia_driver_version: 384
+cuda_driver_version: 384.111-1
+cuda_pin_versions: false

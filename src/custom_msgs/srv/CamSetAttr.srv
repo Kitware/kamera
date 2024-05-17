@@ -1,0 +1,23 @@
+## Really hasty attribute setter RPC. Stringly-typed, so probably not the
+## wisest
+
+# Get attribute from a camera
+string name
+
+# Stringlike representation of the value, must be castable to one of the types
+string value
+
+# Type of the `value` field
+string dtype
+
+---
+# Response
+
+# See PvApi.h. 0 if call succeed, enum val if err, e.g. can't find attribute
+int32 tPvErr
+
+# String-ified format of value
+string value
+
+# Type of the `value` field
+string dtype

@@ -1,0 +1,12 @@
+# Set some sort of scalar Unsigned Int
+uint32 val
+
+
+# if this flag is true, do not set, only return the value. for debugging only
+bool only_get
+
+---
+# Response
+
+# Indicates whether the action was successful.
+uint32 gotval

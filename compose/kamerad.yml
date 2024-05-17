@@ -1,0 +1,15 @@
+---
+## Core processes
+version: '3.7'
+services:
+  ## =========================== headless nodes =============================
+  kamerad:
+    image: gitlab.kitware.com:4567/noaa_uav/noaa_kamera/kamerad:latest
+    network_mode: host
+    build: ../src/core/kamerad
+    tty: true
+    user: root
+    volumes:
+        - "/mnt:/mnt:ro,rshared"
+    restart: always
+...

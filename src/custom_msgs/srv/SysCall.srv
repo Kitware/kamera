@@ -1,0 +1,7 @@
+# System call to call (bash command)
+string cmd
+
+---
+# Response from system call
+string stdout
+string stderr

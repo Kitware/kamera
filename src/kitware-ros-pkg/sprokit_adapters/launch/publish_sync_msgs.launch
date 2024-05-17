@@ -1,0 +1,11 @@
+<launch>
+    <arg name="flight_dir"/>
+    <arg name="out_topic"/>
+    <arg name="publish_rate"/>
+
+    <node pkg="sprokit_adapters" type="publish_sync_msgs.py" name="publish_sync_msgs" output="screen">
+        <param name="flight_dir" value="$(arg flight_dir)"/>
+        <param name="out_topic" value="$(arg out_topic)"/>
+        <param name="publish_rate" value="$(arg publish_rate)"/>
+    </node>
+</launch>

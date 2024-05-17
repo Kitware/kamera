@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+# Locate the actual endpoint of the DAQ
+MCC_DAQ=`readlink -f /dev/mcc_daq`
+export MCC_DAQ
+printf "MCC_DAQ.........: ${MCC_DAQ}
+"

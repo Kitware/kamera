@@ -1,0 +1,29 @@
+## Issue commands to control lifetime of the camera
+
+# normal priority image request
+uint8 CMD_HEALTH=0
+# reset the camera connection without restarting nodelet
+uint8 CMD_SOFT_RESET=1
+# reset the nodelet
+uint8 CMD_NODE_RESET=2
+# reset the container (this may not be able to be implemented without some sort of relay
+uint8 CMD_DOCKER_RESET=3
+uint8 command
+
+# idk might be useful
+string payload
+
+---
+# Response
+
+## looks OK
+uint8 RES_OK=0
+## general purpose error
+uint8 RES_ERR=1
+uint8 response
+
+# String-ified ok response
+string out
+
+# String-ified error response
+string err

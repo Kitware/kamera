@@ -1,0 +1,31 @@
+ARG ROS_DISTRO=kinetic
+FROM ros:kinetic-robot as kinetic-robot
+ENV PYTHON=python \
+    ROS_PKG_VERS=1.3.2-0
+
+FROM ros:melodic-robot as melodic-robot
+ENV PYTHON=python \
+    ROS_PKG_VERS=1.4.1-0
+
+FROM ros:noetic-robot as noetic-robot
+ENV PYTHON=python3 \
+    ROS_PKG_VERS=1.5.0-1
+
+## === === === === === === === ros desktop === === === === === === === === === ===
+FROM ${ROS_DISTRO}-robot as ros-desktop
+RUN     printf "\n======\nenv: ROS_DISTRO: ${ROS_DISTRO} PYTHON: ${PYTHON}\n======\n" \
+    &&  apt-get update -q && apt-get install --no-install-recommends -y \
+            curl \
+            git \
+            jq \
+            redis-server \
+            redis-tools \
+            sqlite3 \
+            supervisor \
+            ${PYTHON}-rosdep \
+            ${PYTHON}-rosinstall \
+            ${PYTHON}-vcstools \
+            ${PYTHON}-catkin-tools \
+            python3-dev \
+            unzip \
+    &&  rm -rf /var/lib/apt/lists/*

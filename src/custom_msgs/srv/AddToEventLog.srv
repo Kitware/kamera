@@ -1,0 +1,21 @@
+# Additional description.
+# Project/Year: newproject2018 (spans couple weeks/months)
+string project
+
+# Flight (flights are generally two-digit numbers) ‘fl##’
+string flight
+
+# Effort name
+string effort
+
+# Trigger mode (fixed rate vs fixed overlap)
+string collection_mode
+
+# Event to log.
+string note
+
+---
+# Response
+
+# Indicates whether the action was successful.
+bool success

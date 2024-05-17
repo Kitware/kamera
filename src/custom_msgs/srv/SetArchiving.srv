@@ -1,0 +1,24 @@
+# Indicate whether to start (true) or stop (false) archiving.
+int8 archiving
+
+# ----------------- Archive Metadata Defining Folder Structure ----------------
+# Project/Year: newproject2018 (spans couple weeks/months)
+string project
+
+# Flight (flights are generally two-digit numbers) ‘fl##’
+string flight
+
+# Effort name
+string effort
+
+# Trigger mode (fixed rate vs fixed overlap)
+string collection_mode
+
+# Additional description.
+string notes
+
+---
+# Response
+
+# Indicates whether the action was successful.
+bool success

@@ -1,0 +1,6 @@
+[Desktop Entry]
+Exec=bash -c '/home/user/kw/noaa_kamera/spoof_events.sh'
+Name=spoof
+Terminal=true
+Type=Application
+Name[en_US]=spoof_events.desktop

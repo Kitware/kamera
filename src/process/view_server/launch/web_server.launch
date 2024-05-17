@@ -1,0 +1,6 @@
+<launch>
+  <node pkg="img_server"
+        type="img_server_node.py"
+        name="img_server"  
+        output="screen"/>
+</launch>

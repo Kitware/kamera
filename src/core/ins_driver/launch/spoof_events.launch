@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <node name="spoof_events" pkg="ins_driver" type="spoof_events.py" output="screen"
+        respawn="false">
+  </node>
+</launch>

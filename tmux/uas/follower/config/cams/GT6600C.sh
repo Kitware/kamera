@@ -1,0 +1,3 @@
+PtpMode=Auto
+AcquisitionFrameRateAbs=4.01326
+AcquisitionMode=Continuous

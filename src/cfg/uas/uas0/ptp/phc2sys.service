@@ -1,0 +1,14 @@
+[Unit]
+Description=Synchronize system clock or PTP hardware clock (PHC)
+Documentation=man:phc2sys
+After=ntpdate.service
+Requires=ptp4l.service
+After=ptp4l.service
+
+[Service]
+Type=simple
+# Synchronize the RGB camera's PTP clock (on enp1s0 in this case) to the system's clock (CLOCK_REALTIME)
+ExecStart=/usr/sbin/phc2sys -s CLOCK_REALTIME -c enp1s0 -O 0
+
+[Install]
+WantedBy=multi-user.target

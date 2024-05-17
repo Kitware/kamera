@@ -1,0 +1,4 @@
+ip_address: "192.168.1.6"
+num_threads: 28
+trigger_mode: "manual"
+auto_trigger_rate: 1.0

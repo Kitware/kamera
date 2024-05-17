@@ -1,0 +1,59 @@
+# allow libusb to work with non-root users
+SUBSYSTEM=="usb", ATTR{idVendor}=="09db", ATTR{idProduct}=="0???", MODE="0666", TAG+="uaccess", TAG+="udev-acl", SYMLINK+="mcc_daq"
+
+# Enable non-root access to HID devices
+KERNEL=="hiddev*", NAME="hiddev%n", MODE="0666", TAG+="uaccess", TAG+="udev-acl"
+
+# Enable non-root access to HID devices
+KERNEL=="hidraw*", NAME="hidraw%n", MODE="0666", TAG+="uaccess", TAG+="udev-acl"
+
+#Enable non-root access to pci devices
+SUBSYSTEM=="dda0x-12",   KERNEL=="dda0x-12/da[0-9]_[0-7]",   MODE="0666"
+SUBSYSTEM=="dda0x-12",   KERNEL=="dda0x-12/dio[0-9]_*",      MODE="0666"
+SUBSYSTEM=="dda0x-16",   KERNEL=="dda0x-16/da[0-9]_[0-7]",   MODE="0666"
+SUBSYSTEM=="dda0x-16",   KERNEL=="dda0x-16/dio[0-9]_*",      MODE="0666"
+
+SUBSYSTEM=="dio24",      KERNEL=="dio24/dio[0-9]_*",         MODE="0666"
+SUBSYSTEM=="dio24H",     KERNEL=="dio24H/dio[0-9]_*",        MODE="0666"
+SUBSYSTEM=="dio48H",     KERNEL=="dio48H/dio[0-9]_*",        MODE="0666"
+SUBSYSTEM=="dio96",      KERNEL=="dio96/dio[0-9]_*",         MODE="0666"
+SUBSYSTEM=="dio96H",     KERNEL=="dio96H/dio[0-9]_*",        MODE="0666"
+SUBSYSTEM=="di192",      KERNEL=="di192/di_*",               MODE="0666"
+
+SUBSYSTEM=="das08",      KERNEL=="das08/ad[0-9]_[0-7]",      MODE="0666"
+
+SUBSYSTEM=="das4020-12", KERNEL=="das4020-12/ad[0-9]_[0-4]", MODE="0666"
+SUBSYSTEM=="das4020-12", KERNEL=="das4020-12/da[0-9]_[0-1]", MODE="0666"
+SUBSYSTEM=="das4020-12", KERNEL=="das4020-12/dio[0-9]_*",    MODE="0666"
+
+SUBSYSTEM=="das1602-16", KERNEL=="das1602-16/ad[0-9]_*",     MODE="0666"
+SUBSYSTEM=="das1602-16", KERNEL=="das1602-16/da[0-9]_[0-1]", MODE="0666"
+SUBSYSTEM=="das1602-16", KERNEL=="das1602-16/dio[0-9]_*",    MODE="0666"
+
+SUBSYSTEM=="pcim-das1602-16", KERNEL=="pcim-das1602-16/ad[0-9]_*",     MODE="0666"
+SUBSYSTEM=="pcim-das1602-16", KERNEL=="pcim-das1602-16/da[0-9]_[0-1]", MODE="0666"
+SUBSYSTEM=="pcim-das1602-16", KERNEL=="pcim-das1602-16/dio[0-9]_*",    MODE="0666"
+
+SUBSYSTEM=="pcim-das16jr",    KERNEL=="das16jr/ad[0-9]_*",     MODE="0666"
+
+SUBSYSTEM=="pci-2500",   NAME="db3k/%k", MODE="666"
+
+SUBSYSTEM=="das1000",    KERNEL=="das1000/ad[0-9]_*",        MODE="0666"
+SUBSYSTEM=="das1000",    KERNEL=="das1000/dio[0-9]_*",       MODE="0666"
+SUBSYSTEM=="das1001",    KERNEL=="das1001/ad[0-9]_*",        MODE="0666"
+SUBSYSTEM=="das1001",    KERNEL=="das1001/dio[0-9]_*",       MODE="0666"
+SUBSYSTEM=="das1001",    KERNEL=="das1001/da[0-9]_[0-1]",    MODE="0666"
+SUBSYSTEM=="das1002",    KERNEL=="das1002/ad[0-9]_*",        MODE="0666"
+SUBSYSTEM=="das1002",    KERNEL=="das1002/dio[0-9]_*",       MODE="0666"
+SUBSYSTEM=="das1002",    KERNEL=="das1002/da[0-9]_[0-1]",    MODE="0666"
+
+SUBSYSTEM=="ctr05",      KERNEL=="ctr05/ctr[0-9]_*",         MODE="0666"
+SUBSYSTEM=="ctr05",      KERNEL=="ctr05/dio[0-9]_*",         MODE="0666"
+
+SUBSYSTEM=="ctr10",      KERNEL=="ctr10/ctr[0-9]_*",         MODE="0666"
+SUBSYSTEM=="ctr10",      KERNEL=="ctr10/dio[0-9]_*",         MODE="0666"
+
+SUBSYSTEM=="ctr20HD",    KERNEL=="ctr20HD/ctr[0-9]_*",       MODE="0666"
+
+SUBSYSTEM=="quad04",     KERNEL=="quad04/channel[0-9]_*",    MODE="0666"
+

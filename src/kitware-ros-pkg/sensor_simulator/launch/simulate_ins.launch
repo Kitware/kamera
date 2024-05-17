@@ -1,0 +1,48 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!-- Simulate messages from INS -->
+<launch>
+  <arg name="namespace" default="/" />
+
+  <arg name="lat" default="42.849649"/>
+  <arg name="lon" default="-73.758830"/>
+  <arg name="height" default="10"/>
+  <arg name="nominal_yaw" default="81.20"/>
+  <arg name="nominal_pitch" default="0"/>
+  <arg name="nominal_roll" default="0"/>
+  <arg name="yaw_range" default="10"/>
+  <arg name="pitch_range" default="10"/>
+  <arg name="roll_range" default="10"/>
+  <arg name="motion_rate" default="0.1"/>
+  <arg name="pub_rate" default="10"/>
+  <arg name="topic" default="/ins"/>
+
+  <group ns="$(arg namespace)">
+    <node name="simulate_ins" pkg="sensor_simulator" type="simulate_ins.py" respawn="false" output="screen">
+      <!-- Latitude (degrees) -->
+      <param name="lat" type="double" value="$(arg lat)"/>
+      <!-- Longitude (degrees) -->
+      <param name="lon" type="double" value="$(arg lon)"/>
+      <!-- Height above ellipsoid (m) -->
+      <param name="height" type="double" value="$(arg height)"/>
+      <!-- Nominal yaw in degrees -->
+      <param name="nominal_yaw" type="double" value="$(arg nominal_yaw)"/>
+      <!-- Nominal pitch in degrees -->
+      <param name="nominal_pitch" type="double" value="$(arg nominal_pitch)"/>
+      <!-- Nominal  roll in degrees -->
+      <param name="nominal_roll" type="double" value="$(arg nominal_roll)"/>
+      <!-- Yaw range in degrees -->
+      <param name="yaw_range" type="double" value="$(arg yaw_range)"/>
+      <!-- Pitch range in degrees -->
+      <param name="pitch_range" type="double" value="$(arg pitch_range)"/>
+      <!-- Roll range in degrees -->
+      <param name="roll_range" type="double" value="$(arg roll_range)"/>
+      <!-- Rate of motion in deg per second -->
+      <param name="motion_rate" type="double" value="$(arg motion_rate)"/>
+      <!-- Publish rate -->
+      <param name="pub_rate" type="double" value="$(arg pub_rate)"/>
+      <!-- Topic to publish on -->
+      <param name="topic" type="str" value="$(arg topic)"/>
+    </node>
+  </group>
+  <!-- end group sys_namespace -->
+</launch>

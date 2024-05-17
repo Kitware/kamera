@@ -1,0 +1,287 @@
+#! /usr/bin/python
+"""
+ckwg +31
+Copyright 2018 by Kitware, Inc.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+ * Neither name of Kitware, Inc. nor the names of any contributors may be used
+   to endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS''
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+==============================================================================
+
+"""
+from __future__ import division, print_function
+import os
+import numpy as np
+import threading
+from collections import deque
+import cv2
+
+# ROS imports
+import rospy
+import rospkg
+from sensor_msgs.msg import CompressedImage, Image
+from cv_bridge import CvBridge, CvBridgeError
+
+# Kamera Imports
+from custom_msgs.msg import SynchronizedImages, SyncedPathImages
+from custom_msgs.srv import RequestImageMetadata, RequestCompressedImageView, \
+    RequestImageView
+from nexus.pathimg_bridge import PathImgBridge, ExtendedBridge, coerce_message
+
+MEM_TRANSPORT_DIR = os.environ.get('MEM_TRANSPORT_DIR', False)
+if MEM_TRANSPORT_DIR:
+    membridge = PathImgBridge()
+    membridge.dirname = MEM_TRANSPORT_DIR
+    SyncedImageMsg = SyncedPathImages
+else:
+    membridge = ExtendedBridge()
+    SyncedImageMsg = SynchronizedImages
+
+bridge = CvBridge()
+
+
+rospack = rospkg.RosPack()
+
+
+def get_interpolation(interpolation):
+    if interpolation == 4:
+        flags = cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP
+    elif interpolation == 3:
+        flags = cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP
+    elif interpolation == 2:
+        flags = cv2.INTER_AREA | cv2.WARP_INVERSE_MAP
+    elif interpolation == 1:
+        flags = cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP
+    else:
+        flags = cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP
+    return flags
+
+
+class ImageViewServer(object):
+    """Provides windowed or reduced-resolution image access over network.
+
+    When a request for imagery is made, it is not returned until a new image is
+    received by this node.
+
+    """
+    def __init__(self, sync_image_topic, rgb_service_topic=None,
+                     rgb_metadata_service_topic=None, ir_service_topic=None,
+                     ir_metadata_service_topic=None, uv_service_topic=None,
+                     uv_metadata_service_topic=None):
+        """
+        :param sync_image_topic: Topic providing SynchronizedImages messages.
+        :type sync_image_topic: str
+
+        :param _service_topic: The service topic providing access to windowed or
+            reduced-resolution imagery.
+        :type service_topic: str
+
+        :param _metadata_service_topic: The service topic providing metadata for
+            the raw imagery stored on this server.
+        :type service_topic: str
+
+        """
+        self.image_lock = threading.RLock()
+        self.rgb_msg = None
+        self.ir_msg = None
+        self.uv_msg = None
+
+
+        if MEM_TRANSPORT_DIR:
+            sync_image_topic += '_shm'
+
+        rospy.loginfo('Subscribing to SynchronizedImages topic \'%s\''
+                      % sync_image_topic)
+        rospy.Subscriber(sync_image_topic, SyncedImageMsg,
+                         self.sync_images_callback, queue_size=1)
+
+        def subscribe_to_image_service(service_topic, metadata_service_topic,
+                                       key):
+            if service_topic is not None:
+                rospy.loginfo('Creating RequestImageView service to provide '
+                              '\'%s\' image views on topic \'%s\'' %
+                              (key,service_topic))
+                rospy.Service(service_topic, RequestImageView,
+                              lambda req: self.image_patch_service_request(req,
+                                                                           key,
+                                                                           False))
+
+            if service_topic is not None:
+                compressed_service_topic = '%s/compressed' % service_topic
+                rospy.loginfo('Creating RequestCompressedImageView service to '
+                              'provide \'%s\' image views on topic \'%s\'' %
+                              (key,compressed_service_topic))
+                rospy.Service(compressed_service_topic,
+                              RequestCompressedImageView,
+                              lambda req: self.image_patch_service_request(req,
+                                                                           key,
+                                                                           True))
+
+            if metadata_service_topic is not None:
+                rospy.loginfo('Creating RequestImageMetadata service to '
+                              'provide \'%s\' image metadata via '
+                              'RequestImageMetadata on topic \'%s\'' %
+                              (key,metadata_service_topic))
+            rospy.Service(metadata_service_topic, RequestImageMetadata,
+                          lambda req: self.metadata_service_topic_request(req,
+                                                                          key))
+
+        subscribe_to_image_service(rgb_service_topic,
+                                   rgb_metadata_service_topic,
+                                   'rgb_msg')
+
+        subscribe_to_image_service(ir_service_topic,
+                                   ir_metadata_service_topic,
+                                   'ir_msg')
+
+        subscribe_to_image_service(uv_service_topic,
+                                   uv_metadata_service_topic,
+                                   'uv_msg')
+
+
+    def sync_images_callback(self, msg):
+        with self.image_lock:
+            try:
+                rgb_str = ('RGB=%ix%i %s' % (msg.image_rgb.width,
+                                             msg.image_rgb.height,
+                                             msg.image_rgb.encoding))
+            except:
+                rgb_str = 'No RGB'
+
+            try:
+                ir_str = ('IR=%ix%i %s' % (msg.image_ir.width,
+                                           msg.image_ir.height,
+                                           msg.image_ir.encoding))
+            except:
+                ir_str = 'No IR'
+
+            try:
+                uv_str = ('UV=%ix%i %s' % (msg.image_uv.width,
+                                            msg.image_uv.height,
+                                            msg.image_uv.encoding))
+            except:
+                uv_str = 'No UV'
+
+            rospy.loginfo('Received SynchronizedImages message with [%s] [%s] '
+                          '[%s]' % (rgb_str,ir_str,uv_str))
+            self.rgb_msg = msg.image_rgb
+            self.ir_msg = msg.image_ir
+            self.uv_msg = msg.image_uv
+
+    def image_patch_service_request(self, req, modality, compress):
+        """
+        see custom_msgs/srv/RequestImagePatches.srv for more details.
+
+        :param modality: Which image stream from which to return an image view.
+        :type modality: str {'RGB','IR','UV'}
+
+        """
+        rospy.loginfo('Requesting %s \'%s\' image view of size %i x %i' %
+                      ('compressed' if compress else '',modality,
+                       req.output_width,req.output_height))
+
+        # We want to return the next image received.
+        with self.image_lock:
+            img_msg0 = getattr(self, modality)
+
+        # Get the image.
+        while True:
+            with self.image_lock:
+                img_msg = getattr(self, modality)
+                if  img_msg != img_msg0:
+                    break
+
+        if img_msg.encoding == '':
+            return (False,Image(),CompressedImage())
+
+        image = membridge.imgmsg_to_cv2(img_msg, 'passthrough')
+        flags = get_interpolation(req.interpolation)
+        dsize = (req.output_width, req.output_height)
+
+        homography = np.reshape(req.homography, (3,3)).astype(np.float32)
+        image2 = cv2.warpPerspective(image, homography, dsize=dsize,
+                                    flags=flags)
+
+        if compress:
+            raise NotImplementedError('disabled for now')
+            compressed_msg = CompressedImage()
+            compressed_msg.format = "jpeg"
+            compressed_msg.data = np.array(cv2.imencode('.jpg',
+                                                        image2)[1]).tostring()
+            compressed_msg.header = img_msg.header
+            return (True,compressed_msg)
+        else:
+            new_image_msg = bridge.cv2_to_imgmsg(image2, encoding="passthrough")
+            new_image_msg.header = img_msg.header
+            return (True,new_image_msg)
+
+    def metadata_service_topic_request(self, req, modality):
+        """
+        see custom_msgs/srv/RequestImagePatches.srv for more details.
+
+        :param modality: Which image stream from which to return an image view.
+        :type modality: str {'RGB','IR','UV'}
+
+        """
+        # We want to return the next image received.
+        with self.image_lock:
+            img_msg0 = getattr(self, modality)
+
+        if img_msg0 is None:
+            return (False,0,0,'')
+
+        return (True,img_msg0.height,img_msg0.width,img_msg0.encoding)
+
+
+def main():
+    # Launch the node.
+    node = 'image_view_server'
+    rospy.init_node(node, anonymous=False)
+    node_name = rospy.get_name()
+
+    # -------------------------- Read Parameters -----------------------------
+    sync_image_topic = rospy.get_param('%s/sync_image_topic' % node_name)
+    rgb_service_topic = rospy.get_param('%s/rgb_service_topic' % node_name)
+    ir_service_topic = rospy.get_param('%s/ir_service_topic' % node_name)
+    uv_service_topic = rospy.get_param('%s/uv_service_topic' % node_name)
+
+    rgb_metadata_service_topic = rospy.get_param('%s/rgb_metadata_service_topic' % node_name)
+    ir_metadata_service_topic = rospy.get_param('%s/ir_metadata_service_topic' % node_name)
+    uv_metadata_service_topic = rospy.get_param('%s/uv_metadata_service_topic' % node_name)
+    # ------------------------------------------------------------------------
+
+    ImageViewServer(sync_image_topic, rgb_service_topic,
+                    rgb_metadata_service_topic, ir_service_topic,
+                    ir_metadata_service_topic, uv_service_topic,
+                    uv_metadata_service_topic)
+
+    rospy.spin()
+
+if __name__ == '__main__':
+    try:
+        main()
+    except rospy.ROSInterruptException:
+        pass

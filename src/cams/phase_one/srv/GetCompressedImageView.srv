@@ -1,0 +1,31 @@
+# This service provides a view into imagery available on a remote system where
+# the overhead of transporting the full-resolution imagery is too expensive.
+# This service allows a downsampled or cropped version of the high-resolution
+# imagery to be requested.
+
+# The 3x3 homography that takes output-image coordinates and returns the
+# associated full-resolution image coordinates. This array will be of length 9,
+# where the homography matrix values is unraveled row by row.
+float64[] homography
+
+# Define the height and width of the returned image.
+int32 output_height
+int32 output_width
+
+# Interpolation algorithm: 0 - nearest neighbor, 1 - linear, 3 - cubic, 4 -
+# Lanczos4
+int8 interpolation
+
+# Indicates whether anti-aliasing should be done in cases where image
+# downsampling occurs. The additional processing on the image server required
+# for the anti-aliasing may substantially increase response latency in some
+# cases.
+bool antialias
+---
+# Response
+
+# Indicates whether the request was successfully serviced.
+bool success
+
+# Compressed image.
+sensor_msgs/CompressedImage image

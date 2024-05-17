@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Launches DAQ node -->
+<launch>
+    <arg name="platform_ns" default="nuvo0"/>
+    <!-- -->
+    <!-- Parse configuration parameters -->
+    <arg name="nominal_heading" default="107.7"/>
+    <arg name="heading_range" default="0"/>
+    <arg name="motion_rate" default="1"/>
+    <arg name="pub_rate" default="10"/>
+    <arg name="topic" default="daq"/>
+    <arg name="start_running" default="true"/>
+    <arg name="dummy" default="false"/>
+    <arg name="norespawn" default="false"/>
+    <arg name="respawn"  value="true" unless="$(arg norespawn)"/>
+    <arg name="respawn"  value="false" if="$(arg norespawn)"/>
+    <!-- -->
+    <group ns="$(arg platform_ns)">
+        <node name="daq_node" pkg="mcc_daq" type="daq_node" output="screen"
+              required="$(arg norespawn)" respawn="$(arg respawn)">
+            <!-- Topic to publish on -->
+            <param name="topic" type="str" value="$(arg topic)"/>
+            <param name="start_running" type="bool" value="$(arg start_running)"/>
+            <param name="dummy" type="bool" value="$(arg dummy)"/>
+        </node>
+
+    </group>
+    <!-- end group $(arg platform_ns)" -->
+</launch>

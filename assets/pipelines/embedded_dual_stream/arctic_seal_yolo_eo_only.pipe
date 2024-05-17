@@ -1,0 +1,57 @@
+# ============================== GLOBAL PROPERTIES =================================
+# global pipeline config
+#
+config _pipeline:_edge
+   :capacity                                   5
+
+# ==================================================================================
+process in_adapt
+ :: input_adapter
+
+process out_adapt
+ :: output_adapter
+
+process downsampler
+  :: downsample
+  _non_blocking =                              4
+
+connect from in_adapt.image
+        to   downsampler.input_1
+connect from in_adapt.file_name
+        to   downsampler.input_2
+
+connect from in_adapt.image2
+        to   downsampler.input_3
+connect from in_adapt.file_name
+        to   downsampler.input_4
+
+# ==================================================================================
+
+include ../common_arctic_seal_eo_yolo_detector.pipe
+
+connect from downsampler.output_1
+        to   optical_detector_input.image
+
+# ==================================================================================
+
+connect from optical_detector_output.detected_object_set
+        to   out_adapt.detected_object_set
+connect from downsampler.output_2
+        to   out_adapt.file_name
+
+# ==================================================================================
+
+process optical_writer_csv
+  :: detected_object_output
+
+  # Type of file to output
+  :file_name                                   $ENV{DETECTION_CSV_DIR}/EO.csv
+  :frame_list_output                           $ENV{IMAGE_LIST_DIR}/EO_images.txt
+  :writer:type                                 viame_csv
+
+connect from optical_detector_output.detected_object_set
+        to   optical_writer_csv.detected_object_set
+connect from downsampler.output_2
+        to   optical_writer_csv.image_file_name
+
+# -- end of file --

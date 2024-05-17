@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Launches testing node -->
+<launch>
+    <arg name="platform_ns" default="subsys0"/>
+    <arg name="topic" default="daq"/>
+    <!-- -->
+    <group ns="$(arg platform_ns)">
+        <node name="chatter_in" pkg="mcc_daq" type="chatter" respawn="false" output="screen">
+            <!-- Topic to publish on -->
+            <param name="topic" type="str" value="$(arg topic)"/>
+        </node>
+    </group>
+    <!-- end group $(arg platform_ns)" -->
+</launch>

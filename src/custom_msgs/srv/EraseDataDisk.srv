@@ -1,0 +1,10 @@
+# Indicate system to wipe disk on
+string system_name
+
+# Do it.
+bool push_the_button
+---
+# Response
+
+# Indicates whether the action was successful.
+bool success

@@ -1,0 +1,48 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <arg name="sysidx" default="0"/>
+    <arg name="system_name" default="nuvo$(arg sysidx)" />
+    <arg name="sys_namespace" default="/$(arg system_name)" />
+  <arg name="node_name" default="image_view_server"/>
+
+  <!-- Specify the image topics that will be used to service image-patch
+       requests. The default value "unused" indicates that no further image
+       topics will be used. -->
+  <arg name="sync_image_topic" default="/$(arg system_name)/synched"/>
+
+  <!-- Topic for the image view provider service for each image topic -->
+  <arg name="rgb_service_topic" default="$(arg sync_image_topic)/rgb_view_service"/>
+  <arg name="ir_service_topic" default="$(arg sync_image_topic)/ir_view_service"/>
+  <arg name="uv_service_topic" default="$(arg sync_image_topic)/uv_view_service"/>
+
+  <!-- Topic for the image metadata provider service for each image topic -->
+  <arg name="rgb_metadata_service_topic" default="$(arg sync_image_topic)/rgb_metadata_service"/>
+  <arg name="ir_metadata_service_topic" default="$(arg sync_image_topic)/ir_metadata_service"/>
+  <arg name="uv_metadata_service_topic" default="$(arg sync_image_topic)/uv_metadata_service"/>
+  
+  <!-- Whether to compress / decompress imagery for detector -->
+  <arg name="compress_imagery" default="true"/>
+  
+  <!-- Whether to send any image bytes to the detector -->
+  <arg name="send_image_data" default="true"/>
+
+  <arg name="norespawn" default="false"/>
+  <arg name="respawn"  value="true" unless="$(arg norespawn)"/>
+  <arg name="respawn"  value="false" if="$(arg norespawn)"/>
+
+  <group ns="$(arg sys_namespace)">
+    <node name="$(arg node_name)" pkg="view_server" type="image_view_server.py" output="screen"
+    required="$(arg norespawn)" respawn="$(arg respawn)">
+      <param name="sync_image_topic" value="$(arg sync_image_topic)" type="str"/>
+      <param name="rgb_service_topic" value="$(arg rgb_service_topic)" type="str"/>
+      <param name="ir_service_topic" value="$(arg ir_service_topic)" type="str"/>
+      <param name="uv_service_topic" value="$(arg uv_service_topic)" type="str"/>
+      <param name="compress_imagery" value="$(arg compress_imagery)" type="bool"/>
+      <param name="send_image_data" value="$(arg send_image_data)" type="bool"/>
+      <param name="rgb_metadata_service_topic" value="$(arg rgb_metadata_service_topic)" type="str"/>
+      <param name="ir_metadata_service_topic" value="$(arg ir_metadata_service_topic)" type="str"/>
+      <param name="uv_metadata_service_topic" value="$(arg uv_metadata_service_topic)" type="str"/>
+    </node>
+  </group>
+  <!-- end group sys_namespace -->
+</launch>

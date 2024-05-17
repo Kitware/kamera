@@ -1,0 +1,74 @@
+Profiling Notes on Nuvo0 at 0.5Hz:
+    operation     size(B)  time(sec) speed(Byte/sec)
+   resizedImage  28829184 0.00967016   2981252016.513 Byte/s
+         memcpy  28829184 0.00283331  10175089912.505 Byte/s
+   resizedImage  28829184 0.00979254   2943994510.107 Byte/s
+         memcpy  28829184 0.00261958  11005269547.027 Byte/s
+   resizedImage  28829184 0.01008175   2859541647.035 Byte/s
+         memcpy  28829184 0.00287129  10040498869.846 Byte/s
+   resizedImage  28829184 0.01014159   2842669048.936 Byte/s
+         memcpy  28829184 0.00301845   9550989415.097 Byte/s
+   resizedImage  28829184 0.01124186   2564449655.128 Byte/s
+         memcpy  28829184 0.00265764  10847663340.407 Byte/s
+   resizedImage  28829184 0.01093399   2636657249.549 Byte/s
+         memcpy  28829184 0.00290637   9919309654.311 Byte/s
+   resizedImage  28829184 0.00940134   3066497329.104 Byte/s
+         memcpy  28829184 0.00280530  10276684846.540 Byte/s
+   resizedImage  28829184 0.01180290   2442550898.508 Byte/s
+         memcpy  28829184 0.00283329  10175161737.768 Byte/s
+   resizedImage  28829184 0.01005468   2867240329.876 Byte/s
+         memcpy  28829184 0.00313507   9195706634.940 Byte/s
+   resizedImage  28829184 0.01102009   2616057037.647 Byte/s
+         memcpy  28829184 0.00318394   9054562585.978 Byte/s
+   resizedImage  28829184 0.01127832   2556159428.000 Byte/s
+         memcpy  28829184 0.00295354   9760891675.752 Byte/s
+   resizedImage  28829184 0.00991902   2906454871.550 Byte/s
+         memcpy  28829184 0.00266386  10822334507.069 Byte/s
+   resizedImage  28829184 0.01034837   2785867146.227 Byte/s
+         memcpy  28829184 0.00282459  10206502182.618 Byte/s
+   resizedImage  28829184 0.01030451   2797724879.689 Byte/s
+         memcpy  28829184 0.00270990  10638467840.142 Byte/s
+
+Averages (1e9byte/sec)
+resizedImage      2.776223
+memcpy           10.119224
+
+Ramdisk read/write:
+jpg BGR8:
+dumped   86487552 in 0.156
+read     86487552 in 0.141
+
+bmp mono8:
+dumped   28829184 in 0.026
+read     86487552 in 0.051
+
+bmp mono8 IMREAD_UNCHANGED
+dumped   28829184 in 0.026
+read     28829184 in 0.026
+
+SSD:
+jpg mono8:
+dumped   28829184 in 0.095
+read     28829184 in 0.056
+
+jpg bgr8
+dumped   86487552 in 0.160
+read     86487552 in 0.163
+
+bayer8 transit to python node:
+0.030
+
+Event mapping
+EventsEnable1 - EventID
+4 - 40002 - EventFrameTrigger
+5 - 40002
+...
+8 - 40003 - EventExposureEnd
+9 - 40003
+...
+12 - 40002 + 40003
+15 - 40002 + 40003
+16 - ?
+31 - 40002 + 40003
+63 - 40002 + 40003
+

@@ -1,0 +1,46 @@
+---
+## Netplan for cas1
+network:
+  version: 2
+  ethernets:
+    # LAN
+    25g_outer:
+      match:
+        macaddress: 78:d0:04:33:57:ba
+      set-name: 25g_outer
+      addresses: [192.168.88.101/24]
+      gateway4: 192.168.88.1
+      nameservers:
+        addresses: [8.8.8.8, 192.168.88.100]
+      optional: true
+    # UV Camera
+    25g_inner:
+      match:
+        macaddress: 78:d0:04:33:57:b9
+      set-name: 25g_inner
+      addresses: [192.168.2.101/24]
+      optional: true
+    # NAS
+    pci_top:
+      mtu: 9000
+      match:
+        macaddress: 98:b7:85:1e:b1:2f
+      set-name: pci_top
+      addresses: [192.168.198.101/24]
+      optional: true
+    # P1 Camera
+    pci_bot:
+      mtu: 9000
+      match:
+        macaddress: 98:b7:85:1e:b1:2e
+      addresses: [192.168.4.101/24]
+      set-name: pci_bot
+      optional: true
+    # IR Camera
+    1g:
+      match:
+        macaddress: 78:d0:04:33:1c:a1
+      set-name: 1g
+      addresses: [192.168.1.101/24]
+      optional: true
+...

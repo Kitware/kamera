@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Simulate cameras for one system -->
+<launch>
+  <arg name="sysidx" default="0"/>
+  <arg name="sys_namespace" default="/subsys$(arg sysidx)" />
+  <arg name="frame_rate" default="4"/>
+
+  <!-- The system namespace -->
+  <group ns="$(arg sys_namespace)">
+     <node name="simulate_cameras" pkg="sensor_simulator" type="simulate_cameras.py" respawn="true" output="screen">
+       <param name="~frame_rate" type="double" value="$(arg frame_rate)"/>
+     </node>
+  </group>
+  <!-- end group -->
+</launch>

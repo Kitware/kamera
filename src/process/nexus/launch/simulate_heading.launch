@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!-- Launches Heading Simulation Node -->
+<launch>
+  <arg name="platform_ns" default="support"/>
+  <!-- -->
+  <!-- Parse configuration parameters -->
+  <arg name="nominal_heading" default="107.7"/>
+  <arg name="heading_range" default="0"/>
+  <arg name="motion_rate" default="1"/>
+  <arg name="pub_rate" default="10"/>
+  <arg name="topic" default="nav/heading"/>
+  <!-- -->
+  <group ns="$(arg platform_ns)">
+    <node name="simulate_heading" pkg="image_nexus" type="simulate_heading.py" respawn="false" output="screen">
+      <!-- Nominal heading in degrees -->
+      <param name="nominal_heading" type="double" value="$(arg nominal_heading)"/>
+      <!-- heading range in degrees -->
+      <param name="heading_range" type="double" value="$(arg heading_range)"/>
+      <!-- Rate of motion in deg per second -->
+      <param name="motion_rate" type="double" value="$(arg motion_rate)"/>
+      <!-- Publish rate -->
+      <param name="pub_rate" type="double" value="$(arg pub_rate)"/>
+      <!-- Topic to publish on -->
+      <param name="topic" type="str" value="$(arg topic)"/>
+    </node>
+  </group>
+  <!-- end group $(arg platform_ns)" -->
+</launch>

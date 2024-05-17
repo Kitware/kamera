@@ -1,0 +1,233 @@
+# Playbook for properly configuring individual systems
+- hosts: all
+
+  tasks:
+
+  - name: Manned system tasks
+    block:
+      - name: Clone kamera repo
+        git:
+          repo: "https://github.com/Kitware/kamera.git"
+          dest: "{{ kamera_dir }}"
+          version: develop
+          recursive: True
+          accept_hostkey: True
+          update: True
+          force: True
+
+      - name: Set redis configuration
+        become: True
+        when: redis_host
+        copy:
+          src: "{{ kamera_dir }}/src/cfg/redis/redis.conf"
+          remote_src: true
+          dest: /etc/redis/redis.conf
+          owner: root
+
+      - name: Redis Restart
+        become: true
+        when: redis_host
+        service: name=redis-server state=restarted enabled=yes
+
+        # Sets all system-wide parameters (except for REDIS_HOST)
+      - name: Set Redis defaults
+        when: redis_host
+        shell: cat "{{ kamera_dir }}/src/cfg/redis/cas_system_config.conf" | xargs -n 2 bash -c 'redis-cli -h {{ inventory_hostname }} set $0 $1'
+
+      - name: Set up supervisor trampoline
+        become: True
+        file:
+          src: "/home/{{ ansible_user }}/supervisor.conf"
+          dest: /etc/supervisor/conf.d/cas.conf
+          state: link
+          force: True
+          owner: root
+
+      - name: Finish supervisor trampoline
+        become: True
+        file:
+          src: "{{ supervisor_file }}"
+          dest: "/home/{{ ansible_user }}/supervisor.conf"
+          state: link
+          force: True
+
+      - name: Copy over supervisor config for sudoless and RPC
+        become: True
+        copy:
+          src: "{{ kamera_dir }}/src/cfg/cas/supervisord.conf"
+          remote_src: true
+          dest: /etc/supervisor/supervisord.conf
+          owner: root
+
+      - name: Reload Supervisor file
+        become: True
+        shell: supervisorctl reload
+
+      - name: Create ~/.config/kamera if it does not exist
+        file:
+          path: ~/.config/kamera
+          state: directory
+          mode: '0755'
+
+      - name: Create repo dir symlink
+        file:
+          src: "{{ kamera_dir }}/repo_dir.bash"
+          dest: ~/.config/kamera/repo_dir.bash
+          owner: "{{ ansible_user }}"
+          state: link
+
+      - name: Create bootstrap symlink
+        file:
+          src: "{{ kamera_dir }}/src/run_scripts/bootstrap_app.sh"
+          dest: ~/.config/kamera/repo_dir.bash
+          owner: "{{ ansible_user }}"
+          state: link
+
+        # Overwrite default
+      - name: Setup netplan configuration.
+        become: True
+        copy:
+          src: "{{ kamera_dir }}/src/cfg/cas/{{ inventory_hostname }}/custom-netplan.yaml"
+          remote_src: true
+          dest: /etc/netplan/{{ inventory_hostname }}-netplan.yaml
+          owner: root
+
+      - name: Add mappings to /etc/hosts
+        become: True
+        copy:
+          src: "{{ kamera_dir }}/src/cfg/cas/{{ inventory_hostname }}/hosts"
+          remote_src: true
+          dest: /etc/hosts
+          owner: root
+
+        # Overwrite default, this is for our 10G cameras
+      - name: Add sysctl rmem params.
+        become: True
+        copy:
+          src: "{{ kamera_dir }}/src/cfg/sysctl/sysctl.conf"
+          remote_src: true
+          dest: /etc/sysctl.conf
+          owner: root
+
+      - name: Make mount directory "{{ data_dir }}"
+        become: True
+        file:
+          path: "{{ data_dir }}"
+          state: directory
+          mode: '0777'
+
+      - name: Edit fstab to mount NAS to "{{ data_dir }}"
+        become: True
+        lineinfile:
+          path: /etc/fstab
+          line: kamera_nas:/volume1/kamera/flight_data {{ data_dir }} nfs auto,nofail,noatime,nolock,intr,tcp,actimeo=1800   0   0
+          state: present
+          insertbefore: EOF
+
+      - name: Make mount directory "/mnt/data"
+        become: True
+        file:
+          path: "/mnt/data"
+          state: directory
+          mode: '0777'
+
+      - name: Edit fstab to mount internal ssd to "/mnt/data"
+        become: True
+        lineinfile:
+          path: /etc/fstab
+          line: /dev/disk/by-id/{{ ssd_id }}    /mnt/data          ext4     nofail,user,noatime   0   0
+          state: present
+          insertbefore: EOF
+
+      - name: Place chrony config.
+        become: True
+        when: leader or follower or gui
+        copy:
+          src: "{{ kamera_dir }}/src/cfg/cas/{{ inventory_hostname }}/chrony.conf"
+          remote_src: true
+          dest: /etc/chrony/chrony.conf
+          owner: root
+
+      - name: Place tmux config.
+        become: True
+        when: leader or follower or gui
+        copy:
+          src: "{{ kamera_dir }}/src/cfg/tmux.conf"
+          remote_src: true
+          dest: /home/user/.tmux.conf
+
+      - name: Place vimrc config.
+        become: True
+        when: leader or follower or gui
+        copy:
+          src: "{{ kamera_dir }}/src/cfg/vimrc"
+          remote_src: true
+          dest: /home/user/.vimrc
+
+      - name: Place ntp config.
+        become: True
+        when: leader
+        copy:
+          src: "{{ kamera_dir }}/src/cfg/cas/{{ inventory_hostname }}/ntp.conf"
+          remote_src: true
+          dest: /etc/ntp.conf
+
+      - name: Place bash aliases.
+        copy:
+          src: "/home/user/kw/noaa_kamera/src/run_scripts/alias/basic-aliases.sh"
+          remote_src: true
+          dest: /home/user/.bash_aliases
+
+      - name: Disable timesyncd on subsystems.
+        become: True
+        when: follower or leader or gui
+        shell: sudo systemctl disable systemd-timesyncd
+
+      - name: Disable sleep state on subsystems.
+        become: True
+        when: follower or leader or gui
+        shell: sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+
+      - name: Create ~/.local/bin if it does not exist
+        when: gui
+        file:
+          path: ~/.local/bin
+          state: directory
+          mode: '0755'
+
+      - name: Create ~/.tmuxinator if it does not exist
+        file:
+          path: ~/.tmuxinator
+          state: directory
+          mode: '0755'
+
+      - name: Create repo dir symlink
+        file:
+          src: "{{ kamera_dir }}/repo_dir.bash"
+          dest: ~/.config/kamera/repo_dir.bash
+          owner: "{{ ansible_user }}"
+          state: link
+
+      - name: Create bootstrap symlink
+        file:
+          src: "{{ kamera_dir }}/src/run_scripts/bootstrap_app.sh"
+          dest: ~/.config/kamera/repo_dir.bash
+          owner: "{{ ansible_user }}"
+          state: link
+
+      - name: Create kamera_run symlink
+        when: gui
+        file:
+          src: "{{ kamera_dir }}/src/run_scripts/newstartup/kamera_run.sh"
+          dest: ~/.local/bin/kamera_run
+          owner: "{{ ansible_user }}"
+          state: link
+
+      - name: Create udev rule for mcc_daq
+        become: True
+        when: leader
+        file:
+          src: "{{ kamera_dir }}/src/core/mcc_daq/61-mcc.rules"
+          dest: /etc/udev/rules.d/61-mcc.rules
+          state: link
+          owner: root

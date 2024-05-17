@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- launch file -->
+<launch>
+    <!-- Specify input SynchronizedImages topics, which will be multiplexed
+         through the detector pipeline. You can add an arbitrary number of input
+         image topics by incrementing image_in#_topic. But, the first instance of
+         image_in#_topic without a valid name or with "unused" will indicate
+         that no more input image topics will be considered. -->
+    <arg name="system_name" default="system" />
+    <arg name="synchronized_images_in1"/>
+    <arg name="synchronized_images_in2" default="unused"/>
+    <arg name="synchronized_images_in3" default="unused"/>
+    <arg name="synchronized_images_in4" default="unused"/>
+    <arg name="synchronized_images_in5" default="unused"/>
+    <arg name="synchronized_images_in6" default="unused"/>\
+
+    <!-- Specify mapping from RGB, IR, and UV images into VIAME pipeline port
+         (0=unused, 1=image, 2=image2, 3=image2) -->
+    <arg name="rgb_port_ind" default="1"/>
+    <arg name="ir_port_ind" default="2"/>
+    <arg name="uv_port_ind" default="3"/>
+
+    <!-- Name of the detector node -->
+    <arg name="detector_node" default="detector"/>
+
+    <!-- Topic to publish detections on -->
+    <arg name="det_topic" default="~detections_out"/>
+
+    <!-- Detector ID string populating the 'detector' field in output detection messages -->
+    <arg name="detector_id_string" default="unspecified"/>
+
+
+    <!-- Directory to store detection csv files. -->
+    <arg name="detection_csv_dir" default="~/detections"/>
+
+    <!-- Where the Redis server is hosted. -->
+    <arg name="redis_uri" default="tcp://192.168.88.10:6379"/>
+
+    <!-- Directory to store detection image list files. -->
+    <arg name="image_list_dir" default="~/image_lists"/>
+
+    <!-- The pipefile should be specified on the command line or other means.
+         Without knowing what detector, there is no good default -->
+    <arg name="detection_pipefile"/>
+    <arg name="pipeline_dir" default=""/>
+
+    <!-- Number of threads for OpenCV parallel regions to utilize.
+         A value of 0 means that NO threading optimizations will be used (not sure
+         if same as passing 1). A negative value will reset threads number to
+         system default. -->
+    <arg name="ocv_num_threads" default="-1"/>
+
+    <!-- Size of sync message queue to buffer in ROS. -->
+    <arg name="sync_q_size" default="1"/>
+
+    <arg name="norespawn" default="false"/>
+    <arg name="respawn"  value="true" unless="$(arg norespawn)"/>
+    <arg name="respawn"  value="false" if="$(arg norespawn)"/>
+
+    <group ns="$(arg system_name)">
+
+        <node name="$(arg detector_node)" pkg="sprokit_adapters"
+              type="kw_detector_fusion_adapter_node" output="screen"
+              required="$(arg norespawn)" respawn="$(arg respawn)">
+
+            <!-- In order to interoperate Python2/3 in ROS Kinetic, this is required.
+            roslaunch requires py2, and after it's launched, the PYTHONPATH
+            can be switched to use Python3, and the Python3 plugins that VIAME 
+            references won't explode-->
+            <env name="PYTHONPATH" value="/build/viame/install/lib/python3.6/site-packages:/root/anaconda3/lib/python3.6/site-packages/:$(env PYTHONPATH)"/>
+            
+            <param name="synchronized_images_in1" value="$(arg synchronized_images_in1)"
+                   type="str"/>
+            <param name="synchronized_images_in2" value="$(arg synchronized_images_in2)"
+                   type="str"/>
+            <param name="synchronized_images_in3" value="$(arg synchronized_images_in3)"
+                   type="str"/>
+            <param name="synchronized_images_in4" value="$(arg synchronized_images_in4)"
+                   type="str"/>
+            <param name="synchronized_images_in5" value="$(arg synchronized_images_in5)"
+                   type="str"/>
+            <param name="synchronized_images_in6" value="$(arg synchronized_images_in6)"
+                   type="str"/>
+
+            <param name="rgb_port_ind" value="$(arg rgb_port_ind)" type="int"/>
+            <param name="ir_port_ind" value="$(arg ir_port_ind)" type="int"/>
+            <param name="uv_port_ind" value="$(arg uv_port_ind)" type="int"/>
+            
+            <param name="redis_uri" value="$(arg redis_uri)" type="str"/>
+
+            <remap from="~detections_out" to="$(arg det_topic)"/>
+            <param name="detector_id_string" value="$(arg detector_id_string)"
+                   type="str"/>
+            <param name="pipe_file" value="$(arg detection_pipefile)"/>
+            <param name="pipeline_dir" value="$(arg pipeline_dir)"/>
+            <param name="ocv_num_threads" value="$(arg ocv_num_threads)" type="int"/>
+            <param name="sync_q_size" value="$(arg sync_q_size)" type="int"/>
+
+            <env name="DETECTION_CSV_DIR" value="$(arg detection_csv_dir)"/>
+            <env name="IMAGE_LIST_DIR" value="$(arg image_list_dir)"/>
+        </node>
+    </group>
+</launch>

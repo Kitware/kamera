@@ -1,0 +1,51 @@
+---
+## Netplan for nuvo0
+network:
+  version: 2
+  ethernets:
+    25g_outer:
+      match:
+        macaddress: 78:d0:04:33:75:60
+      set-name: 25g_outer
+#      dhcp4: true
+      addresses: [192.168.88.103/24]
+      gateway4: 192.168.88.1
+      optional: true
+    # this will go to UV cam
+    25g_inner:
+      match:
+        macaddress: 78:d0:04:33:75:5f
+      set-name: 25g_inner
+#      dhcp4: true
+      addresses: [192.168.2.10/24]
+      optional: true
+    # pci top is our connection to the big switch
+    pci_top:
+      mtu: 9000
+      match:
+        macaddress: 98:b7:85:1e:b1:47
+      set-name: pci_top
+      addresses: [192.168.2.103/24]
+#      dhcp4: true
+      optional: true
+    pci_bot:
+      mtu: 9000
+      match:
+        macaddress: 98:b7:85:1e:b1:46
+      set-name: pci_bot
+      addresses: [192.168.1.103/24]
+      optional: true
+    1g:
+      match:
+        macaddress: 78:d0:04:33:21:05
+      set-name: 1g
+      dhcp4: true
+      optional: true
+    10g:
+      mtu: 9000
+      match:
+        macaddress: 78:d0:04:33:21:06
+      set-name: 10g
+      dhcp4: true
+      optional: true
+...

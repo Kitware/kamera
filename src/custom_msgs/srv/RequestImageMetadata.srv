@@ -1,0 +1,28 @@
+# This service provides requests the metadata for imagery available on a remote
+# image server.
+# It also doubles as a signal to flush any blocking image requests.
+# There are certainly better ways to implement this but this approach worked given the constraints
+# Using the RequestImageView.srv to trigger the flush caused all manner of snarls. Thus,
+# a side-channel signal was needed, and the RequestImageMetadata.srv was easily available
+
+# determine how to handle any currently pending RequestImageView threads
+uint8 RELEASE_NONE=0
+# release all threads at the barrier with negative signal
+uint8 RELEASE_INVALIDATE=1
+# release all threads at the barrier with positive signal
+uint8 RELEASE_ALL=2
+# release all threads at the barrier and return immediately
+uint8 RELEASE_NOWAIT=3
+uint8 release
+---
+# Response
+
+# Indicates whether the request was successfully serviced.
+bool success
+
+# Define the height and width of the imagery.
+int32 height
+int32 width
+
+# Defines the encoding of the imagery.
+string encoding

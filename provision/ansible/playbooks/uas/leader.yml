@@ -1,0 +1,37 @@
+## Playbook for provisioning leader/GUI system for NOAA KAMERA
+## Use the admin account for these
+
+- hosts: noaa_guibox
+  vars:
+    kamera_target_platform: guibox
+    sys_packages: [
+                    'ansible',
+                    'gnome-tweak-tool',
+                    'chrome-gnome-shell',
+                    'gir1.2-gtop-2.0',
+                    'gir1.2-clutter-1.0',
+                    'gir1.2-networkmanager-1.0'
+                  ]
+    gitlab_token: "{{ lookup('file', lookup('env','HOME') + '/.config/tokens/noaa_uav.txt') }}"
+
+
+  pre_tasks:
+    - shell: uname -s
+      ignore_errors: yes
+      register: uname_s
+    - shell: uname -m
+      ignore_errors: yes
+      register: uname_m
+
+    - debug: msg = "{{ uname_s.stdout }} {{ uname_m.stdout }}"
+    - name: Install aptitude
+      become: True
+      apt: name=aptitude state=present
+
+    - name: Update apt
+      become: True
+      apt: update_cache=yes
+
+    - name: Install required system packages
+      become: True
+      apt: name={{ sys_packages }}

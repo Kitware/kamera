@@ -1,0 +1,2 @@
+include gsof_utils/cfg/*
+include gsof_utils/cfg/avx_time.service

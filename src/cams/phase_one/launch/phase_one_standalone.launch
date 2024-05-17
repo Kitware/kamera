@@ -1,0 +1,26 @@
+<launch>
+  <arg name="ip_address"/>
+  <arg name="num_threads"/>
+  <arg name="trigger_mode"/>
+  <arg name="cam_mode"/>
+  <arg name="hostname"/>
+  <arg name="auto_trigger_rate"/>
+  <arg name="system_name" default="cas0"/>
+  <arg name="norespawn" default="false"/>
+  <arg name="respawn"  value="true" unless="$(arg norespawn)"/>
+  <arg name="respawn"  value="false" if="$(arg norespawn)"/>
+
+  <node pkg="phase_one"
+        type="phase_one_standalone"
+        name="$(arg cam_mode)_driver"
+        output="screen"
+        required="$(arg norespawn)"
+        respawn="$(arg respawn)">
+    <param name="ip_address" type="str" value="$(arg ip_address)"/>
+    <param name="num_threads" type="int" value="$(arg num_threads)"/>
+    <param name="hostname" type="str" value="$(arg hostname)"/>
+    <param name="trigger_mode" type="str" value="$(arg trigger_mode)"/>
+    <param name="auto_trigger_rate" type="double" value="$(arg auto_trigger_rate)"/>
+  </node>
+
+</launch>

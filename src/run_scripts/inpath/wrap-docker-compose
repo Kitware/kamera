@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+## Wraps calls to docker compose with a prefix script
+PREFIX_DC_BASH=${PREFIX_DC_BASH:-""}
+PREFIX_DC_SOURCE=${PREFIX_DC_SOURCE:-""}
+
+if [[ -n "$PREFIX_DC_BASH" ]]; then
+    echo "exec ${PREFIX_DC_BASH}"
+    bash "${PREFIX_DC_BASH}"
+fi
+
+if [[ -n "$PREFIX_DC_SOURCE" ]]; then
+    echo "exec ${PREFIX_DC_SOURCE}"
+    source "${PREFIX_DC_SOURCE}"
+fi
+
+exec docker compose "$@"

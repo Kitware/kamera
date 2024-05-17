@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+## Add user to xhost to allow passthrough with GUI in container
+xhost -local:root
+

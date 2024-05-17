@@ -1,0 +1,224 @@
+## Playbook for provisioning NOAA KAMERA systems
+## Use the admin account for these
+
+- hosts: all
+  vars:
+    linux_distro: ubuntu18.04
+    ros_distro: melodic
+    ros_package: perception
+    ansible_user: user
+    sys_packages: [
+                    'apt-transport-https', 'gnupg-agent', # secure socket / signing
+                    'software-properties-common', # add/manage PPAs
+                    'build-essential', # Basic build tools
+                    'ca-certificates', 'lsb-release', # Necessary certificate signing
+                    'tmux', 'zsh', # shell tools
+                    'mosh', # SSH tools
+                    'git', # vcs
+                    'vim', # editor
+                    'rubygems', # tmuxinator
+                    'supervisor', # startup tools
+                    'curl', 'wget', # http / download
+                    'htop', # process monitor
+                    'tree', 'mc', # explore filesystem
+                    'traceroute', 'net-tools', 'iftop', # IP layer tools
+                    'nmap', 'arp-scan', 'netdiscover', 'iftop', # Network layer tools
+                    'dnsutils', # dig
+                    'lm-sensors', # utilities for /dev and hardware sensors/fans
+                    'jq', # json query, used for configs
+                    'chrony', 'gpsd', # For NTP sheduling
+                    'pps-tools', 'linuxptp', # PTP tools
+                    'dnsutils', # DNS tools
+                    'openssh-server', # For ssh key use
+                    'redis-server', 'redis-tools', # Redis tools
+                    'ubuntu-drivers-common', # For hardware drivers
+                    'python3-pip', 'python-pip' # Pip goodness
+                    ]
+    ros_packages: [
+                   'ros-melodic-rc-genicam-driver',
+                   'ros-melodic-rc-genicam-camera',
+                   'ros-melodic-rqt-image-view',
+                   'python-catkin-tools'
+                  ]
+    pip_packages: [
+                   'pyinstaller',
+                  ]
+    cuda_vars:
+        cuda_repo_package: "cuda-repo-ubuntu1804"
+        cuda_repo_deb_url: "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-repo-ubuntu1804_10.2.89-1_amd64.deb"
+        cuda_nvidia_driver_version: 440
+        cuda_driver_version: 440.95.01-1
+        cuda_package: cuda-10-2
+        cuda_apt_key: "http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub"
+        cuda_pin_versions: true
+
+  pre_tasks:
+    - shell: uname -s
+      ignore_errors: yes
+      register: uname_s
+
+    - shell: uname -m
+      ignore_errors: yes
+      register: uname_m
+
+    - debug: msg = "{{ uname_s.stdout }} {{ uname_m.stdout }}"
+    - name: Install aptitude
+      become: True
+      apt: name=aptitude state=present
+
+    - name: Update apt
+      become: True
+      apt: update_cache=yes
+
+    - name: Install NVIDIA CUDA
+      import_role:
+        name: nvidia.cuda
+      become: True
+      become_user: root
+      vars:
+          cuda_repo_package: "{{ cuda_vars.cuda_repo_package }}"
+          cuda_repo_deb_url: "{{ cuda_vars.kwcuda_repo_deb_url }}"
+          cuda_nvidia_driver_version: "{{ cuda_vars.cuda_nvidia_driver_version }}"
+          cuda_driver_version: "{{ cuda_vars.cuda_driver_version }}"
+          cuda_package: "{{ cuda_vars.cuda_package }}"
+          cuda_apt_key: "{{ cuda_vars.cuda_apt_key }}"
+          cuda_pin_versions: "{{ cuda_vars.cuda_pin_versions }}"
+      when: nvidia_cuda
+      tags:
+        - base
+        - nuvo
+
+    - name: Add ROS repository apt-key
+      become: True
+      apt_key:
+        url: "https://raw.githubusercontent.com/ros/rosdistro/master/ros.key"
+        state: present
+
+    - name: Add ROS repository
+      become: True
+      apt_repository:
+        repo: "deb http://packages.ros.org/ros/ubuntu {{ ansible_lsb.codename }} main"
+        state: present
+
+    - name: Install ROS
+      become: True
+      apt:
+        pkg: "ros-{{ ros_distro }}-{{ ros_package }}"
+        state: present
+
+    - name: Add ros setup sourcing to .bashrc
+      become: True
+      lineinfile:
+        path: /home/{{ ansible_user }}/.bashrc
+        state: present
+        line: "source /opt/ros/{{ ros_distro }}/setup.bash"
+
+    - name: Install required system packages
+      become: True
+      apt: name={{ sys_packages }}
+
+    - name: Add Docker GPG apt Key
+      become: True
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      become: True
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu bionic stable
+        state: present
+
+    - name: Update apt and install docker-ce
+      become: True
+      apt: update_cache=yes name=docker-ce state=latest
+
+    - name: Add Nvidia Docker GPG apt Key
+      become: True
+      apt_key:
+        url: https://nvidia.github.io/nvidia-docker/gpgkey
+        state: present
+      when: nvidia_cuda
+      tags:
+        - base
+        - nuvo
+
+    - name: Add Nvidia Docker Repository
+      become: True
+      apt_repository:
+        repo: "https://nvidia.github.io/nvidia-docker/{{ linux_distro }}/nvidia-docker.list"
+        state: present
+      when: nvidia_cuda
+      tags:
+        - base
+        - nuvo
+
+    - name: Update apt and install nvidia-container-toolkit
+      become: True
+      apt: update_cache=yes name=nvidia-container-toolkit state=latest
+      when: nvidia_cuda
+      tags:
+        - base
+        - nuvo
+
+    - name: Install Docker Module for Python (for Ansible)
+      pip:
+        name: docker
+        executable: pip3
+        extra_args: --user
+
+    - name: Ensure group "docker" exists
+      become: True
+      group:
+        name: docker
+        state: present
+
+    - name: Ensure group "dialout" exists
+      become: True
+      group:
+        name: dialout
+        state: present
+      tags:
+        - base
+        - nuvo
+
+    - name: "Add the user {{ ansible_user }} to group 'docker' and 'dialout'"
+      become: True
+      become_user: root
+      user:
+        name: "{{ ansible_user }}"
+        groups: ['user', 'docker', 'dialout',  'sudo']
+
+  tasks:
+    - name: Install required ros packages
+      become: True
+      apt: name={{ ros_packages }}
+
+    - name: Install tmuxinator
+      become: True
+      shell: gem install tmuxinator -v 1.1.5
+
+    - name: Install docker-compose
+      become: True
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-{{ uname_s.stdout }}-{{ uname_m.stdout }}"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    - name: Install yq
+      become: True
+      get_url:
+        url: "https://github.com/mikefarah/yq/releases/download/2.4.0/yq_{{ uname_s.stdout }}_amd64"
+        dest: /usr/local/bin/yq
+        mode: '0755'
+
+    - name: Install pip packages
+      become: True
+      pip:
+        name: "{{ pip_packages }}"
+        state: latest
+        executable: pip3
+
+    - name: Reboot system
+      become: True
+      reboot:

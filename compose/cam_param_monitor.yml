@@ -1,0 +1,24 @@
+---
+## Core processes
+version: '3.7'
+services:
+  cam_param_monitor:
+    container_name: cam_param_monitor
+    image: "gitlab.kitware.com:4567/noaa_uav/noaa_kamera/kamera/${ROS_DISTRO}:${TAG_KAMERA_CAM_PARAM:-latest}"
+    tty: true
+    environment:
+      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      NODE_HOSTNAME: "${NODE_HOSTNAME}"
+      REDIS_HOST: "${REDIS_HOST}"
+    dns:
+      - "${KAMERA_DNS_IP}"
+    dns_search:
+      - kamera.systems
+    network_mode: host
+    volumes:
+      - "/home/user/kw/noaa_kamera/src:/root/kamera_ws/src"
+      - "${PWD}/src:${PROJ_DIR}/src:ro"
+    entrypoint: ["/bin/tini", "--"]
+    command: ["/entry/cam_param_monitor.sh"]
+    restart: always
+...

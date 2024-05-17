@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <arg name="sysidx" default="0"/>
+  <arg name="sys_namespace" default="/subsys$(arg sysidx)"/>
+  <arg name="node_name" default="nmea"/>
+
+  <arg name="port" default="5017"/>
+  <arg name="ip" default="192.168.88.99"/>
+
+  <arg name="spoof" default="0"/>
+  <arg name="replay" default=""/>
+
+  <!-- Topic to publish ROS SynchronizedImages messages on -->
+  <arg name="out_topic" default="gis"/>
+
+  <!-- Time to wait after receiving one image for the other-modality images
+       to arrive (seconds) -->
+  <arg name="max_wait" default="0.2"/>
+
+  <group ns="$(arg sys_namespace)">
+    <node name="$(arg node_name)" pkg="ins_driver" type="nmea_socket_driver" respawn="false" output="screen">
+      <param name="port" value="$(arg port)" type="int"/>
+      <param name="ip" value="$(arg ip)" type="str"/>
+
+      <param name="out_topic" value="$(arg out_topic)" type="str"/>
+      <param name="max_wait" value="$(arg max_wait)" type="double"/>
+      <param name="spoof" value="$(arg spoof)" type="double"/>
+      <param name="replay" value="$(arg replay)" type="str"/>
+
+    </node>
+  </group>
+  <!-- end group sys_namespace -->
+</launch>

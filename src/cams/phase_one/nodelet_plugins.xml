@@ -1,0 +1,12 @@
+<library path="lib/libphase_one">
+  <class name="phase_one/PhaseOneNodelet" type="phase_one::PhaseOneNodelet" base_class_type="nodelet::Nodelet">
+  <description>
+  Nodelet for interfacing with PhaseOne cameras.
+  </description>
+  </class>
+  <class name="phase_one/ViewServerNodelet" type="phase_one::ViewServerNodelet" base_class_type="nodelet::Nodelet">
+  <description>
+  Nodelet for displaying parts of images.
+  </description>
+  </class>
+</library>

@@ -1,0 +1,11 @@
+[Unit]
+Description=Precision Time Protocol (PTP) service
+Documentation=man:ptp4l
+
+[Service]
+Type=simple
+# Create a PTP clock on the interface the RGB camera is on (enp1s0)
+ExecStart=/usr/sbin/ptp4l -f /etc/linuxptp/ptp4l.conf -i enp1s0
+
+[Install]
+WantedBy=multi-user.target

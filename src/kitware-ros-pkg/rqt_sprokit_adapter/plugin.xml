@@ -1,0 +1,17 @@
+<library path="src">
+  <class name="SprokitAdapter" type="rqt_sprokit_adapter.sprokit_adapter.SprokitAdapter" base_class_type="rqt_gui_py::Plugin">
+    <description>
+      A Python GUI plugin for Controlling the behavior of a Sprokit Adapter Node
+    </description>
+    <qtgui>
+      <group>
+        <label>Configuration</label>
+        <icon type="theme">folder</icon>
+        <statustip>Plugins related to Configuration.</statustip>
+      </group>
+      <label>SprokitAdapter</label>
+      <icon type="theme">applications-other</icon>
+      <statustip>A Python GUI plugin Controlling the behavior of a Sprokit Adapter Node.</statustip>
+    </qtgui>
+  </class>
+</library>

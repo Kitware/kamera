@@ -1,0 +1,1 @@
+src/run_scripts/newstartup/kamera_halt.sh
