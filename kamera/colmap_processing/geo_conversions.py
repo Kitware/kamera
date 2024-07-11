@@ -49,7 +49,7 @@ except ImportError:
     sklearn_imported = False
 
 # colmap_processing imports
-from colmap_processing.rotations import quaternion_multiply
+from kamera.colmap_processing.rotations import quaternion_multiply
 
 
 # WGS84 constants

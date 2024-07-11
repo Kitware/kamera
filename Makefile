@@ -11,8 +11,8 @@ ROS_MASTER_URI ?= not_set_your_config_is_bad
 DAQPATH = $(shell readlink -f "/dev/$(DAQDEV)")
 PROJ_DIR=/root/noaa_kamera
 WS_DIR=/root/kamera_ws
-
-include .env
+ROS_DISTRO=noetic
+BRANCH=latest
 
 .PHONY: info
 info:

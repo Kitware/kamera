@@ -47,8 +47,8 @@ except ImportError:
     HAS_MATPLOTLIB = False
 
 # colmap_processing imports
-from colmap_processing.geo_conversions import llh_to_enu, enu_to_llh
-from colmap_processing.rotations import quaternion_slerp, quaternion_matrix, \
+from kamera.colmap_processing.geo_conversions import llh_to_enu, enu_to_llh
+from kamera.colmap_processing.rotations import quaternion_slerp, quaternion_matrix, \
     quaternion_inverse, quaternion_multiply, euler_from_quaternion
 
 
