@@ -308,6 +308,7 @@ class NavStateINSJson(NavStateINSBinary):
                 d = json.load(json_file)
 
                 if d['ins']['time'] in nav_pose_dict:
+                    print(d['ins']['time'])
                     print('err: duplicate time')
                     continue
                 self._ins_nav_times.append(d['ins']['time'])

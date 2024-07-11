@@ -1,1 +1,1 @@
-src/run_scripts/newstartup/kamera_run.sh
+../src/run_scripts/newstartup/kamera_run.sh

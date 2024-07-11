@@ -35,8 +35,8 @@ import os
 import collections
 import struct
 
-from colmap_processing.camera_models import StandardCamera
-from colmap_processing.platform_pose import PlatformPoseInterp
+from kamera.colmap_processing.camera_models import StandardCamera
+from kamera.colmap_processing.platform_pose import PlatformPoseInterp
 
 
 CameraModel = collections.namedtuple(

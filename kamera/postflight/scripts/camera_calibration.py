@@ -36,6 +36,7 @@ Library handling projection operations of a standard camera model.
 """
 from __future__ import division, print_function
 import os
+import os.path as osp
 import glob
 import json
 from random import shuffle
@@ -47,7 +48,7 @@ import cv2
 import PIL
 
 # Custom package imports.
-from sensor_models import (
+from kamera.sensor_models import (
         quaternion_multiply,
         quaternion_from_matrix,
         quaternion_from_euler,
@@ -55,36 +56,46 @@ from sensor_models import (
         quaternion_inverse,
         quaternion_matrix
         )
-from postflight_scripts import utilities
-from sensor_models.nav_conversions import enu_to_llh
-from sensor_models.nav_state import NavStateINSJson, NavStateFixed
-from colmap_processing.camera_models import StandardCamera
-from colmap_processing.colmap_interface import read_images_binary, Image, \
+from kamera.postflight import utilities
+from kamera.sensor_models.nav_conversions import enu_to_llh
+from kamera.sensor_models.nav_state import NavStateINSJson, NavStateFixed
+from kamera.colmap_processing.camera_models import StandardCamera
+from kamera.colmap_processing.colmap_interface import read_images_binary, Image, \
     read_points3D_binary, read_cameras_binary, qvec2rotmat, \
     standard_cameras_from_colmap
-from colmap_processing.image_renderer import render_view
+from kamera.colmap_processing.image_renderer import render_view
 
 
 # ---------------------------- Define Paths ----------------------------------
 # KAMERA flight directory where each sub-directory contains meta.json files.
-flight_dir = '/host_filesystem/mnt/homenas2/kamera/Calibration/fl08'
+flight_dir = '/host_filesystem/data/users/adam.romlein/noaa/data/2024_AOC_Calibration/2024_AOC_Calibration'
 
 # You should have a colmap directory where all of the Colmap-generated files
 # reside.
-colmap_dir = '/host_filesystem/mnt/data10tb/kamera_fl8/colmap'
+colmap_dir = '/host_filesystem/data/users/adam.romlein/noaa/data/2024_AOC_Calibration'
 
 # Directory with all of the raw images.
-colmap_images_subdir = 'images0'
+colmap_images_subdir = 'images'
 
 # Sub-directory containing the images.bin and cameras.bin. Set to '' if in the
 # top-level Colmap directory.
-sparse_recon_subdir = 'sparse'
+sparse_recon_subdir = 'sparse/1'
 aligned_sparse_recon_subdir = 'aligned'
 
 # Location to save KAMERA camera models.
 save_dir = '%s/kamera_models' % flight_dir
 # ----------------------------------------------------------------------------
 
+def get_base_name(fname):
+    """ Given an arbitrary filename (could be UV, IR, RGB, json),
+    extract the portion of the filename that is just the time, flight,
+    machine (C, L, R), and effort name.
+    """
+    # get base
+    base = os.path.basename(fname)
+    # get it without an extension and modality
+    modality_agnostic = "_".join(base.split("_")[:-1])
+    return modality_agnostic
 
 # Establish correspondence between real-world exposure times base of file
 # names.
@@ -95,8 +106,8 @@ for json_fname in glob.glob('%s/**/*_meta.json' % flight_dir):
             d = json.load(json_file)
 
             # Time that the image was taken.
-            fname = os.path.split(json_fname)[1].replace('_meta.json', '')
-            fname_to_time[fname] = d['evt']['time']
+            basename = get_base_name(json_fname)
+            fname_to_time[basename] = d['evt']['time']
     except (OSError, IOError):
         pass
 
@@ -141,14 +152,16 @@ def process_images(colmap_images):
     img_times = []
     ins_poses = []
     sfm_poses = []
+    llhs = []
     for image_num in colmap_images:
         image = colmap_images[image_num]
-        base_name = '_'.join(os.path.split(image.name)[1].split('_')[:-1])
+        base_name = get_base_name(image.name)
         try:
             t = fname_to_time[base_name]
 
             # Query the navigation state recorded by the INS for this time.
             pose = nav_state_provider.pose(t)
+            llh = nav_state_provider.llh(t)
 
             # Query Colmaps pose for the camera.
             R = qvec2rotmat(image.qvec)
@@ -175,6 +188,7 @@ def process_images(colmap_images):
             ins_poses.append(pose)
             img_fnames.append(image.name)
             sfm_poses.append(sfm_pose)
+            llhs.append(llh)
         except KeyError:
             print('Couldn\'t find a _meta.json file associated with \'%s\'' %
                   base_name)
@@ -182,11 +196,14 @@ def process_images(colmap_images):
     ind = np.argsort(img_fnames)
     img_fnames = [img_fnames[i] for i in ind]
     img_times = [img_times[i] for i in ind]
+    ins_poses = [ins_poses[i] for i in ind]
+    sfm_poses = [sfm_poses[i] for i in ind]
+    llhs = [llhs[i] for i in ind]
 
-    return img_fnames, img_times, ins_poses, sfm_poses
+    return img_fnames, img_times, ins_poses, sfm_poses, llhs
 
 
-img_fnames, img_times, ins_poses, sfm_poses = process_images(colmap_images)
+img_fnames, img_times, ins_poses, sfm_poses, llhs = process_images(colmap_images)
 # ----------------------------------------------------------------------------
 
 
@@ -207,7 +224,9 @@ with open(align_fname, 'w') as fo:
     for i in range(len(img_fnames)):
         name = img_fnames[i]
         pos = ins_poses[i][0]
+        llh = llhs[i]
         fo.write('%s %0.8f %0.8f %0.8f\n' % (name, pos[0], pos[1], pos[2]))
+        #fo.write('%s %0.8f %0.8f %0.8f\n' % (name, llh[0], llh[1], llh[2][0]))
 
 
 try:
@@ -222,7 +241,7 @@ print('Now run\nnoaa_kamera/src/kitware-ros-pkg/postflight_scripts/scripts/'
                                                aligned_sparse_recon_subdir))
 
 # ---------------------------------------------------------------------------
-if False:
+if True:
     # Sanity check, pick the coordinates for a point in the 3-D model and
     # convert them to latitude and longitude.
     enu = np.array((640.446167, 822.111633, -9.576390))
@@ -265,7 +284,7 @@ points_per_image = {}
 camera_from_camera_str = {}
 for image_num in colmap_images:
     image = colmap_images[image_num]
-    camera_str = image.name.split('/')[0]
+    camera_str = osp.basename(osp.dirname(image.name))
     camera_from_camera_str[camera_str] = colmap_cameras[image.camera_id]
 
     xys = image.xys
@@ -274,14 +293,14 @@ for image_num in colmap_images:
     pt_ids = pt_ids[ind]
     xys = xys[ind]
     xyzs = np.array([points3d[pt_id].xyz for pt_id in pt_ids])
-    base_name = os.path.splitext(os.path.split(image.name)[1])[0]
+    base_name = get_base_name(image.name)
     try:
-        t = fname_to_time['_'.join(base_name.split('_')[:-1])]
+        t = fname_to_time[base_name]
         points_per_image[image.name] = (xys, xyzs, t)
     except KeyError:
         pass
 
-img_fnames, img_times, ins_poses, sfm_poses = process_images(colmap_images)
+img_fnames, img_times, ins_poses, sfm_poses, llhs = process_images(colmap_images)
 
 
 if False:
@@ -293,7 +312,7 @@ if False:
         print('%i/%i' % (i + 1, len(img_fnames)))
         fname = img_fnames[i]
         sfm_pose = sfm_poses[i]
-        camera_str = os.path.split(fname)[0]
+        camera_str = osp.basename(osp.dirname(fname))
 
         colmap_camera = camera_from_camera_str[camera_str]
 
@@ -307,16 +326,19 @@ if False:
         dist = np.array([d1, d2, d3, d4])
 
         cm = StandardCamera(colmap_camera.width, colmap_camera.height, K, dist,
-                            [0, 0, 0], [0, 0, 0, 1], None, frame_id=None,
-                            nav_state_provider=NavStateFixed(*sfm_pose))
+                            [0, 0, 0], [0, 0, 0, 1],
+                            platform_pose_provider=NavStateFixed(*sfm_pose))
         xy, xyz, t = points_per_image[fname]
         err_ = np.sqrt(np.sum((xy - cm.project(xyz.T, t).T)**2, axis=1))
         err = err + err_.tolist()
 
-    plt.hist(err, 1000)
+    print("Errors: ")
+    print(np.mean(err))
+    print(np.median(err))
+    #plt.hist(err, 1000)
 
 
-camera_strs = set([os.path.split(fname)[0] for fname in img_fnames])
+camera_strs = set([osp.basename(osp.dirname(fname)) for fname in img_fnames])
 
 
 # ------------------------------ Calibrate RGB -------------------------------
@@ -329,7 +351,7 @@ for camera_str in camera_strs:
     points_per_image_ = []
     for i in range(len(img_fnames)):
         fname = img_fnames[i]
-        if os.path.split(fname)[0] == camera_str:
+        if osp.basename(osp.dirname(fname)) == camera_str:
             ins_quat_.append(ins_poses[i][1])
             sfm_quat_.append(sfm_poses[i][1])
             try:
@@ -359,9 +381,8 @@ for camera_str in camera_strs:
         cam_quat = cam_quat/np.linalg.norm(cam_quat)
         camera_model = StandardCamera(colmap_camera.width,
                                       colmap_camera.height,
-                                      K, dist, [0, 0, 0], cam_quat, None,
-                                      frame_id=None,
-                                      nav_state_provider=nav_state_provider)
+                                      K, dist, [0, 0, 0], cam_quat,
+                                      platform_pose_provider=nav_state_provider)
 
         err = []
         for xys, xyzs, t in points_per_image_:
@@ -395,7 +416,7 @@ for camera_str in camera_strs:
         print('RMS reproject error for quat', cam_quat, ': %0.8f' % err)
         return err
 
-
+    print("Iterating through %s quaternion guesses." % len(cam_quats))
     shuffle(cam_quats)
     best_quat = None
     best_err = np.inf
@@ -413,6 +434,12 @@ for camera_str in camera_strs:
 
         if best_err < 10:
             break
+
+    print("Best error: ", best_err)
+    print("Best quat: ")
+    print(cam_quat)
+
+    print("Minimizing error over camera quaternions")
 
     ret = minimize(cam_quat_error, best_quat)
     best_quat = ret.x/np.linalg.norm(ret.x)
@@ -441,8 +468,8 @@ for camera_str in camera_strs:
         best_quat = set_x(x)
 
     camera_model = StandardCamera(colmap_camera.width, colmap_camera.height,
-                                  K, dist, [0, 0, 0], best_quat, '',  '',
-                                  nav_state_provider=nav_state_provider)
+                                  K, dist, [0, 0, 0], best_quat,
+                                  platform_pose_provider=nav_state_provider)
 
     try:
         os.makedirs(save_dir)
@@ -539,7 +566,6 @@ for camera_str in camera_strs:
         fig.subplots_adjust(left=0.15)
         pdf.savefig()
 
-
 # ----------------------------- Calibrate UV ---------------------------------
 images_bin_fname = '%s/%s/images.bin' % (colmap_dir, sparse_recon_subdir)
 colmap_images = read_images_binary(images_bin_fname)
@@ -549,7 +575,7 @@ colmap_cameras = read_cameras_binary(camera_bin_fname)
 camera_from_camera_str = {}
 for image_num in colmap_images:
     image = colmap_images[image_num]
-    camera_str = image.name.split('/')[0]
+    camera_str = osp.basename(osp.dirname(image.name))
     camera_from_camera_str[camera_str] = colmap_cameras[image.camera_id]
 
 
@@ -561,7 +587,7 @@ for camera_str in camera_strs:
 
     rgb_str = camera_str.replace('uv', 'rgb')
     cm_rgb = StandardCamera.load_from_file('%s/%s.yaml' % (save_dir, rgb_str),
-                                           nav_state_provider=nav_state_fixed)
+                                           platform_pose_provider=nav_state_fixed)
 
     im_pts = []
     im_pts_rgb = []
@@ -572,13 +598,13 @@ for camera_str in camera_strs:
     for image_num in image_nums:
         print('%i/%i' % (image_num + 1, image_nums[-1]))
         image = colmap_images[image_num]
-        if image.name.split('/')[0] != camera_str:
+        if osp.basename(osp.dirname(image.name)) != camera_str:
             continue
 
-        base_name = os.path.splitext(os.path.split(image.name)[1])[0]
+        base_name = get_base_name(image.name)
 
         try:
-            t1 = fname_to_time['_'.join(base_name.split('_')[:-1])]
+            t1 = fname_to_time[base_name]
         except KeyError:
             continue
 
@@ -587,13 +613,13 @@ for camera_str in camera_strs:
 
         for image_num_rgb in colmap_images:
             image_rgb = colmap_images[image_num_rgb]
-            if image_rgb.name.split('/')[0] != rgb_str:
+            if os.path.basename(image_rgb.name) != rgb_str:
                 continue
 
-            base_name2 = os.path.splitext(os.path.split(image_rgb.name)[1])[0]
+            base_name2 = get_base_name(image_rgb.name)
 
             try:
-                t2 = fname_to_time['_'.join(base_name2.split('_')[:-1])]
+                t2 = fname_to_time[base_name2]
             except KeyError:
                 continue
 
@@ -694,8 +720,8 @@ for camera_str in camera_strs:
 
         K = np.array([[fx_, 0, cx], [0, fy_, cy], [0, 0, 1]])
         cm = StandardCamera(colmap_camera.width, colmap_camera.height,
-                            K, dist_, [0, 0, 0], cam_quat, '',  '',
-                            nav_state_provider=nav_state_fixed)
+                            K, dist_, [0, 0, 0], cam_quat,
+                            platform_pose_provider=nav_state_fixed)
         return cm
 
     def error(x):
@@ -800,13 +826,13 @@ for camera_str in camera_strs:
         for i in range(len(img_fnames)):
             fname1 = img_fnames[inds[i]]
             t1 = img_times[inds[i]]
-            if os.path.split(fname1)[0] != rgb_str:
+            if os.path.basename(fname1) != rgb_str:
                 continue
 
             for j in range(len(img_fnames)):
                 fname2 = img_fnames[inds[j]]
                 t2 = img_times[inds[j]]
-                if os.path.split(fname2)[0] != camera_str or t1 != t2:
+                if osp.basename(osp.dirname(fname2)) != camera_str or t1 != t2:
                     continue
 
                 img2 = cv2.imread('%s/images0/%s' % (colmap_dir, fname2),
@@ -822,7 +848,7 @@ for camera_str in camera_strs:
 
         img2_ = PIL.Image.fromarray(cv2.pyrDown(cv2.pyrDown(img2)))
         img3_ = PIL.Image.fromarray(cv2.pyrDown(cv2.pyrDown(img3)))
-        fname_out = '%s/%s_to_%s_registeration_%i.gif' % (gif_dir, rgb_str,
+        fname_out = '%s/%s_to_%s_registration_%i.gif' % (gif_dir, rgb_str,
                                                           camera_str, k+1)
         img2_.save(fname_out, save_all=True, append_images=[img3_],
                    duration=250, loop=0)

@@ -57,13 +57,13 @@ except ImportError:
     pass
 
 # Repository imports.
-from colmap_processing.image_renderer import stitch_images
-from colmap_processing.platform_pose import PlatformPoseFixed
-from colmap_processing.geo_conversions import enu_to_llh, llh_to_enu
-import colmap_processing.dp as dp
-from colmap_processing.rotations import euler_from_quaternion, \
+from kamera.colmap_processing.image_renderer import stitch_images
+from kamera.colmap_processing.platform_pose import PlatformPoseFixed
+from kamera.colmap_processing.geo_conversions import enu_to_llh, llh_to_enu
+from kamera.colmap_processing.rotations import euler_from_quaternion, \
     quaternion_multiply, quaternion_matrix, quaternion_from_euler, \
     quaternion_inverse, quaternion_from_matrix
+import kamera.colmap_processing.dp as dp
 
 
 def to_str(v):
