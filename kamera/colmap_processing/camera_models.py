@@ -1,68 +1,28 @@
 #!/usr/bin/env python
-"""
-ckwg +31
-Copyright 2020 by Kitware, Inc.
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
- * Redistributions of source code must retain the above copyright notice,
-   this list of conditions and the following disclaimer.
-
- * Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
- * Neither name of Kitware, Inc. nor the names of any contributors may be used
-   to endorse or promote products derived from this software without specific
-   prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS''
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-==============================================================================
-
-Library handling projection operations of a standard camera model.
-
-Note: the image coordiante system has its origin at the center of the top left
-pixel.
-
-"""
-from __future__ import division, print_function, absolute_import
 import numpy as np
 import os
-from numpy import pi
 import cv2
 import time
 import yaml
 from scipy.interpolate import interp1d, RectBivariateSpline
 from scipy.optimize import fmin, fminbound, minimize
-import copy
-import pickle
 import PIL
 from math import sqrt
 
-try:
-    import matplotlib.pyplot as plt
-except ImportError:
-    pass
+import matplotlib.pyplot as plt
 
 # Repository imports.
 from kamera.colmap_processing.image_renderer import stitch_images
 from kamera.colmap_processing.platform_pose import PlatformPoseFixed
 from kamera.colmap_processing.geo_conversions import enu_to_llh, llh_to_enu
-from kamera.colmap_processing.rotations import euler_from_quaternion, \
-    quaternion_multiply, quaternion_matrix, quaternion_from_euler, \
-    quaternion_inverse, quaternion_from_matrix
+from kamera.colmap_processing.rotations import (
+        euler_from_quaternion,
+        quaternion_multiply,
+        quaternion_matrix,
+        quaternion_from_euler,
+        quaternion_inverse,
+        quaternion_from_matrix,
+        )
 import kamera.colmap_processing.dp as dp
 
 
@@ -70,13 +30,17 @@ def to_str(v):
     """Convert numerical values (scalar or float) to string for saving to yaml
 
     """
-    if hasattr(v,  "__len__"):
+    if isinstance(v, np.ndarray):
+        v = v.tolist()
+    else:
+        return str(v)
+    if isinstance(v,  list):
         if len(v) > 1:
             return repr(list(v))
         else:
-            v = v[0]
+            return str(v[0])
 
-    return repr(v)
+    return str(v)
 
 
 class CamToCamTform(object):
@@ -241,9 +205,6 @@ def load_from_file(filename, platform_pose_provider=None):
 
     if calib['model_type'] == 'static':
         return GeoStaticCamera.load_from_file(filename, platform_pose_provider)
-
-    if calib['model_type'] == 'azel':
-        return AzelCamera.load_from_file(filename, platform_pose_provider)
 
     raise Exception()
 
@@ -694,27 +655,6 @@ class Camera(object):
 
         return fov_h, fov_v, fov_d
 
-    def add_image_to_list(self, raw_image, t=None):
-        """Add image to image buffer.
-
-        """
-        if t is None:
-            t = time.time()
-
-        if hasattr(self, '_buffer_size'):
-            buffer_size = self._buffer_size
-        else:
-            buffer_size = np.inf
-
-        with lock:
-            # Make sure list will not exceed buffer size after addition.
-            while len(self.images) >= buffer_size:
-                self.images.pop(0)
-                self._image_times = np.delete(self.image_times, 0)
-
-            self._images.append(raw_image)
-            self._image_times = np.hstack([self._image_times,t])
-
     def unproject_to_depth(self, points, t=None):
         """See Camera.unproject_to_depth documentation.
 
@@ -810,17 +750,18 @@ class StandardCamera(Camera):
         assert calib['model_type'] == 'standard'
 
         # fill in CameraInfo fields
-        width = calib['image_width']
-        height = calib['image_height']
+        width = int(calib['image_width'])
+        height = int(calib['image_height'])
         dist = calib['distortion_coefficients']
 
         if dist == 'None':
             dist = np.zeros(4)
+        dist = np.float64(dist)
 
-        fx = calib['fx']
-        fy = calib['fy']
-        cx = calib['cx']
-        cy = calib['cy']
+        fx = np.float64(calib['fx'])
+        fy = np.float64(calib['fy'])
+        cx = np.float64(calib['cx'])
+        cy = np.float64(calib['cy'])
         K = np.array([[fx,0,cx],[0,fy,cy],[0,0,1]])
 
         cam_quat = calib['camera_quaternion']
@@ -910,7 +851,7 @@ class StandardCamera(Camera):
             f.write(''.join(['# Position of the camera\'s center of ',
                              'projection within the navigation\n# coordinate ',
                              'system.\n',
-                             'camera_position: ',to_str(self.cam_pos),
+                             'camera_position: ', to_str(self.cam_pos),
                              '\n\n']))
 
     @property
@@ -997,7 +938,7 @@ class StandardCamera(Camera):
 
     @dist.setter
     def dist(self, value):
-        if value is None or value is 0:
+        if value is None or value == 0:
             value = np.zeros(4)
 
         self._dist = np.atleast_1d(value)
@@ -1092,10 +1033,11 @@ class StandardCamera(Camera):
             t = time.time()
 
         pose_mat = self.get_camera_pose(t)
+        pose_mat = np.vstack((pose_mat, np.array([0,0,0,1])))
 
         # Project rays into camera coordinate system.
         rvec = cv2.Rodrigues(pose_mat[:3,:3])[0].ravel()
-        tvec = pose_mat[:,3]
+        tvec = pose_mat[:3, 3]
         im_pts = cv2.projectPoints(points.T, rvec, tvec, self._K,
                                    self._dist)[0]
         im_pts = np.squeeze(im_pts, 1).T
@@ -1103,13 +1045,14 @@ class StandardCamera(Camera):
         # Make homogeneous
         points = np.vstack([points, np.ones(points.shape[1])])
         points = np.dot(pose_mat, points)
-        points /= np.sqrt(np.sum(points**2, 0))
+        #points /= np.sqrt(np.sum(points**2, 0))
+        points /= points[3, :]
 
         # Add the 1e-8 to avoid "falling off the focal plane" due to rounding
         # error.
-        ind = points[2] <= self.min_ray_cos
+        # ind = points[2] <= self.min_ray_cos
 
-        im_pts[:, ind] = -100000
+        #im_pts[:, ind] = np.nan
 
         return im_pts
 

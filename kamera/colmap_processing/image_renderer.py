@@ -1,47 +1,8 @@
 #!/usr/bin/env python
-"""
-ckwg +31
-Copyright 2017-2018 by Kitware, Inc.
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
- * Redistributions of source code must retain the above copyright notice,
-   this list of conditions and the following disclaimer.
-
- * Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
- * Neither name of Kitware, Inc. nor the names of any contributors may be used
-   to endorse or promote products derived from this software without specific
-   prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS''
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-==============================================================================
-
-Library handling projection operations of a standard camera model.
-
-Note: the image coordiante system has its origin at the center of the top left
-pixel.
-
-"""
-from __future__ import division, print_function
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-from scipy.interpolate import interp2d, RectBivariateSpline
+from scipy.interpolate import RegularGridInterpolator
 import PIL
 
 
@@ -149,6 +110,32 @@ def warp_perspective(image, h, dsize, interpolation=0, use_pyr=True,
     flags = interpolation | cv2.WARP_INVERSE_MAP
     warped_image = cv2.warpPerspective(image, h, dsize=dsize, flags=flags)
     return warped_image
+
+def visualize_camera_and_points(pose_mat, points):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot camera position
+    cam_pos = pose_mat[:3, 3]
+    ax.scatter(cam_pos[0], cam_pos[1], cam_pos[2], c='r', marker='^', label='Camera')
+
+    # Plot points
+    points_np = np.array(points)
+    ax.scatter(points_np[:,0], points_np[:,1], points_np[:,2], c='b', marker='o', label='Points')
+
+    # Draw camera orientation axes
+    axes_length = 1.0
+    rotation_matrix = pose_mat[:3, :3]
+    for i, color in zip(range(3), ['r', 'g', 'b']):
+        axis = rotation_matrix[:, i] * axes_length
+        ax.quiver(cam_pos[0], cam_pos[1], cam_pos[2],
+                  axis[0], axis[1], axis[2], color=color)
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.legend()
+    plt.show()
 
 
 def render_view(src_cm, src_img, src_t, dst_cm, dst_t, interpolation=1,
@@ -265,8 +252,8 @@ def render_view(src_cm, src_img, src_t, dst_cm, dst_t, interpolation=1,
             # Densely sample all pixels.
             x = np.linspace(0, dst_cm.width-1, dst_cm.width)
             y = np.linspace(0, dst_cm.height-1, dst_cm.height)
-            X,Y = np.meshgrid(x, y)
-            im_pts = np.vstack([X.ravel(),Y.ravel()])
+            xb, yb = np.meshgrid(x, y)
+            im_pts = np.vstack([xb.ravel(),yb.ravel()])
 
             # Unproject rays into camera coordinate system.
             ray_pos, ray_dir = dst_cm.unproject(im_pts, dst_t)
@@ -283,48 +270,52 @@ def render_view(src_cm, src_img, src_t, dst_cm, dst_t, interpolation=1,
             X = np.reshape(im_pts_src[0], (dst_cm.height,dst_cm.width))
             Y = np.reshape(im_pts_src[1], (dst_cm.height,dst_cm.width))
         else:
-            # Sample the full projection equation every 'blocksize' pixels and
-            # interpolate in between.
-            nx = dst_cm.width//block_size
-            ny = dst_cm.height//block_size
-            x = np.linspace(0, dst_cm.width-1, nx)
-            y = np.linspace(0, dst_cm.height-1, ny)
-            X,Y = np.meshgrid(x, y)
-            im_pts = np.vstack([X.ravel(),Y.ravel()])
+            # Define block size and calculate grid sampling points
+            nx = dst_cm.width // block_size
+            ny = dst_cm.height // block_size
+            x = np.linspace(0, dst_cm.width - 1, nx)
+            y = np.linspace(0, dst_cm.height - 1, ny)
 
-            # Unproject rays into camera coordinate system.
-            ray_pos, ray_dir = dst_cm.unproject(im_pts, dst_t)
+            # Create sparse grid with consistent indexing
+            xb, yb = np.meshgrid(x, y, indexing='ij')  # Shape: (nx, ny)
+            sampled_im_pts = np.vstack([xb.ravel(), yb.ravel()])  # Shape: (2, nx*ny)
 
+            # Unproject rays into camera coordinate system
+            ray_pos, ray_dir = dst_cm.unproject(sampled_im_pts, dst_t)
+
+            # Intersect rays with world model or project to infinity
             if world_model is not None:
                 points = world_model.intersect_rays(ray_pos, ray_dir)
             else:
-                # Project the ray out to "infinity" (well, surface_distance).
                 ray_dir *= surface_distance
                 points = ray_pos + ray_dir
 
+            # Project points to source camera
             im_pts_src = src_cm.project(points, src_t).astype(np.float32)
 
-            X = np.reshape(im_pts_src[0], (ny,nx))
-            Y = np.reshape(im_pts_src[1], (ny,nx))
+            # Reshape projected points for interpolation
+            X = np.reshape(im_pts_src[0], (nx, ny))  # Shape: (nx, ny)
+            Y = np.reshape(im_pts_src[1], (nx, ny))  # Shape: (nx, ny)
 
-            if True:
-                fx = interp2d(x, y, X)
-                fy = interp2d(x, y, Y)
-            else:
-                # RectBivariateSpline is much faster than interp2d on a
-                # rectangular grid.
-                # Order of the interpolation
-                n = 1
-                fx = RectBivariateSpline(x, y, X.T, kx=n, ky=n)
-                fy = RectBivariateSpline(x, y, Y.T, kx=n, ky=n)
+            # Create the interpolators with grid axes (x, y)
+            interpx = RegularGridInterpolator((x, y), X,
+                                              bounds_error=False, fill_value=np.nan)
+            interpy = RegularGridInterpolator((x, y), Y,
+                                              bounds_error=False, fill_value=np.nan)
 
-            # Evaluate on dense sampling.
-            xd = np.linspace(0, dst_cm.width-1, dst_cm.width)
-            yd = np.linspace(0, dst_cm.height-1, dst_cm.height)
-            X = fx(xd, yd).astype(np.float32)
-            Y = fy(xd, yd).astype(np.float32)
+            # Define dense grid for evaluation with consistent indexing
+            xd = np.linspace(0, dst_cm.width - 1, dst_cm.width)
+            yd = np.linspace(0, dst_cm.height - 1, dst_cm.height)
+            y_grid, x_grid = np.meshgrid(yd, xd, indexing='ij')  # Shape: (height, width)
 
-        dst_img = cv2.remap(src_img, X, Y, interpolation)
+            # Prepare points as (n_points, 2) array with (x, y) coordinates
+            dense_points = np.vstack([x_grid.ravel(), y_grid.ravel()]).T  # Shape: (width*height, 2)
+
+            # Evaluate interpolators with dense_points
+            X_dense = interpx(dense_points).reshape(dst_cm.height, dst_cm.width).astype(np.float32)
+            Y_dense = interpy(dense_points).reshape(dst_cm.height, dst_cm.width).astype(np.float32)
+
+        dst_img = cv2.remap(src_img, X_dense, Y_dense, interpolation)
 
         # Set mask to False any place where the src image coordinates are
         # within edge_buffer from the edge.

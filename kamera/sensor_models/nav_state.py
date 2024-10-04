@@ -1,50 +1,13 @@
 #!/usr/bin/env python
-"""
-ckwg +31
-Copyright 2017-2019 by Kitware, Inc.
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
- * Redistributions of source code must retain the above copyright notice,
-   this list of conditions and the following disclaimer.
-
- * Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
- * Neither name of Kitware, Inc. nor the names of any contributors may be used
-   to endorse or promote products derived from this software without specific
-   prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS''
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-==============================================================================
-
-Library handling projection operations of a standard camera model.
-
-Note: the image coordiante system has its origin at the center of the top left
-pixel.
-
-"""
-from __future__ import division, print_function, absolute_import
 import numpy as np
 import threading
 import bisect
 import json
-import glob
 
 # KAMERA imports
+#from libnmea_navsat_driver.stream_archive import enumerate_packets
+#from libnmea_navsat_driver.gsof import GsofEventDispatch, GsofInsDispatch, \
+#    maybe_gsof, parse_gsof_stream, separate_nmea
 from kamera.sensor_models.nav_conversions import (
         enu_to_llh,
         llh_to_enu,
@@ -284,32 +247,24 @@ class NavStateINSBinary(NavStateProvider):
 
 
 class NavStateINSJson(NavStateINSBinary):
-    def __init__(self, json_path, lat0=None, lon0=None, alt0=0):
+    def __init__(self, json_paths, lat0=None, lon0=None, alt0=0):
         """
         :param json_path: GLOB path for metadata json file(s).
         :type json_path: str
 
         """
-        json_paths = glob.glob(json_path)
-
-        if len(json_paths) == 0:
-            raise Exception('Could not find any _meta.json in \'%s\'' %
-                            json_path)
-
-        print('Reconstructing navigation stream from %i meta.json files' %
-              len(json_paths))
+        #json_paths = glob.glob(json_path)
         frame_times = []
         nav_pose_dict = {}
         self._ins_nav_times = []
         self._ins_ypr = []
         self._ins_llh = []
+        json_counter = 0
         for fname in json_paths:
             with open(fname) as json_file:
                 d = json.load(json_file)
 
                 if d['ins']['time'] in nav_pose_dict:
-                    print(d['ins']['time'])
-                    print('err: duplicate time')
                     continue
                 self._ins_nav_times.append(d['ins']['time'])
                 self._ins_ypr.append([d['ins']['heading'],
@@ -334,6 +289,9 @@ class NavStateINSJson(NavStateINSBinary):
                                                    quat[3]]
 
                 frame_times.append(d['evt']['time'])
+                json_counter += 1
+        print('Reconstructed navigation stream from %i meta.json files' %
+              json_counter)
 
         self._ins_ypr = np.array(self._ins_ypr)
         self._ins_llh = np.array(self._ins_llh)

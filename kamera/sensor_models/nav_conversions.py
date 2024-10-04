@@ -478,7 +478,7 @@ def sincosd(x):
     * &minus;0 is returned.
 
     """
-    r = np.fmod(x, 360)
+    r = np.remainder(x, 360)
     q = int(np.floor(r / 90 + 0.5))
     r -= 90 * q
     # now abs(r) <= 45

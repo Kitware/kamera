@@ -3,7 +3,7 @@ try:
     # Use ROS tf.transformations for rotation operations.
     from tf.transformations import euler_from_quaternion, quaternion_multiply, \
         quaternion_from_matrix, quaternion_matrix, quaternion_from_euler, \
-        quaternion_inverse, euler_matrix, quaternion_slerp
+        quaternion_inverse, euler_matrix
 except ImportError:
     # Instead, use the pip installed transformations.py, which isn't compatible
     # with Python 2. However, this requires some modifications to the
