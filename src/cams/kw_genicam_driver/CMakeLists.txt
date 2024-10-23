@@ -181,8 +181,8 @@ add_executable( a6750_driver_node
         src/decode_error.cpp
         src/driver_a6750.cpp
         src/macros.h
-        src/aux.h
-        src/aux.cpp
+        src/utils.h
+        src/utils.cpp
         src/spec_a6750.h
         src/spec_a6750.cpp
         src/genicam_ctl.cpp src/genicam_ctl.h
