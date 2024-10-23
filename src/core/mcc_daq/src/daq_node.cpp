@@ -19,7 +19,7 @@
 #include "usb-2408.h"
 #include "usbdaq.h"
 #include "daq_node.h"
-#include "aux.h"
+#include "utils.h"
 
 using std::shared_ptr;
 

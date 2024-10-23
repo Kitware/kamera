@@ -1,5 +1,5 @@
-#ifndef MCC_DAQ_AUX_H
-#define MCC_DAQ_AUX_H
+#ifndef MCC_DAQ_UTILS_H
+#define MCC_DAQ_UTILS_H
 
 #include <ros/ros.h>
 
@@ -22,4 +22,4 @@ extern uint8_t G_INFO_VERBOSITY;
 
 void msleep(uint32_t milliseconds);
 
-#endif //MCC_DAQ_AUX_H
+#endif //MCC_DAQ_UTILS_H
