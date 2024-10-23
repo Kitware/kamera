@@ -9,7 +9,7 @@
 
 #include "decode_error.h"
 #include "spec_a6750.h"
-#include "aux.h"
+#include "utils.h"
 #include "macros.h"
 
 using std::string;

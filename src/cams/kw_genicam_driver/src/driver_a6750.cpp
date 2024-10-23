@@ -34,7 +34,7 @@
 #include <phase_one/phase_one_utils.h>
 
 
-#include "aux.h"
+#include "utils.h"
 #include "macros.h"
 #include "decode_error.h"
 #include "spec_a6750.h"

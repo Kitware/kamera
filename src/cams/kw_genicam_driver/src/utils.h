@@ -1,7 +1,7 @@
 // aux.h
 /* Auxiliary code for genicam driver files */
-#ifndef KW_GENICAM_DRIVER_AUX_H
-#define KW_GENICAM_DRIVER_AUX_H
+#ifndef KW_GENICAM_DRIVER_UTILS_H
+#define KW_GENICAM_DRIVER_UTILS_H
 
 #include <cstdio>
 #include <atomic>
@@ -260,4 +260,4 @@ public:
 
 
 
-#endif //KW_GENICAM_DRIVER_AUX_H
+#endif //KW_GENICAM_DRIVER_UTILS_H
