@@ -159,7 +159,7 @@ add_executable(daq_node
         src/usb-2416.c
         src/daq_node.cpp src/daq_node.h
         src/usbdaq.cpp
-        src/aux.h src/aux.cpp)
+        src/utils.h src/utils.cpp)
 
 add_executable(chatter
         src/chatter.cpp

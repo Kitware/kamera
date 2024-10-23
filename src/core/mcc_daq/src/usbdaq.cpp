@@ -8,7 +8,7 @@
 
 #include "pmd.h"
 #include "usb-2408.h"
-#include "aux.h"
+#include "utils.h"
 #include "usbdaq.h"
 
 
