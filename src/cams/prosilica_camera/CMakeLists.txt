@@ -63,7 +63,7 @@ target_link_libraries(prosilica ${catkin_LIBRARIES})
 add_library(prosilica_nodelet
         src/nodes/prosilica_nodelet.cpp
         src/nodes/view_server_nodelet.cpp
-        /root/kamera_ws/src/cams/phase_one/src/phase_one_utils.cpp
+        /root/noaa_kamera/src/cams/phase_one/src/phase_one_utils.cpp
         )
 target_link_libraries(prosilica_nodelet
         prosilica

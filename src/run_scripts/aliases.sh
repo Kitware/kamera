@@ -44,7 +44,7 @@ notes: ''"
 # catkin build shortcuts
 alias cb-daq="catkin build custom_msgs mcc_daq"
 alias cb-ins="catkin build custom_msgs ins_driver"
-alias cb-cam="catkin build custom_msgs kamera_launch nexus kw_genicam_driver prosilica_camera"
+alias cb-cam="catkin build custom_msgs nexus kw_genicam_driver prosilica_camera"
 
 alias cb-backend="catkin build backend"
 alias cb-gui="catkin build wxpython_gui"
@@ -67,7 +67,7 @@ alias run3-ins="run-ins"
 # todo: put this stuff in the .launch
 # bring up both cams
 run-rgb() {
-    roslaunch --wait kamera_launch prosilica.launch ip:=${iprgb} system_name:=${NODE_HOSTNAME} trigger_mode:=syncin2
+    roslaunch --wait prosilica_camera prosilica.launch ip:=${iprgb} system_name:=${NODE_HOSTNAME} trigger_mode:=syncin2
 }
 run-ir() {
     roslaunch --wait kw_genicam_driver genicam_a6750.launch camera_ipv4:=${ipir} \

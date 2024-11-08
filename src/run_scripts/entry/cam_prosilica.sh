@@ -62,7 +62,7 @@ if [[ ${CAM_IFACE} == 'null' ]]; then
     exit 1
 fi
 
-IFACE_INFO=$(ipj.sh | jq ".$CAM_IFACE")
+IFACE_INFO=$(${KAM_REPO_DIR}/src/run_scripts/inpath/ipj.sh | jq ".$CAM_IFACE")
 if [[ ${CAM_IFACE} == 'null' ]]; then
     printf "<!> Failed to get info for interface $CAM_IFACE"
     exit 1
@@ -106,7 +106,7 @@ if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/rebuild ) == "true" ]]; then
   fi
 fi
 
-exec roslaunch "${ROSWAIT}" kamera_launch prosilica.launch \
+exec roslaunch "${ROSWAIT}" prosilica_camera prosilica.launch \
     ip:=${CAM_IP} \
     system_name:=${NODE_HOSTNAME} \
     cameratype:=${CAM_MODE} \

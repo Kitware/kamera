@@ -57,7 +57,7 @@
     <arg name="respawn"  value="true" unless="$(arg norespawn)"/>
     <arg name="respawn"  value="false" if="$(arg norespawn)"/>
 
-
+  <group ns="$(arg namespace)">
     <node pkg="nodelet"
           type="nodelet"
           name="prosilica_manager"
@@ -67,7 +67,7 @@
     <node pkg="nodelet"
           type="nodelet"
           name="$(arg cameratype)_driver"
-          args="load prosilica_nodelet/ProsilicaNodelet prosilica_manager"
+          args="load prosilica_camera/ProsilicaNodelet prosilica_manager"
           output="screen"
           required="$(arg norespawn)"
           respawn="$(arg respawn)">
@@ -87,12 +87,6 @@
             <!--<param name="exposure" value="$(arg exposure)" type="double"/>-->
 
             <param name="exposure_auto_max" value="$(arg exposure_auto_max)" type="double"/>
-    </node>
-    <node pkg="nodelet"
-          type="nodelet"
-          name="ViewServerNodelet"
-          args="load prosilica_nodelet/ViewServerNodelet prosilica_manager"
-          output="screen">
-    </node>
-
+        </node>
+    </group>
 </launch>
