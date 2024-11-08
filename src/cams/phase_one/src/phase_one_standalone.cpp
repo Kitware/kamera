@@ -110,7 +110,7 @@ namespace phase_one
             P1::ImageSdk::SetArchitecture(P1::ImageSdk::Architecture::Cuda);
         }
         P1::ImageSdk::SetSensorProfilesLocation(
-        "/root/kamera_ws/artifacts/ImageSDKCuda/SensorProfiles");
+        "/root/noaa_kamera/artifacts/ImageSDKCuda/SensorProfiles");
         connectToIPCamera(ip_address_);
 
         auto list = camera.AllPropertyIds();
