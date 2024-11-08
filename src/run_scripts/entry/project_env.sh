@@ -2,14 +2,7 @@
 
 # Source environment variables for the project.sh entrypoint. No exec.
 
-# $WS_DIR and $ROS_DISTRO should be provided by the container
-# If not, define them here:
-#ROS_DISTRO=kinetic
-#WS_DIR=/root/kamera_ws
-
-# this makes tab complete break the container
-#set -e
-
+echo "NEW ENTRY?"
 echo "~~~ ~~~ Project entry point  project_env.sh ~~~ ~~~"
 for VNAME in ROS_DISTRO WS_DIR
 do
@@ -45,8 +38,6 @@ export REDIS_HOST=${REDIS_HOST}
 export ARCH_KEY="/sys/arch/"
 # Try turning respawning back to roslaunch
 export NORESPAWN="false"
-# Not sure if this is actually used
-export KWIVER_DIR=/build/viame/install/lib/cmake/kwiver/
 
 ## alternate path syntax
 #[ "${PATH#*$HOME/.local/bin:}" == "$PATH" ] && export PATH="$HOME/.local/bin:$PATH"
@@ -59,3 +50,5 @@ prependToPath /opt/ros/$ROS_DISTRO/bin
 errcho() {
     (>&2 echo -e "\e[31m$1\e[0m")
 }
+
+export KAM_REPO_DIR=/root/noaa_kamera

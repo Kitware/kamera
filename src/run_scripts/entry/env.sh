@@ -18,6 +18,8 @@ done
 echo "Redis successfully connected at $REDIS_HOST, starting."
 
 export NODE_HOSTNAME=$(hostname)
+export ROS_IP=$(dig ${NODE_HOSTNAME} +short)
+echo "ROS IP: ${ROS_IP}"
 export ROS_MASTER_URI="http://${REDIS_HOST}:11311"
 export KAMERA_DIR="/home/user/kw/noaa_kamera"
 export DATA_MOUNT_POINT=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/base)
@@ -25,6 +27,24 @@ export CAM_FOV=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/hosts/${NODE_HOS
 
 export ROS_DISTRO="noetic"
 export KAMERA_DNS_IP="192.168.88.1"
-export PROJ_DIR="${KAMERA_DIR}"
+export PROJ_DIR="/root/kamera_ws"
 export PULSE_TTY=/dev/ttyS0
 export MCC_DAQ="/dev/$(readlink /dev/mcc_daq)"
+
+# Toggles reading detector images from NAS vs. reading from ROS msg
+# INCREASED I/O
+export READ_FROM_NAS=0
+
+# Toggles the option to compress / decompress images within the nexus
+# To test the detector's performance on compressed imagery
+# INCREASED LATENCY (~0.7s)
+export COMPRESS_IMAGERY=0
+
+# Sets the compression used on the phase on imagery
+# Best to keep within 80-100 for optimal quality
+export JPEG_QUALITY=90
+
+# If in a GPS-denied environment, this will publish events on each event
+# trigger to simulated the GPS timestamp
+# BE SURE TO SET TO 0 BEFORE FLIGHT
+export SPOOF_EVENTS=0

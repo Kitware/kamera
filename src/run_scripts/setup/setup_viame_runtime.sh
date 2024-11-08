@@ -1,0 +1,69 @@
+###############################################################################
+# This script sets up all paths required for standard VIAME Usage       #
+# This properly sets the PATH to point to the local bin, but unforunately
+# this causes a catkin build to crash, so it is a 2-part process.
+###############################################################################
+
+this_dir="/opt/noaa/viame" #$(readlink -f $(dirname $BASH_SOURCE[0]))
+
+# Setup VIAME install path
+export VIAME_INSTALL=$this_dir
+
+# Paths for loading C++ algorithm plugins built in KWIVER
+export KWIVER_PLUGIN_PATH=$this_dir/lib/kwiver/plugins/algorithms:$KWIVER_PLUGIN_PATH
+export KWIVER_PLUGIN_PATH=$this_dir/lib64/kwiver/plugins/algorithms:$KWIVER_PLUGIN_PATH
+export KWIVER_PLUGIN_PATH=$this_dir/lib/kwiver/plugins/modules:$KWIVER_PLUGIN_PATH
+export KWIVER_PLUGIN_PATH=$this_dir/lib64/kwiver/plugins/modules:$KWIVER_PLUGIN_PATH
+export KWIVER_PLUGIN_PATH=$this_dir/lib/kwiver/plugins/processes:$KWIVER_PLUGIN_PATH
+export KWIVER_PLUGIN_PATH=$this_dir/lib64/kwiver/plugins/processes:$KWIVER_PLUGIN_PATH
+
+# Paths for loading C++ algorithm plugins built in VIAME
+export KWIVER_PLUGIN_PATH=$this_dir/lib/viame/modules:$KWIVER_PLUGIN_PATH
+export KWIVER_PLUGIN_PATH=$this_dir/lib64/viame/modules:$KWIVER_PLUGIN_PATH
+export KWIVER_PLUGIN_PATH=$this_dir/lib/viame/processes:$KWIVER_PLUGIN_PATH
+export KWIVER_PLUGIN_PATH=$this_dir/lib64/viame/processes:$KWIVER_PLUGIN_PATH
+
+# Paths for loading process plugins
+export SPROKIT_MODULE_PATH=$this_dir/lib/sprokit:$SPROKIT_MODULE_PATH
+
+# Paths for the GUIs
+export QT_PLUGIN_PATH=$this_dir/lib/qt4/plugins
+export VG_PLUGIN_PATH=$this_dir
+export VIDTK_MODULE_PATH=$this_dir/lib/modules
+
+# Excessive KWIVER python arrow and process import locations
+export SPROKIT_PYTHON_MODULES=kwiver.sprokit.processes:kwiver.sprokit.schedulers
+export SPROKIT_PYTHON_MODULES=kwiver.sprokit.tests.processes:$SPROKIT_PYTHON_MODULES
+export SPROKIT_PYTHON_MODULES=kwiver.arrows.core:$SPROKIT_PYTHON_MODULES
+export SPROKIT_PYTHON_MODULES=kwiver.arrows.python:$SPROKIT_PYTHON_MODULES
+export SPROKIT_PYTHON_MODULES=kwiver.sprokit.processes.pytorch:$SPROKIT_PYTHON_MODULES
+export SPROKIT_PYTHON_MODULES=viame.arrows.core:$SPROKIT_PYTHON_MODULES
+export SPROKIT_PYTHON_MODULES=viame.arrows.pytorch:$SPROKIT_PYTHON_MODULES
+export SPROKIT_PYTHON_MODULES=viame.arrows.tensorflow:$SPROKIT_PYTHON_MODULES
+export SPROKIT_PYTHON_MODULES=viame.arrows.smqtk:$SPROKIT_PYTHON_MODULES
+export SPROKIT_PYTHON_MODULES=viame.processes:$SPROKIT_PYTHON_MODULES
+
+# Set default log level
+export KWIVER_DEFAULT_LOG_LEVEL=info
+
+# Paths for matlab (empty if not built with matlab)
+
+# Paths for CUDA libraries
+if [ ! -z "$CUDA_INSTALL_DIR" ]; then
+  if [ -d "$CUDA_INSTALL_DIR" ]; then
+    export LD_LIBRARY_PATH=$CUDA_INSTALL_DIR/lib64:$LD_LIBRARY_PATH
+  else
+    echo "CUDA directory specified in setup_viame.sh does not exist"
+    return
+  fi
+fi
+
+# Paths for adding exes to path (must occur after python and matlab)
+export PATH=$this_dir/bin:$PATH
+export KWIVER_DIR=$this_dir/lib/cmake/kwiver
+export LD_LIBRARY_PATH=$this_dir/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$this_dir/lib64:$LD_LIBRARY_PATH
+
+# Show when VIAME is sourced in terminal without duplicates
+export PS1="${PS1//"(viame) "/}"
+export PS1="(viame) ${PS1//"(base) "/}"

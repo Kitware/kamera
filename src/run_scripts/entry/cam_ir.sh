@@ -72,6 +72,7 @@ fi
 
 exec roslaunch "${ROSWAIT}" kw_genicam_driver ${DRIVER} \
     system_name:=${NODE_HOSTNAME} \
+    norespawn:="false" \
     cam_fov:=${CAM_FOV} \
     camera_ipv4:=${CAM_IP} \
     camera_manufacturer:=FLIR \

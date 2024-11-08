@@ -2,34 +2,35 @@
 
 ## === === === ===  User-set configuration  === === === ===
 
-KAM_REPO_DIR=$(~/.config/kamera/repo_dir.bash)
+source /entry/project_env.sh
 source ${KAM_REPO_DIR}/src/cfg/cfg-aliases.sh  # get cq - ConfigQuery
 
 ## tell the system hostname of the node acting as ROS master host
 export MASTER_HOST=$(cq '.master_host')
+export REDIS_HOST=$(cq '.redis_host')
 
 NODE_HOSTNAME=${NODE_HOSTNAME:-$(hostname)}
-CAM_FOV=$(cq ".hosts.${NODE_HOSTNAME}.fov")
+CAM_FOV="$(redis-cli -h ${REDIS_HOST} -p 6379 get "/sys/arch/hosts/${NODE_HOSTNAME}/fov")"
+CAM_FOV=${CAM_FOV:-"null_fov"}
+FOV_SHORT=`echo $CAM_FOV | cut -c1-1`
+FOV_SHORT="${FOV_SHORT^}"
 export NODE_HOSTNAME
 export CAM_FOV
+export FOV_SHORT
 
 ## === === === ===  Static configuration  === === === ===
 
-WS_VIAME=/root/noaa_kamera
-WS_KAMERA=/root/kamera_ws
-WS_DEVEL="${WS_VIAME}/devel"
+WS_DEVEL="${KAM_REPO_DIR}/devel"
 
 
 ## === === === ===  catkin rebuild  === === === ===
-
-source /entry/project_env.sh
 
 if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/rebuild ) == "true" ]]; then
   echo "/debug/rebuild set, triggering rebuild on startup"
   # todo: remove this shim
   #  we have to clean first since the current docker image puts roskv in the wrong spot
   catkin clean -y
-  catkin build roskv sprokit_adapters
+  catkin build sprokit_adapters
   if [[ $? -ne 0 ]]; then
     echo "Rebuild failed. Your code is in an unstable state"
     exit 1
@@ -43,7 +44,7 @@ fi
 # === === === === env part 1 === === === ===
 
 # This pulls in VIAME_INSTALL variable
-source get_viame_install
+source "${KAM_REPO_DIR}/src/run_scripts/setup/setup_viame_runtime.sh"
 
 
 for VNAME in CFG_ALIAS_SET CAM_FOV MASTER_HOST WS_DEVEL VIAME_INSTALL
@@ -66,20 +67,8 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-
-# === === === === env part 2 electric boogaloo === === === ===
-# This is necessary to get all the viame env setup
-# WARNING: This completely screws with catkin build, see below
-source "${VIAME_INSTALL}/setup_viame.sh"
-
 # Directory to store detection csv files.
 _DETECTION_CSV_DIR="${DATA_MOUNT_POINT}/$(date +%Y%m%d%H%M%S)"
-
-
-# crazy scratch dir stuff
-#mkdir -p /scratch
-#cp -R -f "${VIAME_INSTALL}/configs/pipelines" /scratch/
-#ln -srvf "${REPO_DIR}/src/kitware-ros-pkg/sprokit_adapters/pipelines/embedded_dual_stream" /scratch/pipelines
 
 PIPEFILE=$(redis-cli -h ${REDIS_HOST} -p 6379 get "/sys/${NODE_HOSTNAME}/detector/pipefile")
 DETECTION_CSV_DIR="$(redis-cli -h ${REDIS_HOST} -p 6379 get "/sys/syscfg_dir")/../detections"
@@ -94,8 +83,6 @@ mkdir -p ${IMAGE_LIST_DIR}
 # Defaults
 _PIPEFILE="/mnt/flight_data/detector_models/viame-configs/pipelines/embedded_dual_stream/EO_Seal_Detector.pipe"
 PIPEFILE=${PIPEFILE:-$_PIPEFILE}
-# todo: wait for Matt to patch the pipe file bug then rely entirely on PIPEFILE relative paths
-
 PIPELINE_DIR=$(dirname $PIPEFILE)
 
 for VNAME in PIPEFILE KWIVER_PLUGIN_PATH
@@ -125,36 +112,19 @@ fi
 
 ## === === === ===  end configuration  === === === ===
 
-
 ## grab params - HOPEFULLY these are set up
 #TODO Pull from Redis
-KAM_FLIGHT=$(rosparam get /flight -p)
-KAM_PROJECT=$(rosparam get /project -p)
-KAM_FLIGHT_DIR="${DATA_MOUNT_POINT}/${KAM_PROJECT}/fl${KAM_FLIGHT}/${CAM_FOV}_view"
+export KAM_FLIGHT="$(redis-cli -h ${REDIS_HOST} -p 6379 get "/sys/arch/flight")"
 
 echo "NODE_HOSTNAME: ${NODE_HOSTNAME}"
 echo "NODE_MODE    : ${NODE_MODE}"
 echo "DATA_MOUNT   : ${DATA_MOUNT_POINT}"
 echo "DETN_CSV_DIR : ${DETECTION_CSV_DIR}"
 echo "KAM_FLIGHT   : ${KAM_FLIGHT}"
-echo "KAM_PROJECT  : ${KAM_PROJECT}"
-echo "_FLIGHT_DIR  : ${KAM_FLIGHT_DIR}"
 
 ## === === === ===  env configuration  === === === ===
 
-# This is the price we pay for interoperating py 2/3
-# Have to ensure ros is launched with only py2 things in PYTHONPATH
-# Then the py3 PYTHONPATH stuff is added in in launch file
-
-PYTHONPATH=""
-source /entry/project_env.sh
-source  /root/anaconda3/bin/activate
-
-# Point explicitly to OpenCV3
-export LD_LIBRARY_PATH="/opt/ros/kinetic/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH"
-
 echo "PIPEFILE that's in use: ${PIPEFILE}"
-
 printf "
 \$ exec roslaunch sprokit_adapters sprokit_detector_fusion_adapter.launch \
                     kwiver:=${WS_DEVEL} \

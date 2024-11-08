@@ -24,6 +24,7 @@ else
 fi
 
 roslaunch --wait view_server image_view_server.launch \
+    norespawn:="false" \
 	system_name:=${NODE_HOSTNAME} \
 	send_image_data:=${SEND_IMAGE_DATA} \
 	compress_imagery:=${COMPRESS_IMAGERY}

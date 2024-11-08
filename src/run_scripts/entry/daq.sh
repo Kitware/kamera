@@ -22,9 +22,9 @@ if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/rebuild ) == "true" ]]; then
   fi
 fi
 
-if [[ "$MCC_DAQ" == *"tty"* ]] ; then 
+if [[ "$MCC_DAQ" == *"tty"* ]] ; then
     export DAQ_TTY="$MCC_DAQ"
-    exec roslaunch --wait ser_daq ser_daq.launch norespawn:=${NORESPAWN:-false}
+    exec roslaunch --wait ser_daq ser_daq.launch norespawn:="false"
 else
-    exec roslaunch --wait mcc_daq daq.launch norespawn:=${NORESPAWN:-false}
+    exec roslaunch --wait mcc_daq daq.launch norespawn:="false"
 fi

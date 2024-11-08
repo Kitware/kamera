@@ -112,7 +112,7 @@ exec roslaunch "${ROSWAIT}" kamera_launch prosilica.launch \
     cameratype:=${CAM_MODE} \
     cam_fov:=${CAM_FOV} \
     trigger_mode:=${TRIGGER_MODE} \
-    norespawn:=${NORESPAWN} \
+    norespawn:="false" \
     GainMode:=$(cq ".launch.cam.${CAM_MODE}.GainMode") \
     GainValue:=$(cq ".launch.cam.${CAM_MODE}.GainValue") 2> >(tee -a "${LOGFILE}" >&2) &
 

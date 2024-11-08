@@ -11,4 +11,4 @@ if [[ -n ${SPOOF_INS} ]] ; then
     echo "spoof mode"
     ARG_SPOOF="spoof:=${SPOOF_INS}"
 fi
-exec roslaunch --wait ins_driver ins.launch ${ARG_SPOOF} norespawn:=${NORESPAWN:-false}
+exec roslaunch --wait ins_driver ins.launch ${ARG_SPOOF} norespawn:="false"
