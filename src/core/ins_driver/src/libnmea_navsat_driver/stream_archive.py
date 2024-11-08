@@ -44,7 +44,6 @@ def dumpbuf(filename, buf):
     with open(filename, 'ab') as fp:
         fp.write(bundle_packet(buf))
 
-
 def enumerate_packets(buf):
     """
     Unpack a binary stream packaged using dumpbuf
@@ -61,16 +60,18 @@ def enumerate_packets(buf):
         Generator which yields (i, packet)
     """
     count = 0
-    while buf:
-        sth, length = struct.unpack('>BH', buf[:3])
-        if len(buf) < length:
+    p = 0 # pointer
+    end = len(buf)
+    while p < end:
+        sth, length = struct.unpack('>BH', buf[p:p+3])
+        if end - p + 1 < length:
             raise StopIteration('Incomplete packet')
-        payload, tail = buf[3:length+3], buf[length+3:length+8]
+        payload, tail = buf[p+3:p+length+3], buf[p+length+3:p+length+8]
         etb, checksum, cr, nl = struct.unpack('>BHBB', tail)
-
         check = sum(bytearray(payload)) & 0xFFFF
         if check != checksum:
-            warnings.warn('Warning: invalid checksum', RuntimeWarning)
-        buf = buf[length+8:]
+            print('Warning: invalid checksum')
+        p = p + length + 8
         yield count, payload
         count += 1
+
