@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
         ros-noetic-nodelet \
         ros-noetic-nodelet-topic-tools \
         ros-noetic-vision-opencv \
-        ros-noetic-prosilica-gige-sdk \
         ros-noetic-diagnostic-updater \
+        ros-noetic-self-test \
         libgtkmm-2.4-1v5 \
         libglademm-2.4-1v5 \
         libgtkglextmm-x11-1.2-dev \
@@ -106,7 +106,6 @@ WORKDIR /root/noaa_kamera
 
 # Copy products into container
 COPY        .             $WS_DIR
-COPY ./artifacts/ImageSDKCuda $WS_DIR/src/cams/phase_one/lib/
 
 RUN rm -rf /entry                                                       &&\
     ln -sf $WS_DIR/src/run_scripts/entry /entry                        &&\
@@ -116,15 +115,10 @@ RUN rm -rf /entry                                                       &&\
     printf "\nsource /aliases.sh\n" >> /root/.bashrc
 
 # Making useful links and copies
-RUN ln -sf $WS_DIR/scripts/repo_dir.bash $WS_DIR/repo_dir.bash
 RUN ln -sf $WS_DIR/scripts/activate_ros.bash $WS_DIR/activate_ros.bash
 RUN ln -sf $WS_DIR/src/cfg /cfg
-RUN mkdir -p /root/.config/kamera/src/cfg/ && \
-    ln -sf $WS_DIR/scripts/repo_dir.bash /root/.config/kamera/repo_dir.bash && \
-    ln -sf $WS_DIR/scripts/cfg-aliases.sh /root/.config/kamera/src/cfg/cfg-aliases.sh && \
-    ln -sf $WS_DIR/scripts/get /root/.config/kamera/src/cfg/get && \
-    ln -sf $WS_DIR/src/cfg/user-config.yml /root/.config/kamera/src/cfg/user-config.yml && \
-    ln -sf $WS_DIR/scripts/get /cfg/get
+RUN mkdir -p /root/.config/kamera && \
+    ln -sf $WS_DIR/.dir /root/.config/kamera/repo_dir.bash
 
 RUN [ "/bin/bash", "-c", "source /entry/project.sh && catkin build backend"]
 RUN ln -sv /usr/bin/python3 /usr/bin/python || true
