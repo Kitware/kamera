@@ -15,7 +15,7 @@ import rospy
 
 from custom_msgs.msg import GSOF_INS
 
-HOSTS = ["nuvo0", "nuvo1", "nuvo2"]
+HOSTS = [] #"nuvo0", "nuvo1", "nuvo2"]
 
 # Location of the geod file.
 KAM_DIR = os.environ["KAMERA_DIR"]

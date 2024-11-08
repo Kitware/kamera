@@ -108,7 +108,7 @@ class CamParamMonitor(object):
             rospy.logwarn(f"|GET| value coercion failed on {param}, resp value: %s" % resp.value)
             rospy.logerr(e)
             return
-        if not getsrv_val:
+        if getsrv_val is None:
             return
         if mode == "rgb":
             param = '_'.join(param.split(' '))
@@ -124,7 +124,7 @@ class CamParamMonitor(object):
             param = ' '.join(param.split('_'))
         # Value has changed, will return value to set
         if getsrv_val != requested_val:
-            print("Param: %s, getsrv_val: %s, requested_val: %s" % 
+            print("Param: %s, getsrv_val: %s, requested_val: %s" %
                   (param, getsrv_val, requested_val))
             rospy.logwarn("Setting parameter %s on %s because it differs."
                             % (param, host + "/" + mode))
@@ -188,6 +188,9 @@ class CamParamMonitor(object):
                     params_to_set = {}
                     for param, requested_val in requested_params.items():
                         param = ' '.join(param.split('_'))
+                        if param == "ExposureAuto":
+                            # Write-only for some reason
+                            continue
                         ret = self.get_param_val(host, mode, param, requested_val)
                         if ret is not None:
                             params_to_set[ret[0]] = (ret[1], ret[2])
