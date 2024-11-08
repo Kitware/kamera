@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+#Retrieve values from user config yaml, basically syntactic sugar for `yq r user-config.yml`
+
+CFG_FILE="${CFG_FILE:-/cfg/user-config.yml}"
+## Gotta pass it into jq cause it's more feature rich
+yq read -j "${CFG_FILE}" | jq -r "${1}"
