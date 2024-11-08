@@ -360,9 +360,7 @@ class ImageViewServer(object):
                 image = membridge.imgmsg_to_cv2(img_msg, 'passthrough')
             except Exception as exc:
                 rospy.logerr('{}: {}'.format(exc.__class__.__name__, exc))
-                traceback.print_exc()
-                print(membridge.data.keys())
-                raise
+                return False, Image()
         else:
             return True, Image()
         try:
