@@ -1,31 +1,75 @@
-# Base image from which viame-kamera is built
-# This may engage in some network access during the viame build
-ARG VIAME_BRANCH=latest
-FROM kamera/base/detector-base:${VIAME_BRANCH} as viame_src
+# Build off the public VIAME docker build (with ITK support)
+FROM kitware/viame:gpu-algorithms-latest as vb
 
-RUN echo 'edit here to invalidate cache [0]' \
-    && git clone https://github.com/VIAME/VIAME.git ${SRC_BASE}/viame \
-    && cd ${SRC_BASE}/viame \
-    && git checkout kamera/master \
-    && git submodule update --init --recursive
+WORKDIR /root
+# setup environment
+ENV LANG C.UTF-8
+ENV LC_ALL C.UTF-8
+ENV ROS_DISTRO noetic
+ENV DEBIAN_FRONTEND noninteractive
 
-FROM viame_src as viame_cache
+# install packages
+RUN apt-get update && apt-get install -q -y --no-install-recommends \
+    dirmngr \
+    curl \
+    git \
+    vim \
+    gnupg2 \
+    jq \
+    redis-server \
+    iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
 
-# Throw checkpoint on this line so we can change hash without invalidating previous cache
-ENV VIAME_CHECKPOINT 73df62910069f1de02e1abce8d78c8eb7f3fc40f
-# Get VIAME - don't change this hash - this is for caching!
-# kamera/master
-#RUN echo 'edit here to invalidate cache [0]' \
-#    && cd ${SRC_BASE}/viame \
-#    && git checkout ${VIAME_CHECKPOINT} \
-#    && git submodule update --init --recursive
+# setup sources.list
+RUN echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros1-latest.list
 
-# === === === === === ===  viame cache build === === === === ===
-FROM viame_cache as viame_kamera
+# setup keys
+RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
 
-COPY src/run_scripts/setup/build_viame.sh       $REPO_DIR/src/run_scripts/setup/build_viame.sh
+# install ros packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-noetic-ros-core=1.5.0-1* \
+    ros-noetic-ros-base=1.5.0-1* \
+    ros-noetic-perception=1.5.0-1* \
+    python3-catkin-tools \
+    ros-noetic-rqt-image-view \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN VIAME_BRANCH=$VIAME_CHECKPOINT $REPO_DIR/src/run_scripts/setup/build_viame.sh
+# Build tools necessary for catkin and roskv
 
-# now build latest kamera/master
-#RUN $REPO_DIR/src/run_scripts/setup/build_viame.sh
+# Add Tini to handle signals
+RUN curl -sSL https://github.com/krallin/tini/releases/download/v0.18.0/tini -o /tini && \
+    chmod +x /tini
+
+# Add yq to make config query work
+RUN curl -sL https://github.com/mikefarah/yq/releases/download/2.4.0/yq_linux_amd64 \
+    -o /usr/local/bin/yq && \
+    chmod +x /usr/local/bin/yq
+
+## === === === === === === === === === === === === === === ===
+# Clone in C++ Deps for Redis
+RUN mkdir /src
+RUN cd /src && git clone https://github.com/fmtlib/fmt.git \
+    &&  mkdir -p /src/fmt/build \
+    &&  cd /src/fmt/ \
+    &&  git checkout 9c418bc468baf434a848010bff74663e1f820e79 \
+    &&  cd /src/fmt/build \
+    &&  cmake -D CMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=TRUE .. \
+    &&  make -j && make install
+
+RUN cd /src && git clone --depth 1 https://github.com/nlohmann/json.git \
+    &&  mkdir -p /src/json/build && cd /src/json/build \
+    &&  cmake -D CMAKE_BUILD_TYPE=Release -D JSON_BuildTests=Off .. \
+    &&  make -j && make install
+
+RUN cd /src && git clone --depth 1 https://github.com/redis/hiredis.git \
+    &&  mkdir -p /src/hiredis/build \
+    &&  cd /src/hiredis/build \
+    &&  cmake -D CMAKE_BUILD_TYPE=Release .. \
+    &&  make -j && make install
+
+RUN cd /src && git clone --depth 1 https://github.com/sewenew/redis-plus-plus.git \
+    &&  mkdir -p /src/redis-plus-plus/build \
+    &&  cd /src/redis-plus-plus/build \
+    &&  cmake -D CMAKE_BUILD_TYPE=Release -D REDIS_PLUS_PLUS_BUILD_TEST=OFF .. \
+    &&  make -j && make install

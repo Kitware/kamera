@@ -1,6 +1,5 @@
 ARG BRANCH=latest
-ARG ROS_DISTRO
-FROM kamera/base/kamera-gui-deps-${ROS_DISTRO}:latest
+FROM kamera/base/kamera-gui-deps:latest
 
 
 # Create a non-root user and switch to it. Running X11 applications as root does

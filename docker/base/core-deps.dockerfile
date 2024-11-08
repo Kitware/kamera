@@ -1,13 +1,16 @@
-ARG ROS_DISTRO
-FROM kamera/base/roskitchen:${ROS_DISTRO}
+ARG CUDA
+FROM kamera/base/core-ros-cuda${CUDA}:latest
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-        ros-${ROS_DISTRO}-compressed-image-transport\
-        ros-${ROS_DISTRO}-camera-info-manager\
-        ros-${ROS_DISTRO}-image-view \
-        ros-${ROS_DISTRO}-cv-bridge \
-        ros-${ROS_DISTRO}-nodelet\
-        ros-${ROS_DISTRO}-nodelet-topic-tools \
+        ros-noetic-compressed-image-transport \
+        ros-noetic-camera-info-manager \
+        ros-noetic-image-view \
+        ros-noetic-cv-bridge \
+        ros-noetic-nodelet \
+        ros-noetic-nodelet-topic-tools \
+        ros-noetic-vision-opencv \
+        ros-noetic-prosilica-gige-sdk \
+        ros-noetic-diagnostic-updater \
         libgtkmm-2.4-1v5 \
         libglademm-2.4-1v5 \
         libgtkglextmm-x11-1.2-dev \
@@ -16,17 +19,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
         libglademm-2.4-dev \
     && rm -rf /var/lib/apt/lists/*
 
-## this will fail on noetic, that's ok, we can build from source
-RUN apt-get update && apt-get install --no-install-recommends -y \
-        ros-${ROS_DISTRO}-prosilica-camera\
-        ros-${ROS_DISTRO}-vision-opencv\
-        ros-${ROS_DISTRO}-prosilica-gige-sdk\
-    || echo "failed to install camera packages" \
-    && rm -rf /var/lib/apt/lists/*
-
 ## build deps
 
-RUN     apt-get update -q && apt-get install --no-install-recommends -y \
+RUN apt-get update -q && apt-get install --no-install-recommends -y \
             autoconf \
             automake\
             build-essential \
@@ -38,11 +33,18 @@ RUN     apt-get update -q && apt-get install --no-install-recommends -y \
             libusb-1.0 \
             libhidapi-libusb0 \
             libtool \
-            rsync \
             libhiredis-dev \
             nlohmann-json3-dev \
             usbutils \
     && rm -rf /var/lib/apt/lists/*
+
+RUN     pip install --no-cache-dir \
+            pyserial \
+            osrf-pycommon \
+            shapely \
+            pygeodesy \
+            pyshp \
+            scipy
 
 ## ===================  install hid and DAQ drivers  ===================
 
@@ -81,41 +83,51 @@ RUN :\
     &&  make -j && make install \
     &&:
 
+# Add yq for configu query to work
+RUN  curl -sL https://github.com/mikefarah/yq/releases/download/3.4.1/yq_linux_amd64 \
+     -o /usr/local/bin/yq && \
+     chmod +x /usr/local/bin/yq
+
+## ===================  install ebus sdk  ===================
+COPY ./artifacts/ebus.deb /ebus.deb
+COPY ./artifacts/GigE-V-Framework_x86_2.02.0.0132.tar.gz /gigev.tar.gz
+RUN dpkg -i /ebus.deb && rm /ebus.deb \
+    &&  tar xf /gigev.tar.gz && mkdir -p /src && rm /gigev.tar.gz
+RUN cd /src/DALSA &&\
+    sed -re 's/read -p.*$//g' GigeV/bin/install.gigev |\
+    sed -re 's/^\s*\$OUTPUT_LICENSE$//g' |\
+    sed -re 's/INSTALL_PROMPT=""/INSTALL_PROMPT="Accept."/g' \
+    > GigeV/bin/temp && mv GigeV/bin/temp GigeV/bin/install.gigev &&\
+    chmod +x GigeV/bin/install.gigev && ./corinstall install
+
 ## === === === === === === Project specifics === === === === === === === ===
-ENV REPO_DIR=/root/noaa_kamera \
-    WS_DIR=/root/kamera_ws \
-    CONTAINER_TYPE=kamera_base
+ENV WS_DIR=/root/noaa_kamera
+WORKDIR /root/noaa_kamera
 
-WORKDIR /root/kamera_ws
+# Copy products into container
+COPY        .             $WS_DIR
+COPY ./artifacts/ImageSDKCuda $WS_DIR/src/cams/phase_one/lib/
 
-RUN ln -sf   $REPO_DIR/src               $WS_DIR/src                    &&\
-    rm -rf /entry                                                       &&\
-    ln -sf $REPO_DIR/src/run_scripts/entry /entry                       &&\
+RUN rm -rf /entry                                                       &&\
+    ln -sf $WS_DIR/src/run_scripts/entry /entry                        &&\
     printf "\nsource /entry/project.sh\n" >> /root/.bashrc              &&\
-    touch /root/kamera_ws/.catkin_workspace                             &&\
-    ln -sf $REPO_DIR/src/run_scripts/aliases.sh /aliases.sh             &&\
-    printf "\nsource /aliases.sh\n" >> /root/.bashrc                    &&\
-    ln -sf $REPO_DIR/src/cfg /cfg
+    touch $WS_DIR/.catkin_workspace                             &&\
+    ln -sf $WS_DIR/src/run_scripts/aliases.sh /aliases.sh             &&\
+    printf "\nsource /aliases.sh\n" >> /root/.bashrc
 
-RUN     pip install --no-cache-dir \
-            pyserial \
-            osrf-pycommon \
-            python-consul \
-            python-benedict \
-            six \
-            redis \
-            typing \
-            shapely \
-            pygeodesy \
-            pyshp \
-            scipy
+# Making useful links and copies
+RUN ln -sf $WS_DIR/scripts/repo_dir.bash $WS_DIR/repo_dir.bash
+RUN ln -sf $WS_DIR/scripts/activate_ros.bash $WS_DIR/activate_ros.bash
+RUN ln -sf $WS_DIR/src/cfg /cfg
+RUN mkdir -p /root/.config/kamera/src/cfg/ && \
+    ln -sf $WS_DIR/scripts/repo_dir.bash /root/.config/kamera/repo_dir.bash && \
+    ln -sf $WS_DIR/scripts/cfg-aliases.sh /root/.config/kamera/src/cfg/cfg-aliases.sh && \
+    ln -sf $WS_DIR/scripts/get /root/.config/kamera/src/cfg/get && \
+    ln -sf $WS_DIR/src/cfg/user-config.yml /root/.config/kamera/src/cfg/user-config.yml && \
+    ln -sf $WS_DIR/scripts/get /cfg/get
 
-WORKDIR /root/kamera_ws
-
-COPY        src             $REPO_DIR/src
 RUN [ "/bin/bash", "-c", "source /entry/project.sh && catkin build backend"]
-RUN ln -sv /usr/bin/$PYTHON /usr/bin/python || true
-COPY        scripts/activate_ros.bash           $WS_DIR/activate_ros.bash
+RUN ln -sv /usr/bin/python3 /usr/bin/python || true
 
 ENTRYPOINT ["/entry/project.sh"]
 CMD ["bash"]

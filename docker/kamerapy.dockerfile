@@ -1,4 +1,4 @@
-FROM python:3.9.16-buster
+FROM python:3.10.15-bookworm
 
 RUN apt-get update && apt-get install -yq \
     libgdal-dev \
@@ -14,7 +14,6 @@ RUN pip install setuptools==57.0.0
 
 COPY ./ /src/kamera
 WORKDIR /src/kamera
-RUN pip install -r requirements.txt
 RUN pip install .
 
 ENTRYPOINT ["bash"]

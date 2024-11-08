@@ -1,5 +1,5 @@
 ## this is currently ONLY supported on kinetic!
-FROM kamera/kamera/kamera-deps-kinetic:latest
+FROM kamera/base/core-deps-kinetic:latest
 
 RUN     apt-get update && apt-get install -y \
             gdal-bin \
