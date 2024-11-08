@@ -20,6 +20,7 @@
   <exec_depend>kamerahealth</exec_depend>
   <exec_depend>roskv</exec_depend>
   <exec_depend>phase_one</exec_depend>
+  <exec_depend>kw_genicam_driver</exec_depend>
   <exec_depend>ins_driver</exec_depend>
   <exec_depend>mcc_daq</exec_depend>
   <exec_depend>nexus</exec_depend>
