@@ -51,7 +51,7 @@ class ROSPublishSyncMsgs(object):
         fov_dirs = get_fov_dirs(self.flight_dir)
         if len(fov_dirs) == 0:
             raise RuntimeError("No valid directories found under given dir %s,"
-                               " Exiting.")
+                               " Exiting." % self.flight_dir)
         fnames = {}
 
         tic = time.time()
@@ -121,15 +121,15 @@ class ROSPublishSyncMsgs(object):
 
 def main():
     rospy.init_node("publish_sync_msgs", anonymous=True)
-    
+
     flight_dir = rospy.get_param("~flight_dir")
     rate = rospy.get_param("~publish_rate")
     out_sync_image_topic = rospy.get_param("~out_topic")
 
     PSM = ROSPublishSyncMsgs(flight_dir, rate, out_sync_image_topic)
-    
+
     PSM.start_publishing()
-    
+
     rospy.spin()
 
 if __name__ == "__main__":

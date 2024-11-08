@@ -1,0 +1,96 @@
+# ============================== GLOBAL PROPERTIES =================================
+# global pipeline config
+#
+config _pipeline:_edge
+   :capacity                                   5
+
+config _scheduler
+  :type                                                 pythread_per_process
+
+
+# ==================================================================================
+process in_adapt
+ :: input_adapter
+
+process out_adapt
+ :: output_adapter
+
+process downsampler
+  :: downsample
+
+connect from in_adapt.image
+        to   downsampler.input_1
+connect from in_adapt.file_name
+        to   downsampler.input_2
+connect from in_adapt.timestamp
+        to   downsampler.timestamp
+
+connect from in_adapt.image2
+        to   downsampler.input_3
+connect from in_adapt.file_name2
+        to   downsampler.input_4
+
+# ==================================================================================
+
+include ../common_eo_arctic_seal_yolo_detector.pipe
+
+connect from downsampler.output_1
+        to   optical_detector_input.image
+
+# ==================================================================================
+
+connect from optical_detector_output.detected_object_set
+        to   out_adapt.detected_object_set
+connect from downsampler.output_2
+        to   out_adapt.file_name
+connect from downsampler.timestamp
+        to   out_adapt.timestamp
+
+# ==================================================================================
+
+process optical_writer_csv
+  :: detected_object_output
+
+  # Type of file to output
+  :file_name                                   [CURRENT_TIME]_EO.csv
+  :frame_list_output                           [CURRENT_TIME]_EO_images.txt
+  :writer:type                                 viame_csv
+
+connect from optical_detector_output.detected_object_set
+        to   optical_writer_csv.detected_object_set
+connect from downsampler.output_2
+        to   optical_writer_csv.image_file_name
+
+# ==================================================================================
+
+#process optical_filter_db
+#  :: initialize_object_tracks
+#  :track_initializer:type                      threshold
+#
+#  block track_initializer:threshold:filter
+#    :type                                      class_probablity_filter
+#    :class_probablity_filter:threshold         0.010
+#    :class_probablity_filter:keep_all_classes  true
+#  endblock
+
+#process optical_writer_db
+#  :: write_object_track
+#  :file_name                                   none
+#  :writer:type                                 db
+#  :writer:db:conn_str                          postgresql:host=localhost;user=postgres
+#  :writer:db:video_name                        optical_stream
+
+#connect from in_adapt.timestamp
+#        to   downsampler.timestamp
+
+#connect from downsampler.timestamp
+#        to   optical_filter_db.timestamp
+#connect from optical_detector_output.detected_object_set
+#        to   optical_filter_db.detected_object_set
+
+#connect from downsampler.timestamp
+#        to   optical_writer_db.timestamp
+#connect from optical_filter_db.object_track_set
+#        to   optical_writer_db.object_track_set
+
+# -- end of file --

@@ -65,10 +65,11 @@
 
             <!-- In order to interoperate Python2/3 in ROS Kinetic, this is required.
             roslaunch requires py2, and after it's launched, the PYTHONPATH
-            can be switched to use Python3, and the Python3 plugins that VIAME 
+            can be switched to use Python3, and the Python3 plugins that VIAME
             references won't explode-->
-            <env name="PYTHONPATH" value="/build/viame/install/lib/python3.6/site-packages:/root/anaconda3/lib/python3.6/site-packages/:$(env PYTHONPATH)"/>
-            
+        <env name="PYTHONPATH" value="/opt/noaa/viame/lib/python3.6:/opt/noaa/viame/lib/python3.6/site-packages:/opt/noaa/viame/lib/dist-packages"/>
+        <env name="PYTHON_LIBRARY" value="/opt/noaa/viame/lib/libpython3.so"/>
+
             <param name="synchronized_images_in1" value="$(arg synchronized_images_in1)"
                    type="str"/>
             <param name="synchronized_images_in2" value="$(arg synchronized_images_in2)"
@@ -85,7 +86,7 @@
             <param name="rgb_port_ind" value="$(arg rgb_port_ind)" type="int"/>
             <param name="ir_port_ind" value="$(arg ir_port_ind)" type="int"/>
             <param name="uv_port_ind" value="$(arg uv_port_ind)" type="int"/>
-            
+
             <param name="redis_uri" value="$(arg redis_uri)" type="str"/>
 
             <remap from="~detections_out" to="$(arg det_topic)"/>
