@@ -55,6 +55,13 @@ namespace phase_one
             image_view_service_ = pnh.advertiseService("get_image_view",
                                       &ViewServerNodelet::getImageView, this);
             ROS_INFO("Image View Server: Finished");
+            //ros::spin();
+
+            // Phase one Initialization
+            //P1::ImageSdk::Initialize();
+            //decodeConfig = P1::ImageSdk::DecodeConfig::Defaults;
+            //P1::ImageSdk::SetSensorProfilesLocation(
+            //        "/home/squadx/noaa/phaseOne/build/ImageSDK/SensorProfiles");
         };
 
         void image_callback(const sensor_msgs::ImageConstPtr& msg) {

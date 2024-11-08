@@ -186,7 +186,7 @@ add_executable( a6750_driver_node
         src/spec_a6750.h
         src/spec_a6750.cpp
         src/genicam_ctl.cpp src/genicam_ctl.h
-        /root/kamera_ws/src/cams/phase_one/src/phase_one_utils.cpp)
+        /root/noaa_kamera/src/cams/phase_one/src/phase_one_utils.cpp)
 
 add_executable( gige_scan
         src/gige_scan.cpp

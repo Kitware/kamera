@@ -28,16 +28,17 @@ FetchContent_Populate(CameraSDK)
 
 find_package(CameraSDK CONFIG REQUIRED HINTS ${CMAKE_CURRENT_BINARY_DIR}/CameraSDK)
 
-FetchContent_Declare(ImageSDK
-    URL https://developer.phaseone.com/sdk/${SDK_MAJOR_VERSION}.${SDK_MINOR_VERSION}/releases/imagesdk/${SDK_MAJOR_VERSION}/p1imagesdk-${SYSTEM_NAME_LC}${LINUX_ARCH}${SDK_PACKAGE_EXT}
-    SOURCE_DIR ImageSDK
-)
+# Leave it to a copy for the GPU version, rather than fetching
+#FetchContent_Declare(ImageSDK
+#    URL https://developer.phaseone.com/sdk/${SDK_MAJOR_VERSION}.${SDK_MINOR_VERSION}/releases/imagesdk/${SDK_MAJOR_VERSION}/p1imagesdk-${SYSTEM_NAME_LC}${LINUX_ARCH}${SDK_PACKAGE_EXT}
+#    SOURCE_DIR ImageSDK
+#)
+#
+#message(STATUS "Downloading ImageSDK...")
+#
+#FetchContent_Populate(ImageSDK)
 
-message(STATUS "Downloading ImageSDK...")
-
-FetchContent_Populate(ImageSDK)
-
-find_package(ImageSDK CONFIG REQUIRED HINTS ${CMAKE_CURRENT_BINARY_DIR}/ImageSDK)
+find_package(ImageSDK CONFIG REQUIRED HINTS lib/ImageSDKCuda)
 
 ## Compile as C++17, supported in ROS Noetic and newer
 add_compile_options(-std=c++17)

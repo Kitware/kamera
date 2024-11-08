@@ -67,7 +67,7 @@ namespace phase_one
 
             // Thread defined for demosaicing / debayering images asynchronously from capture
             int demosaic();
-            
+
             // Given PhaseOne raw image and bayered image, write image to disk as jpeg or tiff
             bool dumpImage(P1::ImageSdk::RawImage rawImage,
                            P1::ImageSdk::BitmapImage bitmap,
@@ -76,9 +76,9 @@ namespace phase_one
 
             // Fill in the entries of the maps 'property_to_id_' and 'property_to_type_' given
             // a 'camera' handle. These maps define the values used for setting/getting the
-            // parameters in the ROS service calls 
+            // parameters in the ROS service calls
             void getPropertyMaps(const P1::CameraSdk::Camera& camera,
-                                 std::map<std::string, int>& property_to_id_, 
+                                 std::map<std::string, int>& property_to_id_,
                                  std::map<std::string, P1::CameraSdk::PropertyValue>& property_to_type);
 
             // ROS service call, grabs a parameter or lists of parameters from the camera
@@ -96,14 +96,18 @@ namespace phase_one
             bool getCompressedImageView(phase_one::GetCompressedImageView::Request& req,
                                         phase_one::GetCompressedImageView::Response& resp);
 
-            // ROS service call, given a homography, return the raw image chip of that 
+            // ROS service call, given a homography, return the raw image chip of that
             // warp
             bool getImageView(custom_msgs::RequestImageView::Request& req,
                               custom_msgs::RequestImageView::Response& resp);
 
-            // ROS subscriber, listens for "event" messages published from the INS, and 
+            // ROS subscriber, listens for "event" messages published from the INS, and
             // when received, adds those to the current EventCache
             void eventCallback (const boost::shared_ptr<custom_msgs::GSOF_EVT const>& msg);
+
+            // ROS subscriber, listens for "detection list" messages published from the detector,
+            // and when received, adds these to the detection cache
+            void detectionListCallback (const boost::shared_ptr<custom_msgs::ImageSpaceDetectionList const>& msg);
         private:
             // Phase One
             P1::CameraSdk::Camera camera;
@@ -117,6 +121,7 @@ namespace phase_one
             ros::ServiceServer get_param_service_;
             ros::ServiceServer set_param_service_;
             ros::Subscriber event_sub_;
+            ros::Subscriber detection_sub_;
             image_transport::Publisher image_pub;
             ros::Publisher stat_pub_;
             cv_bridge::CvImage img_bridge;
@@ -127,11 +132,15 @@ namespace phase_one
             std::string cam_channel_;
             std::string cam_fov_;
             std::string hostname;
+            std::string effort;
+            std::string project;
+            std::string base_dir;
             double      auto_trigger_rate_;
             int         num_threads_;
             // Internal data structures / sync structures
             int processed_counter = 0;
             int total_counter = 0;
+            int save_every_x = 1;
             std::thread capture_thread_;
             std::thread demosaic_thread_;
             // Lock between capture/demosaic threads
@@ -145,7 +154,7 @@ namespace phase_one
             bool new_image = true;
             bool last_show_sat = false;
             // Holds the current queue of files to process
-            std::queue<std::string> filename_q_;
+            std::map<std::string, int> filename_to_seq_map_;
             // Class maps for camera parameters
             std::map<std::string, int> property_to_id_;
             std::map<std::string, P1::CameraSdk::PropertyValue> property_to_type_;

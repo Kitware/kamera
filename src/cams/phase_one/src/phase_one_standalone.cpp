@@ -29,6 +29,7 @@
 #include <roskv/envoy.h>
 #include <roskv/archiver.h>
 #include <custom_msgs/GSOF_EVT.h>
+#include <custom_msgs/ImageSpaceDetectionList.h>
 #include <custom_msgs/Stat.h>
 #include <custom_msgs/RequestImageView.h>
 
@@ -73,7 +74,7 @@ namespace phase_one
         ros::NodeHandle nh;
         ros::NodeHandle pnh("~");
         image_transport::ImageTransport it(nh);
-        image_pub = it.advertise("image_raw", 1);
+        image_pub = it.advertise("image_raw", 1, true);
         stat_pub_ = nh.advertise<custom_msgs::Stat>("/stat", 3);
 
         ROS_INFO("Loading ROS parameters.");
@@ -91,13 +92,25 @@ namespace phase_one
         std::cout << envoy_opts << " | " << RedisHelper::get_redis_uri() <<  std::endl;
         envoy_ = std::make_shared<RedisEnvoy>(envoy_opts);
         ROS_WARN("echo: %s", envoy_->echo("Redis connected").c_str());
+        project = envoy_->get("/sys/arch/project");
+        base_dir = envoy_->get("/sys/arch/base");
 
         // Phase one Initialization
+        std::string infoMsg;
+        bool hasCuda = P1::ImageSdk::IsCudaSupported(infoMsg);
+        ROS_WARN_STREAM("Cuda report: " << infoMsg);
+        ROS_WARN_STREAM("CUDA Available: " << hasCuda);
         P1::ImageSdk::Initialize();
+        if (!hasCuda) {
+            // Only attempt to set the number of threads if no GPU, otherwise it crashes
+            ROS_INFO_STREAM("Setting number of processing threads to " << num_threads_ << ".");
+            P1::ImageSdk::SetThreadPoolThreadCount(num_threads_);
+            P1::ImageSdk::SetArchitecture(P1::ImageSdk::Architecture::Cpu);
+        } else {
+            P1::ImageSdk::SetArchitecture(P1::ImageSdk::Architecture::Cuda);
+        }
         P1::ImageSdk::SetSensorProfilesLocation(
-        "/root/kamera_ws/build/phase_one/ImageSDK/SensorProfiles");
-        ROS_INFO_STREAM("Setting number of processing threads to " << num_threads_ << ".");
-        P1::ImageSdk::SetThreadPoolThreadCount(num_threads_);
+        "/root/kamera_ws/artifacts/ImageSDKCuda/SensorProfiles");
         connectToIPCamera(ip_address_);
 
         auto list = camera.AllPropertyIds();
@@ -125,7 +138,9 @@ namespace phase_one
                     toProcess) != processed_images.end()) {
             } else {
                 write_intersection << toProcess << std::endl;
-                filename_q_.push(toProcess);
+                // sequence doesn't matter if we've cycled, just set to 0
+                filename_to_seq_map_[toProcess] = 0;
+                total_counter++;
             }
         }
         write_intersection.close();
@@ -134,7 +149,7 @@ namespace phase_one
         // Append new entries to cache
         to_process_out.open(to_process_filename, std::ios_base::app);
         processed_out.open(processed_filename, std::ios_base::app);
-            
+
         // Throw results into redis for access
         std::string base = "/sys/" + hostname + "/p1debayerq/";
         std::string total = base + "total";
@@ -159,6 +174,8 @@ namespace phase_one
 
         // Subscribers
         event_sub_ = pnh.subscribe("/event", 1, &PhaseOne::eventCallback, this);
+        std::string det_topic = "/" + hostname + "/detections";
+        detection_sub_ = pnh.subscribe(det_topic, 1, &PhaseOne::detectionListCallback, this);
     };
 
     int PhaseOne::connectToIPCamera(std::string ip) {
@@ -222,7 +239,6 @@ namespace phase_one
                     camera.TriggerCapture();
                 } // else wait for image (hardware signal)
 
-                ROS_INFO("|CAPTURE| Waiting for image from camera...");
                 // Create stat msg
                 auto nodeName = "/" + hostname + "/rgb/rgb_driver";
                 custom_msgs::Stat stat_msg;
@@ -230,12 +246,15 @@ namespace phase_one
                 stat_msg.header.stamp = ros::Time::now();
                 stat_msg.trace_topic = nodeName + "/publishImage";
                 stat_msg.node = nodeName;
-                link << nodeName << "/event/" << event_.header.seq; // link this trace to the event trace
-                stat_msg.link = link.str();
 
                 // Wait for image
+                ROS_INFO("|CAPTURE| Waiting for image from camera...");
+                auto wait_tic = std::chrono::high_resolution_clock::now();
                 P1::CameraSdk::NotificationEventPtr event =
                                 imgListener.WaitForNotification(15000);
+                auto wait_toc = std::chrono::high_resolution_clock::now();
+                auto wait_dt = wait_toc - wait_tic;
+                ROS_INFO_STREAM("|CAPTURE| wait time: " << wait_dt.count() / 1e9 << "s");
                 std::shared_ptr<const P1::CameraSdk::IFullImage> iiqImage;
                 P1::ImageSdk::RawImage image;
                 ros::Time frame_recv_time_;
@@ -264,7 +283,7 @@ namespace phase_one
                     //continue;
                 }
                 auto tic3 = std::chrono::high_resolution_clock::now();
-                    
+
                 // Sync event cache
                 std_msgs::Header gps_header;
                 ROS_INFO("|CAPTURE| Searching event cache.");
@@ -276,18 +295,20 @@ namespace phase_one
                     continue;
                 } else {
                     ROS_WARN("|CAPTURE| Found matching event!");
+                    link << nodeName << "/event/" << gps_header.seq; // link this trace to the event trace
+                    stat_msg.link = link.str();
                     stat_msg.note = "success";
-                }   
+                }
                 ROS_INFO("|CAPTURE| Checking if archiving.");
                 int is_archiving = ArchiverHelper::get_is_archiving(envoy_, "/sys/arch/is_archiving");
                 if (is_archiving) {
                     // Write raw iiq to file
                     long int sec  = gps_header.stamp.sec;
                     long int nsec = gps_header.stamp.nsec;
+                    int seq = gps_header.seq;
                     std::string fname = ArchiverHelper::generateFilename(envoy_, arch_opts_, sec, nsec);
-                    std::string effort = envoy_->get("/sys/arch/project");
                     // Adds an additional dir layer for raw images
-                    fname.insert(fname.find(effort), "iiq_buffer/");
+                    fname.insert(fname.find(base_dir) + base_dir.size(), "/iiq_buffer");
                     //std::string fname = "/mnt/data/test/" + iiqImage->FileName();
                     fname.replace(fname.find("jpg"), 3, "IIQ"); // Replaces "jpg" with "IIQ"
                     ROS_INFO_STREAM("|CAPTURE| Write file: " << fname);
@@ -297,9 +318,10 @@ namespace phase_one
                         std::fstream iiqFile(fname, std::ios::binary | std::ios::trunc | std::ios::out);
                         iiqFile.write((char*)iiqImage->Data().get(), iiqImage->DataSizeBytes());
                         iiqFile.close();
+                        std::lock_guard<std::mutex> lock(mtx);
+                        filename_to_seq_map_[fname] = seq;
+                        // write out every file received here, reduce set size with processed_out
                         to_process_out << fname << std::endl;
-                        std::unique_lock<std::mutex> lock(mtx);
-                        filename_q_.push(fname);
                         total_counter++;
                     } catch (boost::filesystem::filesystem_error &e) {
                         ROS_ERROR("|CAPTURE| Archive Failed [%d]: %s", e.code().value(), e.what());
@@ -390,10 +412,11 @@ namespace phase_one
             auto tic1 = std::chrono::high_resolution_clock::now();
             std::string filename;
             std::unique_lock<std::mutex> lock(mtx);
-            if ( !filename_q_.empty() ) {
+            if ( !filename_to_seq_map_.empty() ) {
                 // grab most-recent filename (could make a LIFO queue?)
-                filename = filename_q_.front();
-                filename_q_.pop();
+                filename = filename_to_seq_map_.begin()->first;
+                // remove from map
+                filename_to_seq_map_.erase(filename);
             } else {
                 lock.unlock();
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -402,7 +425,22 @@ namespace phase_one
             lock.unlock();
             ROS_INFO_STREAM("|DEMOSAIC| read file: " << filename);
             auto tic2 = std::chrono::high_resolution_clock::now();
-            P1::ImageSdk::RawImage imageFile(filename);
+            P1::ImageSdk::RawImage imageFile;
+            try {
+                imageFile = P1::ImageSdk::RawImage(filename);
+            } catch (P1::ImageSdk::SdkException exception)
+            {
+                // Exception from ImageSDK
+                ROS_ERROR_STREAM("|DEMOSAIC| ImageSDK Exception: " << exception.what() << " Code:"
+                                << exception.mCode << std::endl);
+                continue;
+            }
+            catch (...)
+            {
+                // Any other exception - just in case
+                ROS_WARN("|DEMOSAIC| Argh - we got an exception in debayering.");
+                continue;
+            }
             P1::ImageSdk::BitmapImage bitmap;
             try {
                 // demosaic image into RGB format from IIQ
@@ -432,9 +470,10 @@ namespace phase_one
             auto toc = std::chrono::high_resolution_clock::now();
             auto dt = toc - tic2;
             ROS_INFO_STREAM("|DEMOSAIC| load and demosaic time: " << dt.count() / 1e9 << "s");
+            // copy iiq filename for later use, to avoid another string replace call
             std::string filename_iiq(filename);
             filename.replace(filename.find("IIQ"), 3, "jpg"); // Replaces "IIQ" with "jpg"
-            filename.erase(filename.find("iiq_buffer/"), 11); // Removes buffer dir from path
+            filename.erase(filename.find("/iiq_buffer"), 11); // Removes buffer dir from path
             ROS_INFO_STREAM("|DEMOSAIC| write file: " << filename);
             bool success = dumpImage(imageFile, bitmap, filename, "jpg");
             if ( success ) {
@@ -586,6 +625,7 @@ namespace phase_one
 
     bool PhaseOne::getCompressedImageView(phase_one::GetCompressedImageView::Request& req,
                                             phase_one::GetCompressedImageView::Response& resp) {
+        // DOES NOT WORK CURRENTLY
         auto tic = std::chrono::high_resolution_clock::now();
         ROS_INFO("Received Request for Compresssed Image View.");
         P1::ImageSdk::RawImage raw_img;
@@ -707,8 +747,8 @@ namespace phase_one
         ROS_INFO("|VIEW SERVER| : Received Request for image view.");
         P1::ImageSdk::RawImage raw_img;
         std::unique_lock<std::mutex> lock(mtx);
-        bool staleH = req.homography == lastH; 
-        bool staleSat = req.show_saturated_pixels == last_show_sat; 
+        bool staleH = req.homography == lastH;
+        bool staleSat = req.show_saturated_pixels == last_show_sat;
         lastH = req.homography;
         last_show_sat = req.show_saturated_pixels;
         if ( staleH && staleSat && !new_image) {
@@ -846,7 +886,7 @@ namespace phase_one
 
     void PhaseOne::eventCallback (const boost::shared_ptr<custom_msgs::GSOF_EVT const>& msg) {
         ROS_INFO("[%d]<1> eventCallback <>         %2.2f", msg->header.seq, msg->header.stamp.toSec());
-        event_ = *msg;
+        //event_ = *msg;
         event_cache.push_back(msg->sys_time, msg);
         // TODO: hardcoded, but is OK for now
         auto nodeName = "/" + hostname + "/rgb/rgb_driver";
@@ -856,12 +896,67 @@ namespace phase_one
         stat_msg.trace_header = (*msg).header;
         stat_msg.trace_topic = nodeName + "/eventCallback";
         stat_msg.node = nodeName;
-        link << nodeName << "/event/" << event_.header.seq; // link this trace to the event trace
+        link << nodeName << "/event/" << msg->header.seq; // link this trace to the event trace
         stat_msg.link = link.str();
         stat_pub_.publish(stat_msg);
         event_cache.purge();
         //watchdog.check();
         //event_cache.show();
+    };
+
+    void PhaseOne::detectionListCallback (const boost::shared_ptr<custom_msgs::ImageSpaceDetectionList const>& msg) {
+    ROS_INFO("[%d]<1> detectionListCallback <> %2.2f",
+             msg->header.seq, msg->header.stamp.toSec());
+        // this fname is the RGB jpeg filename (always) of the triplet,
+        // even if that file doesn't yet exist
+        std::string fname = msg->header.frame_id;
+        std::string filename_iiq(fname);
+        filename_iiq.replace(filename_iiq.find("jpg"), 3, "IIQ"); // Replaces "jpg" with "IIQ"
+        filename_iiq.insert(filename_iiq.find(base_dir) + base_dir.size(), "/iiq_buffer"); // look for image in buffer
+        std::unique_lock<std::mutex> lock(mtx);
+        int seq;
+        if ( !filename_to_seq_map_.empty() ) {
+            seq = filename_to_seq_map_[filename_iiq];
+        } else {
+            lock.unlock();
+            return;
+        }
+        lock.unlock();
+        int num_detections = msg->detections.size();
+        std::string effort_topic = "/sys/arch/effort";
+        effort = envoy_->get("/sys/arch/effort");
+        std::string x_image_topic = "/sys/effort_metadata_dict/" + effort + "/save_every_x_image";
+        save_every_x = std::stoi(envoy_->get(x_image_topic));
+        if ((seq % save_every_x) == 0) {
+            // this image is part of the modulo, so save regardless
+            return;
+        } else {
+            ROS_INFO("Length of detection list: %ld", msg->detections.size());
+            if (num_detections < 1) {
+                ROS_WARN_STREAM("Dropping file " << filename_iiq << " from debayering.");
+                // there's no detections, and it's not a modulo N image, so we want to
+                // delete the IIQ image without ever processing, and 'touch' a file on the
+                // local dir for footprint generation
+                // WARNING: the inherent assumption here is that detection will never
+                // fall behind image processing. If that happens, more logic will have
+                // to be here
+                // guard access to filename map
+                //
+                // first "touch" jpeg file
+                std::ofstream output(fname);
+                lock.lock();
+                // remove IIQ from processing queue
+                filename_to_seq_map_.erase(filename_iiq);
+                // add to 'processed' file so that it won't attempt to be processed
+                // after a reboot
+                processed_out << filename_iiq << std::endl;
+                processed_counter++;
+                lock.unlock();
+
+                // then remove IIQ file
+                remove(filename_iiq.c_str());
+            }
+        }
     };
 }
 
