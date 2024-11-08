@@ -22,7 +22,6 @@ from roskv.base import (
     ChildService,
 )
 from roskv.util import redis_decode, redis_encode, loader23
-from vprint import vprint
 
 _default = NullDefault()
 
@@ -116,7 +115,7 @@ class RedisKV(redis.client.Redis, KV):
         return super(RedisKV, self).delete(key, **kwargs)
 
     def delete_dict(self, key, **kwargs):
-        vprint("deleting {}".format(key))
+        print("deleting {}".format(key))
         # key = key.strip("/")
         keys = self.keys(key + "*")
         if not keys:
@@ -139,7 +138,7 @@ class RedisHealth(Health):
         self.kv = kv
 
     def __del__(self):
-        vprint("health object destroyed")
+        print("health object destroyed")
 
     def service(
         self, service, index=None, wait=None, passing=None, tag=None, dc=None, near=None, token=None, node_meta=None,
@@ -197,18 +196,18 @@ class RedisAgent(Agent):
         self._auto_register()
 
     def __del__(self):
-        vprint("agent destructor: {}".format(self._auto_name))
+        print("agent destructor: {}".format(self._auto_name))
         self.close()
 
     def _auto_register(self):
         self.service.register(self._auto_name)
-        vprint("  registered:     {}".format(self._auto_name))
+        print("  registered:     {}".format(self._auto_name))
         self._registered = True
 
     def _auto_deregister(self):
         try:
             if self._registered:
-                vprint("deregistered:     {}".format(self._auto_name))
+                print("deregistered:     {}".format(self._auto_name))
                 self.service.deregister(self._auto_name)
         except KeyError:
             pass  # ignore keyerror if something else cleaned it up
@@ -240,7 +239,7 @@ class RedisAgent(Agent):
         anti-entropy, so in most situations everything will be in sync
         within a few seconds.
 
-        Note, this excludes the envoy service itself in the response. 
+        Note, this excludes the envoy service itself in the response.
 
         '/v1/agent/services'
         """
@@ -617,7 +616,7 @@ class RedisEnvoy(BaseEnvoy):
 
     def __del__(self):
         """This destructor is a little weird and doesn't always trigger correctly"""
-        vprint("envoy destructor: {}".format(self.name))
+        print("envoy destructor: {}".format(self.name))
         self.close()
 
     def close(self):
