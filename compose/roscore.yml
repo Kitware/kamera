@@ -5,7 +5,7 @@ services:
   ## =========================== headless nodes =============================
   roscore:
     container_name: roscore
-    image: gitlab.kitware.com:4567/noaa_uav/noaa_kamera/kamera/${ROS_DISTRO}:latest
+    image: kamera/final/core-cudaon
     tty: true
     network_mode: host
     environment:
@@ -13,13 +13,14 @@ services:
       DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
       SPOOF_RATE: "${SPOOF_RATE}"
       REDIS_HOST: "${REDIS_HOST}"
-    volumes:
-      - "${PWD}/src:${PROJ_DIR}/src:ro"
-    command: ["/entry/master.sh"]
     dns:
       - "${KAMERA_DNS_IP}"
     dns_search:
       - kamera.systems
+    volumes:
+      - "/mnt:/mnt"
+      - "${PWD}/src:${KAMERA_DIR}/src:ro"
+    command: ["/entry/master.sh"]
     restart: always
 ...
 

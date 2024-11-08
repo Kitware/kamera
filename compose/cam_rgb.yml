@@ -5,7 +5,7 @@ services:
   ## =========================== headless nodes =============================
   cam_rgb:
     container_name: "cam-rgb-${CAM_FOV}"
-    image: "gitlab.kitware.com:4567/noaa_uav/noaa_kamera/kamera/${ROS_DISTRO}:${TAG_CAM_RGB:-latest}"
+    image: kamera/final/core-cudaon
     tty: true
     environment:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"
@@ -21,9 +21,12 @@ services:
     network_mode: host
     volumes:
       - "/mnt:/mnt"
-      - "/home/user/kw/noaa_kamera/src/run_scripts/entry:/entry"
-      - "${KAMERA_DIR}:/root/noaa_kamera"
-    entrypoint: ["/bin/tini", "--"]
+      - "${PWD}/src:${KAMERA_DIR}/src:ro"
     command: ["/entry/cam_phaseone.sh"]
     restart: always
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
 ...

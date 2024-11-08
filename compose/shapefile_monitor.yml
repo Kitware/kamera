@@ -4,7 +4,7 @@ version: '3.7'
 services:
   shapefile_monitor:
     container_name: shapefile_monitor
-    image: "gitlab.kitware.com:4567/noaa_uav/noaa_kamera/kamera/${ROS_DISTRO}:${TAG_KAMERA_SHAPEFILE:-latest}"
+    image: kamera/final/core-cudaon
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"
@@ -17,9 +17,8 @@ services:
       - kamera.systems
     network_mode: host
     volumes:
-      - "/home/user/kw/noaa_kamera/src:/root/kamera_ws/src"
-      - "${PWD}/src:${PROJ_DIR}/src:ro"
-    entrypoint: ["/bin/tini", "--"]
+      - "/mnt:/mnt"
+      - "${PWD}/src:${KAMERA_DIR}/src:ro"
     command: ["/entry/shapefile_monitor.sh"]
     restart: always
 ...

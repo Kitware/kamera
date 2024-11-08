@@ -4,7 +4,7 @@ version: '3.7'
 services:
   ins:
     container_name: ins
-    image: gitlab.kitware.com:4567/noaa_uav/noaa_kamera/kamera/${ROS_DISTRO}:latest
+    image: kamera/final/core-cudaon
     tty: true
     devices:
       - "${PULSE_TTY}:${PULSE_TTY}"
@@ -24,8 +24,7 @@ services:
     network_mode: host
     volumes:
       - "/mnt:/mnt"
-      - "${KAMERA_DIR}:/root/noaa_kamera"
-    entrypoint: [ "/bin/tini", "--" ]
+      - "${PWD}/src:$KAMERA_DIR/src:ro"
     command: ["/entry/ins.sh"]
     restart: always
 ...

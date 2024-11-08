@@ -7,7 +7,7 @@ services:
 ## ========================== viame =============================
   detector:
     container_name: "viame-${CAM_FOV}"
-    image: "gitlab.kitware.com:4567/noaa_uav/noaa_kamera/final/viame-kamera:${TAG_VIAME_KAMERA:-latest}"
+    image: kamera/final/viame
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"
@@ -23,11 +23,8 @@ services:
       - kamera.systems
     network_mode: host
     volumes:
-      - "/mnt/data:/mnt/data"
-      - "/mnt/flight_data:/mnt/flight_data"
-      - "${PWD}/src:${PROJ_DIR}/src:ro"
-      - "${PWD}/src/run_scripts/entry:/entry:ro"
-    entrypoint: ["/tini", "--"]
+      - "/mnt:/mnt"
+      - "${PWD}/src:${KAMERA_DIR}/src:ro"
     restart: on-failure
     command: ["/entry/viame.sh"]
     deploy:

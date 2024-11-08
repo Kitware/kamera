@@ -4,7 +4,7 @@ version: '3.7'
 services:
   ## =========================== headless nodes =============================
   postproc:
-    image: gitlab.kitware.com:4567/noaa_uav/noaa_kamera/postproc:latest
+    image: kamera/final/postproc
     network_mode: host
     tty: true
     volumes:

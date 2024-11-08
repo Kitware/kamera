@@ -4,7 +4,7 @@ version: '3.7'
 services:
   daq:
     container_name: daq
-    image: "gitlab.kitware.com:4567/noaa_uav/noaa_kamera/kamera/${ROS_DISTRO}:${TAG_KAMERA_DAQ:-latest}"
+    image: kamera/final/core-cudaon
     tty: true
     devices:
       - "${MCC_DAQ}:${MCC_DAQ}"
@@ -19,8 +19,8 @@ services:
       - kamera.systems
     network_mode: host
     volumes:
-      - "${KAMERA_DIR}:/root/noaa_kamera"
-    entrypoint: ["/bin/tini", "--"]
+      - "/mnt:/mnt"
+      - "${PWD}/src:${KAMERA_DIR}/src:ro"
     command: ["/entry/daq.sh"]
     restart: always
 ...

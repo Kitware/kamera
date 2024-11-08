@@ -1,10 +1,10 @@
 ---
-version: "2.4"
+version: "3.7"
 ## =======================image sync publisher===================
 services:
   sync-publisher:
     container_name: "sync-publisher-${CAM_FOV}"
-    image: "gitlab.kitware.com:4567/noaa_uav/noaa_kamera/final/viame-kamera:cuda10.2"
+    image: kamera/final/viame
     tty: true
     environment:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"
@@ -17,11 +17,10 @@ services:
       - kamera.systems
     network_mode: host
     volumes:
-      - "${DATA_MOUNT_POINT}:${DATA_MOUNT_POINT}"
+      - "/mnt:/mnt"
+      - "${PWD}/src:${KAMERA_DIR}/src:ro"
       - "${HOME}:${HOME}:ro"
-      - "${PWD}/src:/src/noaa_kamera/src"
       # this should point to whatever publish_sync_msgs.sh expects
       - "/mnt/data:/mnt/data/calibration_2020_fl08"
-    entrypoint: ["/tini", "--"]
     command: ["/entry/publish_sync_msgs.sh"]
 ...

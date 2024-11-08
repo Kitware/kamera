@@ -4,7 +4,7 @@ version: '3.7'
 services:
   cam_ir:
     container_name: "cam-ir-${CAM_FOV}"
-    image: "gitlab.kitware.com:4567/noaa_uav/noaa_kamera/kamera/${ROS_DISTRO}:${TAG_CAM_IR:-latest}"
+    image: kamera/final/core-cudaon
     tty: true
     environment:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"
@@ -20,8 +20,7 @@ services:
     network_mode: host
     volumes:
       - "/mnt:/mnt"
-      - "${KAMERA_DIR}:/root/noaa_kamera"
-    entrypoint: ["/bin/tini", "--"]
+      - "${PWD}/src:${KAMERA_DIR}/src:ro"
     command: ["/entry/cam_ir.sh"]
     restart: always
 ...
