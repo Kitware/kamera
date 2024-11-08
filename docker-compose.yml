@@ -1,7 +1,6 @@
 ---
 ## container configuration for ROS & Kamera
 ## USE THIS FOR BUILDING not running!
-## Also has examples of how to deploy but `docker compose up` will be a mess.
 ## X11 note: To enable window display from inside the container, you must first
 ## provide permissions with xhost, usually `xhost +local:root` (not the safest)
 ## You also have to volume mount `/tmp/.X11-unix`, blank out $DISPLAY, and
@@ -10,28 +9,6 @@
 version: '3.7'
 services:
 ## ======================= base containers & bases ========================
-  ## Static binaries to provide cached copy of tini
-  tini:
-    build:
-      context: docker
-      dockerfile: ./base/core-tini.dockerfile
-    image: "kamera/base/tini:v0190"
-    profiles:
-      - nuvo
-      - gui
-      - all
-
-  ## Static binaries to provide cached copy of assorted utilities
-  static_bin_utils:
-    build:
-      context: docker
-      dockerfile: ./base/core-static-bin-utils.dockerfile
-    image: "kamera/base/static-bin-utils:latest"
-    profiles:
-      - nuvo
-      - gui
-      - all
-
   # Docker file for kamerad service
   kamerad:
     build:
@@ -41,71 +18,74 @@ services:
       - nuvo
       - all
 
-  ## Base image (no KAMERA code) on which the rest of development is based on
-  ## This should be set in `.env` or by exporting before building. This will ensure it's built
-  ros-base-kitchen-sink:
+  # The core ROS image with basic APT packages, no KAMERA code.
+  core-ros-cudaoff:
     build:
-      context: docker
-      dockerfile: ./base/core-ros-kitchen.dockerfile
-      args:
-        ROS_DISTRO: "${ROS_DISTRO}"
-    image: "kamera/base/roskitchen:${ROS_DISTRO}"
-    depends_on:
-        - tini
-        - static_bin_utils
+      context: .
+      dockerfile: docker/base/core-ros.dockerfile
+    image: "kamera/base/core-ros-cudaoff:${TAG_KAMERA_DEPS:-latest}"
     profiles:
       - nuvo
       - gui
       - all
 
+  # The core ROS image with CUDA and basic APT packages, no KAMERA code.
+  core-ros-cudaon:
+    build:
+      context: .
+      dockerfile: docker/base/core-ros-cuda.dockerfile
+    image: "kamera/base/core-ros-cudaon:${TAG_KAMERA_DEPS:-latest}"
+    profiles:
+      - cuda
+      - all
 
 ## =========================== main (full dependencies) =======================
 
-  ## This is the main image with MOST of the Kamera code.
-  ## It should be used to run core, drivers, processing (but not detector)
-  kamera-deps:
+  ## This is the main image with all dependendencies required for KAMERA, built on
+  # the basic ROS image.
+  core-deps:
     build:
       context: .
       dockerfile: docker/base/core-deps.dockerfile
       args:
-        ROS_DISTRO: "${ROS_DISTRO}"
-    image: "kamera/base/kamera-deps-${ROS_DISTRO}:${TAG_KAMERA_DEPS:-latest}"
+          CUDA: ${CUDA}
+    image: "kamera/base/core-deps-cuda${CUDA}:${TAG_KAMERA_DEPS:-latest}"
     depends_on:
-        - ros-base-kitchen-sink
+        - core-ros-cuda${CUDA}
     profiles:
       - nuvo
       - gui
+      - cuda
       - all
 
-  kamera-gui-deps:
+  core-gui-deps:
     build:
       context: .
       dockerfile: docker/base/gui-deps.dockerfile
-      args:
-        ROS_DISTRO: "${ROS_DISTRO}"
-    image: "kamera/base/kamera-gui-deps-${ROS_DISTRO}:${TAG_KAMERA_GUI_DEPS:-latest}"
+    image: "kamera/base/core-gui-deps:${TAG_KAMERA_GUI_DEPS:-latest}"
     depends_on:
-        - kamera-deps
+        - core-deps
     profiles:
       - gui
 
-  kamera-final:
+  # Just for the catkin rebuild, if we want to save the static image.
+  core-final:
     build:
       context: .
       dockerfile: docker/core.dockerfile
       args:
-        ROS_DISTRO: "${ROS_DISTRO}"
-    image: "kamera/final/${ROS_DISTRO}:${TAG_KAMERA_FINAL:-latest}"
-    shm_size: "8G"
+          CUDA: ${CUDA}
+    image: "kamera/final/core-cuda${CUDA}:${TAG_KAMERA_FINAL:-latest}"
     tty: true
     network_mode: host
     depends_on:
-        - kamera-deps
+        - core-deps
     volumes:
     - "/tmp/.X11-unix:/tmp/.X11-unix"
     - "${PWD}/src:/root/noaa_kamera/src"
     profiles:
       - nuvo
+      - cuda
       - all
 
 ## =========================== gui =============================
@@ -113,12 +93,10 @@ services:
     container_name: gui
     build:
       context: .
-      args:
-        ROS_DISTRO: "${ROS_DISTRO}"
       dockerfile: docker/gui.dockerfile
     image: "kamera/final/gui:${TAG_KAMERA_GUI:-latest}"
     depends_on:
-        - kamera-gui-deps
+        - core-gui-deps
     profiles:
       - gui
 
@@ -139,37 +117,19 @@ services:
 
 
 ## ========================== viame =============================
-  # for caching
-  detector-base:
-    build:
-      context: .
-      dockerfile: docker/base/detector-deps.dockerfile
-      network: host
-      args:
-        DETECTOR_BASE_IMAGE: "${DETECTOR_BASE_IMAGE:-nvcr.io/nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04}"
-    image: "kamera/base/detector-base:${VIAME_BRANCH:-latest}"
-    profiles:
-      - viame
-      - all
-
-  # for caching
   viame-base:
-    container_name: viame-base
     build:
       context: .
       dockerfile: docker/base/detector-viame-deps.dockerfile
       network: host
       args:
         VIAME_BRANCH: "${VIAME_BRANCH:-latest}"
-    image: "kamera/base/viame-base:${VIAME_BRANCH:-latest}"
-    depends_on:
-        - detector-base
+    image: "kamera/base/viame:${VIAME_BRANCH:-latest}"
     profiles:
       - viame
       - all
 
-  viame-kamera:
-    container_name: viame-kamera
+  viame:
     build:
       context: .
       dockerfile: docker/detector.dockerfile
@@ -178,7 +138,6 @@ services:
         VIAME_BRANCH: "${VIAME_BRANCH:-latest}"
     image: "kamera/final/viame:${TAG_VIAME_KAMERA:-latest}"
     tty: true
-    runtime: nvidia
     network_mode: host
     command: ["bash"]
     depends_on:
