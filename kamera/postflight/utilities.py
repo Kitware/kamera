@@ -75,9 +75,13 @@ from kamera.sensor_models import (
 from kamera.colmap_processing.camera_models import load_from_file
 from kamera.sensor_models.nav_conversions import enu_to_llh, llh_to_enu
 from kamera.sensor_models.nav_state import NavStateINSJson
+from kamera.postflight.dat_to_csv import convert_dat_to_csv
 
 # Adjust as necessary
 GEOD_FNAME = "/src/kamera/kamera/assets/geods/egm84-15.pgm"
+if not os.path.isfile(GEOD_FNAME):
+    raise FileNotFoundError(GEOD_FNAME)
+geod = pygeodesy.geoids.GeoidPGM(GEOD_FNAME)
 
 SUFFIX_RGB = 'rgb.jpg'
 SUFFIX_IR = 'ir.tif'
@@ -138,6 +142,15 @@ fov_map.update({k.upper(): v for k, v in fov_map.items()})
 
 def first_wordlike(name):
     return name.replace('-', '_').split('_')[0]
+
+def get_base(fname):
+    """ Take an absolute path to a file, and return its stripped
+    base name, e.g. "ice_seals_2024_fl03_R_<time>", so it could
+    correspond to any modality.
+    """
+    bname = os.path.basename(fname)
+    base = '_'.join(bname.split('_')[:-1])
+    return base
 
 
 def reduce_fov(name, noisy=True):
@@ -534,8 +547,7 @@ def get_image_boundary(camera_model, frame_time, geod_filename=GEOD_FNAME):
     This assumes the ground is located at mean sea level.
 
     """
-    file_assert(geod_filename)
-    geod = pygeodesy.geoids.GeoidPGM(geod_filename)
+    global geod
 
     im_pts = np.array([[0, 0], [camera_model.width, 0],
                        [camera_model.width, camera_model.height],
@@ -1427,6 +1439,7 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
     <flight_dir>/<sys_config>/center_view
 
     """
+    top_tic = time.time()
     flight_id = os.path.basename(flight_dir)
     project_id = os.path.basename(os.path.dirname(flight_dir))
     print("FLIGHT_ID: %s" % flight_id)
@@ -1448,6 +1461,28 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
     # <flight_dir>/<sys_config>/left_view
     # <flight_dir>/<sys_config>/right_view
     # <flight_dir>/<sys_config>/center_view
+
+        # Read in detector information
+    print(flight_dir)
+    det_txts = glob.glob(os.path.join(flight_dir, 'detections', '*.txt'))
+    sets_detector_processed = []
+    for f in det_txts:
+        print(f)
+        with open(f, 'r') as of:
+            sets_detector_processed += [ get_base(l) for l in of.readlines() ]
+    sets_detector_processed = set(sets_detector_processed)
+    print("Number of sets of images detected on: %s" % len(sets_detector_processed))
+
+    det_csvs = glob.glob(os.path.join(flight_dir, 'detections', '*.csv'))
+    sets_with_detections = []
+    for f in det_csvs:
+        with open(f, 'r') as of:
+            lines = of.readlines()
+            lines = [ l for l in lines if l[0] != "#" ]
+            files = [get_base(l.split(',')[1]) for l in lines]
+            sets_with_detections += files
+    sets_with_detections = set(sets_with_detections)
+    print("Number of sets with detections: %s" % len(sets_with_detections))
 
     fn_glob = os.path.join(flight_dir, '*/*/*meta.json')
     count = 0
@@ -1489,6 +1524,7 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
 
             for cam_str in ['rgb', 'ir', 'uv']:
                 img_fnames = glob.glob('%s/*%s.*' % (image_dir, cam_str))
+                num_images = len(img_fnames)
                 key = '%s_%s_yaml_path' % (sys_str, cam_str)
 
                 try:
@@ -1539,7 +1575,10 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
             warnings.warn('No images found for {}'.format(sys_str))
             continue
 
-        for img_fname in img_fnames:
+        num_images = len(img_fnames)
+        for i, img_fname in enumerate(img_fnames):
+            print("Processing system %s, (%s/%s)" % (sys_str, i, num_images))
+
             try:
                 frame_time = img_fname_to_time[img_fname]
             except KeyError:
@@ -1601,6 +1640,7 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
 
     # ------------------------------------------------------------------------
     for sys_str in fnames_by_system:
+        tic = time.time()
         flid_sys_str = "%s_%s_%s" % (project_id, flight_id, sys_str)
         print2('Processing image footprints for system:', sys_str)
         img_fnames = fnames_by_system[sys_str]
@@ -1654,7 +1694,14 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
             pol = kml.newpolygon(name=os.path.split(img_fname)[1])
             pol.outerboundaryis = lls
 
-            c = kml_color_map[sys_str]
+            if os.stat(img_fname).st_size == 0:
+                # This file is empty, meaning we ran detectors on it
+                # and it had none, and it was not part of the Nth
+                # collection. Color differently
+                c = simplekml.Color.gray
+            else:
+                c = kml_color_map[sys_str]
+
             pol.style.linestyle.color = c
             pol.style.linestyle.width = 2
             pol.style.polystyle.color = simplekml.Color.changealphaint(50, c)
@@ -1692,12 +1739,32 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
 
             for i in range(len(shp_shapes)):
                 try:
+                    image_name = shp_shapes_fnames[i]
+                    base = get_base(image_name)
+                    # Add logic for checking if image was detected / collected
+                    if base in sets_detector_processed:
+                        reviewed = "True"
+                        if base in sets_with_detections:
+                            if os.stat(image_name).st_size == 0:
+                                print("ERROR: Image with detections was discarded.")
+                                fate = "incorrectly_discarded"
+                            else:
+                                fate = "collected_via_detections"
+                        else:
+                            if os.stat(image_name).st_size == 0:
+                                fate = "discarded"
+                            else:
+                                fate = "collected_via_nth"
+                    else:
+                        reviewed = "False"
+                        fate = "collected"
+
                     w.poly([shp_shapes[i]])
                     tmp = aircraft_state[shp_shapes_fnames[i]]
                     frame_time, lat, lon, h, heading, pitch, roll = tmp
-                    w.record(shape_img_basenames[i], frame_time, lat, lon, h, heading,
+                    w.record(image_name, frame_time, lat, lon, h, heading,
                          pitch, roll, effort_type[shp_shapes_fnames[i]],
-                         trigger_type[shp_shapes_fnames[i]], 'False', '')
+                         trigger_type[shp_shapes_fnames[i]], reviewed, fate)
                 except Exception as e:
                     warnings.warn('{}: {}'.format(e.__class__.__name__, e))
 
@@ -1736,12 +1803,37 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
 
                     w.poly([shp_shapes[i]])
 
+                    image_name = shp_shapes_fnames[i]
+                    base = get_base(image_name)
+                    # Add logic for checking if image was detected / collected
+                    if base in sets_detector_processed:
+                        reviewed = "True"
+                        if base in sets_with_detections:
+                            if os.stat(image_name).st_size == 0:
+                                print("ERROR: Image with detections was discarded.")
+                                fate = "incorrectly_discarded"
+                            else:
+                                fate = "collected_via_detections"
+                        else:
+                            if os.stat(image_name).st_size == 0:
+                                fate = "discarded"
+                            else:
+                                fate = "collected_via_nth"
+                    else:
+                        reviewed = "False"
+                        fate = "collected"
+                    if os.stat(image_name).st_size == 0:
+                        fate = "discarded"
+                    else:
+                        fate = "collected"
+
+
                     tmp = aircraft_state[shp_shapes_fnames[i]]
                     frame_time, lat, lon, h, heading, pitch, roll = tmp
 
-                    w.record(shape_img_basenames[i], frame_time, lat, lon, h,
+                    w.record(image_name, frame_time, lat, lon, h,
                              heading, pitch, roll, effort_type[shp_shapes_fnames[i]],
-                             trigger_type[shp_shapes_fnames[i]], 'False', '')
+                             trigger_type[shp_shapes_fnames[i]], reviewed, fate)
 
                     w.close()
 
@@ -1749,6 +1841,30 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
                         fout.write(wgs84_wkt)
 
                 process_summary['shapefile_count'] += 1
+
+        toc = time.time()
+        print("Time to process %s was %0.3fs." % (sys_str, toc-tic))
+
+    # Convert INS tracks to CSVs
+    # ------------------------------------------------------------------------
+    dir_out = '%s/processed_results/ins_csvs' % flight_dir
+    try:
+        os.makedirs(dir_out)
+    except OSError:
+        pass
+
+    print("Processing dat files.")
+    ins_dir = os.path.join(flight_dir, 'ins_raw')
+    dat_glob = glob.glob(ins_dir + '/*')
+    for dat_file in dat_glob:
+        out_lines = convert_dat_to_csv(dat_file)
+        out_file = os.path.join(dir_out, os.path.basename(dat_file).replace('dat', 'csv'))
+        with open(out_file, 'w') as of:
+            of.writelines(out_lines)
+
+    toc = time.time()
+    print("Time to process everything was %0.3fs." % (toc-top_tic))
+
 
     return process_summary
 
