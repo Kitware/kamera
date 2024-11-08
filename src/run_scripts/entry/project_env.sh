@@ -2,7 +2,6 @@
 
 # Source environment variables for the project.sh entrypoint. No exec.
 
-echo "NEW ENTRY?"
 echo "~~~ ~~~ Project entry point  project_env.sh ~~~ ~~~"
 for VNAME in ROS_DISTRO WS_DIR
 do

@@ -60,7 +60,7 @@ if [[ ${CAM_IFACE} == 'null' ]]; then
     exit 1
 fi
 
-IFACE_INFO=$(ipj.sh | jq ".$CAM_IFACE")
+IFACE_INFO=$(${KAM_REPO_DIR}/src/run_scripts/inpath/ipj.sh | jq ".$CAM_IFACE")
 if [[ ${CAM_IFACE} == 'null' ]]; then
     printf "<!> Failed to get info for interface $CAM_IFACE"
     exit 1

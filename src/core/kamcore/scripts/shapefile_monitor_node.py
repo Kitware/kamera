@@ -19,7 +19,7 @@ HOSTS = [] #"nuvo0", "nuvo1", "nuvo2"]
 
 # Location of the geod file.
 KAM_DIR = os.environ["KAMERA_DIR"]
-geod_filename = os.path.join('/root/kamera_ws/src/kitware-ros-pkg/wxpython_gui/geods/egm84-15.pgm')
+geod_filename = os.path.join(KAM_DIR, 'assets/geods/egm84-15.pgm')
 geod = pygeodesy.geoids.GeoidPGM(geod_filename)
 
 class ShapefileMonitor(object):
