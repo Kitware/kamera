@@ -3,7 +3,7 @@
 ARG CUDA
 FROM kamera/base/core-deps-cuda${CUDA}:latest
 
-COPY ./src /root/noaa_kamera/
+COPY . /root/noaa_kamera
 WORKDIR /root/noaa_kamera
 
 # use the exec form of run because we need bash syntax

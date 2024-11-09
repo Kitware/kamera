@@ -1,6 +1,6 @@
 FROM kamera/base/viame:latest
 
-COPY ./ /root/noaa_kamera
+COPY . /root/noaa_kamera
 
 RUN ln -sf /root/noaa_kamera/src/run_scripts/entry /entry
 

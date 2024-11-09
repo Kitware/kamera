@@ -32,7 +32,7 @@ prependToPath () {
 
 # setup ros environment
 source "/opt/ros/$ROS_DISTRO/setup.bash"
-source "${WS_DIR}/activate_ros.bash"
+source "${WS_DIR}/scripts/activate_ros.bash"
 export REDIS_HOST=${REDIS_HOST}
 export ARCH_KEY="/sys/arch/"
 # Try turning respawning back to roslaunch
