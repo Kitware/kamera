@@ -50,4 +50,4 @@ errcho() {
     (>&2 echo -e "\e[31m$1\e[0m")
 }
 
-export KAM_REPO_DIR=/root/noaa_kamera
+export KAM_REPO_DIR=/root/kamera

@@ -3,7 +3,7 @@
 
 - hosts: all
   vars:
-    nvidia_driver_version: 535
+    nvidia_driver_version: 560
     linux_distro: ubuntu20.04
     ros_distro: noetic
     ros_package: perception

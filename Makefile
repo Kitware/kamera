@@ -9,8 +9,8 @@ ROS_MASTER_URI ?= not_set_your_config_is_bad
 ## Docker buildkit - disable by setting to 0 if you have issues
 
 DAQPATH = $(shell readlink -f "/dev/$(DAQDEV)")
-PROJ_DIR=/root/noaa_kamera
-WS_DIR=/root/kamera_ws
+PROJ_DIR=/root/kamera
+WS_DIR=/root/kamera
 ROS_DISTRO=noetic
 BRANCH=latest
 
@@ -24,20 +24,20 @@ info:
 build:
 	docker compose build
 
-.PHONY: build-nuvo
-build-nuvo:
-	ROS_DISTRO=noetic docker compose --profile nuvo build
+.PHONY: nuvo
+nuvo:
+	CUDA=on docker compose --profile nuvo build
 
-.PHONY: build-viame
-build-viame:
-	ROS_DISTRO=melodic docker compose --profile viame build
+.PHONY: viame
+viame:
+	docker compose --profile viame build
 
-.PHONY: build-gui
-build-gui:
+.PHONY: gui
+gui:
 	ROS_DISTRO=kinetic docker compose --profile gui build
 
-.PHONY: build-postflight
-build-postflight:
+.PHONY: postflight
+postflight:
 	docker compose --profile pf build
 
 .PHONY: clean

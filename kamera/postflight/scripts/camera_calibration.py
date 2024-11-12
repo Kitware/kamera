@@ -1198,7 +1198,7 @@ def main():
                                                                            nav_state_provider)
         write_image_locations(align_fname, img_fnames, ins_poses)
         ub.ensuredir(osp.join(colmap_dir, aligned_sparse_recon_subdir))
-        print('Now run\nnoaa_kamera/src/kitware-ros-pkg/postflight_scripts/scripts/'
+        print('Now run\nkamera/src/kitware-ros-pkg/postflight_scripts/scripts/'
             'colmap/model_aligner.sh %s %s %s %s' % (colmap_dir.replace('/host_filesystem', ''),
                                                     sparse_recon_subdir,
                                                     'image_locations.txt',

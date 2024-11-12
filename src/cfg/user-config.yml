@@ -48,7 +48,7 @@ postproc_commands:
         - "detections"
 nas_mnt: "/mnt/flight_data"
 local_ssd_mnt: "/mnt/data"
-kamera_dir: "/home/user/kw/noaa_kamera"
+kamera_dir: "/home/user/kw/kamera"
 gui_cfg_dir: "/home/user/.config/kamera/gui"
 master_host: cas0
 redis_host: cas0

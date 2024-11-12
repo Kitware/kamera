@@ -90,7 +90,7 @@ class ColmapImage(object):
 # Colmap text camera model directory.
 flight_dir = '00'
 colmap_dir = '00/colmap'
-camera_model_dir = '/root/noaa_kamera/src/cfg/camera_models'
+camera_model_dir = '/root/kamera/src/cfg/camera_models'
 
 # Read in the nav binary.
 #nav_state_provider = NavStateINSBinary(nav_binary_fname)

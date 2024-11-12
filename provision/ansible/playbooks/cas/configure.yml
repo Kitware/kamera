@@ -3,7 +3,7 @@
 
   tasks:
 
-  - name: Manned system tasks
+  - name: Crewed system tasks
     block:
       - name: Clone kamera repo
         git:
@@ -174,7 +174,7 @@
 
       - name: Place bash aliases.
         copy:
-          src: "/home/user/kw/noaa_kamera/src/run_scripts/alias/basic-aliases.sh"
+          src: "{{ kamera_dir }}/src/run_scripts/alias/basic-aliases.sh"
           remote_src: true
           dest: /home/user/.bash_aliases
 

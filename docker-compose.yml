@@ -82,7 +82,7 @@ services:
         - core-deps
     volumes:
     - "/tmp/.X11-unix:/tmp/.X11-unix"
-    - "${PWD}/src:/root/noaa_kamera/src"
+    - "${PWD}/src:/root/kamera/src"
     profiles:
       - nuvo
       - cuda

@@ -9,7 +9,7 @@ else
 fi
 
 gui_splash() {
-    notify-send -t 5000 -i ~/kw/noaa_kamera/src/cfg/seal-icon.png \
+    notify-send -t 5000 -i ~/kw/kamera/src/cfg/seal-icon.png \
         "KAMERA" "Starting KAMERA Control Panel, please wait" || true
 }
 

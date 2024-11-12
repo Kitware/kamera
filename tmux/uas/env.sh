@@ -19,7 +19,7 @@ echo "Redis successfully connected at $REDIS_HOST, starting."
 
 export NODE_HOSTNAME=$(hostname)
 export ROS_MASTER_URI="http://${REDIS_HOST}:11311"
-export KAMERA_DIR="/home/user/kw/noaa_kamera"
+export KAMERA_DIR="/home/user/kw/kamera"
 export DATA_MOUNT_POINT=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/base)
 export CAM_FOV=$(redis-cli --raw -h ${REDIS_HOST} get /sys/${NODE_HOSTNAME}/cam_fov)
 export IR_DEVICE_ID=$(redis-cli --raw -h ${REDIS_HOST} get /sys/${NODE_HOSTNAME}/ir_device_id)

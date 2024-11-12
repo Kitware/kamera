@@ -125,5 +125,5 @@ check_result "interface pci_btm  exists" W "$(ifconfig | grep pci_btm)"
 check_result "interface mobo_top exists" W "$(ifconfig | grep mobo_top)"
 check_result "interface mobo_btm exists" W "$(ifconfig | grep mobo_btm)"
 check_result "network is on  192.168.88" W "$(ifconfig | grep '192.168.88')"
-check_exists "$HOME/kw/noaa_kamera" E
+check_exists "$HOME/kw/kamera" E
 

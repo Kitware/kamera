@@ -10,7 +10,7 @@ fi
 
 gui_splash() {
    MSG_STRING="${1}ing KAMERA Detector, please wait"
-    notify-send -t 5000 -i ~/kw/noaa_kamera/src/cfg/seal-icon.png \
+    notify-send -t 5000 -i ~/kw/kamera/src/cfg/seal-icon.png \
         "KAMERA" "${MSG_STRING}" 2>/dev/null || echo "${MSG_STRING}";
 }
 

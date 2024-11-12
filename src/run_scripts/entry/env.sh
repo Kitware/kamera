@@ -21,7 +21,7 @@ export NODE_HOSTNAME=$(hostname)
 export ROS_IP=$(dig ${NODE_HOSTNAME} +short)
 echo "ROS IP: ${ROS_IP}"
 export ROS_MASTER_URI="http://${REDIS_HOST}:11311"
-export KAMERA_DIR="/home/user/kw/noaa_kamera"
+export KAMERA_DIR="/home/user/kw/kamera"
 export DATA_MOUNT_POINT=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/base)
 export CAM_FOV=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/hosts/${NODE_HOSTNAME}/fov)
 

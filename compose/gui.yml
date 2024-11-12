@@ -5,7 +5,7 @@ services:
 ## =========================== gui =============================
   gui:
     container_name: gui
-    image: gitlab.kitware.com:4567/noaa_uav/noaa_kamera/final/gui:latest
+    image: kamera/final/gui:latest
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"

@@ -35,7 +35,7 @@ CAM_FOV=${CAM_FOV:-NONE}
 if [[ -n `grep docker /proc/1/cgroup` ]] ; then
     export IS_CONTAINER=true
 else
-    export REPO_DIR=$HOME/kw/noaa_kamera
+    export REPO_DIR=$HOME/kw/kamera
 fi
 
 ## name of current host
@@ -54,7 +54,7 @@ fi
 
 if [[ -z $IS_CONTAINER ]] ; then
     SUBDIR=/kw
-    export REPO_DIR=${HOME}${SUBDIR}/noaa_kamera
+    export REPO_DIR=${HOME}${SUBDIR}/kamera
     export WS_DIR=${HOME}${SUBDIR}/kamera_ws
 fi
 

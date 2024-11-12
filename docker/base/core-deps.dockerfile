@@ -101,8 +101,8 @@ RUN cd /src/DALSA &&\
     chmod +x GigeV/bin/install.gigev && ./corinstall install
 
 ## === === === === === === Project specifics === === === === === === === ===
-ENV WS_DIR=/root/noaa_kamera
-WORKDIR /root/noaa_kamera
+ENV WS_DIR=/root/kamera
+WORKDIR /root/kamera
 
 # Copy products into container
 COPY        .             $WS_DIR

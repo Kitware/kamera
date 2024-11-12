@@ -188,7 +188,7 @@ class AvxClient(object):
 
     def __init__(self):
         self._data_mount_point = rospy.get_param('/data_mount_point', '/mnt/ins_default')
-        self._host = rospy.get_param('/host_center', '/cas0')
+        self._host = socket.gethostname()
         self._project = 'default2024'
         self._flight = 'fl00'
         self.archiver = ArchiverBase()
