@@ -22,5 +22,5 @@ services:
       - "/mnt:/mnt"
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     command: ["/entry/cam_ir.sh"]
-    restart: always
+    restart: unless-stopped
 ...

@@ -11,5 +11,5 @@ services:
     user: root
     volumes:
         - "/mnt:/mnt:ro,rshared"
-    restart: always
+    restart: unless-stopped
 ...
