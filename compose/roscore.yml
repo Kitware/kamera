@@ -19,7 +19,7 @@ services:
       - kamera.systems
     volumes:
       - "/mnt:/mnt"
-      - "${PWD}/src:${KAMERA_DIR}/src:ro"
+      - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     command: ["/entry/master.sh"]
     restart: always
 ...

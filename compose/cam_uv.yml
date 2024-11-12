@@ -21,7 +21,7 @@ services:
     network_mode: host
     volumes:
       - "/mnt:/mnt"
-      - "${PWD}/src:${KAMERA_DIR}/src:ro"
+      - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
         #    command: ["bash"]
     command: ["/entry/cam_prosilica.sh", "uv"]
     restart: always

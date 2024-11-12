@@ -18,7 +18,7 @@ services:
     network_mode: host
     volumes:
       - "/mnt:/mnt"
-      - "${PWD}/src:${KAMERA_DIR}/src:ro"
+      - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
       - "${HOME}:${HOME}:ro"
       # this should point to whatever publish_sync_msgs.sh expects
       - "/mnt/data:/mnt/data/calibration_2020_fl08"

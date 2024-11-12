@@ -13,7 +13,7 @@ services:
       DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
       SPOOF_RATE: "${SPOOF_RATE}"
     volumes:
-      - "${PWD}/src:${KAMERA_DIR}/src:ro"
+      - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     command: ["/entry/rosnode_list.sh"]
     dns:
       - "${KAMERA_DNS_IP}"

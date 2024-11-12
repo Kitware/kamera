@@ -17,7 +17,7 @@ services:
     network_mode: host
     volumes:
       - "/mnt:/mnt"
-      - "${PWD}/src:${KAMERA_DIR}/src:ro"
+      - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     command: ["/entry/cam_param_monitor.sh"]
     restart: always
 ...

@@ -10,7 +10,7 @@ services:
       REDIS_HOST: "${REDIS_HOST}"
       ROS_MASTER_URI: "${ROS_MASTER_URI}"
       NODE_HOSTNAME: "${NODE_HOSTNAME}"
-      KAMERA_DIR: "${KAMERA_DIR}"
+      DOCKER_KAMERA_DIR: "${DOCKER_KAMERA_DIR}"
     dns:
       - "${KAMERA_DNS_IP}"
     dns_search:
@@ -18,7 +18,7 @@ services:
     network_mode: host
     volumes:
       - "/mnt:/mnt"
-      - "${PWD}/src:${KAMERA_DIR}/src:ro"
+      - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     command: ["/entry/shapefile_monitor.sh"]
     restart: always
 ...

@@ -9,5 +9,5 @@ services:
     tty: true
     volumes:
       - "/mnt:/mnt"
-      - "${PWD}/src:${KAMERA_DIR}/src:ro"
+      - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     entrypoint: ["/entry/postproc_detections.sh"]
