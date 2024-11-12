@@ -3,3 +3,4 @@
 artifacts
 build
 devel
+provision/ansible/.password

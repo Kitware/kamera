@@ -37,6 +37,7 @@ services:
     image: "kamera/base/core-ros-cudaon:${TAG_KAMERA_DEPS:-latest}"
     profiles:
       - cuda
+      - nuvo
       - all
 
 ## =========================== main (full dependencies) =======================

@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
         ros-noetic-vision-opencv \
         ros-noetic-diagnostic-updater \
         ros-noetic-self-test \
+        ros-noetic-polled-camera \
         libgtkmm-2.4-1v5 \
         libglademm-2.4-1v5 \
         libgtkglextmm-x11-1.2-dev \
