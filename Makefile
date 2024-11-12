@@ -26,7 +26,7 @@ build:
 
 .PHONY: nuvo
 nuvo:
-	CUDA=on docker compose --profile nuvo build
+	CUDA=on docker compose --profile cuda build
 
 .PHONY: viame
 viame:
