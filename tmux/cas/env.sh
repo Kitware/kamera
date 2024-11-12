@@ -19,7 +19,8 @@ echo "Redis successfully connected at $REDIS_HOST, starting."
 
 export NODE_HOSTNAME=$(hostname)
 export ROS_MASTER_URI="http://${REDIS_HOST}:11311"
-export KAMERA_DIR="/root/kamera"
+export KAMERA_DIR="/home/user/kw/kamera"
+export DOCKER_KAMERA_DIR="/root/kamera"
 export DATA_MOUNT_POINT=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/base)
 export CAM_FOV=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/hosts/${NODE_HOSTNAME}/fov)
 
@@ -45,4 +46,4 @@ JPEG_QUALITY=90
 # If in a GPS-denied environment, this will publish events on each event
 # trigger to simulated the GPS timestamp
 # BE SURE TO SET TO 0 BEFORE FLIGHT
-SPOOF_EVENTS=0
+SPOOF_EVENTS=1

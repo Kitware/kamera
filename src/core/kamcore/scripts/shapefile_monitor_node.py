@@ -15,10 +15,10 @@ import rospy
 
 from custom_msgs.msg import GSOF_INS
 
-HOSTS = [] #"nuvo0", "nuvo1", "nuvo2"]
+HOSTS = []
 
 # Location of the geod file.
-KAM_DIR = os.environ["KAMERA_DIR"]
+KAM_DIR = os.environ["DOCKER_KAMERA_DIR"]
 geod_filename = os.path.join(KAM_DIR, 'assets/geods/egm84-15.pgm')
 geod = pygeodesy.geoids.GeoidPGM(geod_filename)
 

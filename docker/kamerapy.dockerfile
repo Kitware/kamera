@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -yq \
     libsm6 \
     libxext6 \
     redis \
+    dnsutils \
     gdal-bin
 
 RUN pip install --upgrade pip
