@@ -19,6 +19,6 @@ services:
     volumes:
       - "/mnt:/mnt"
       - "${PWD}/src:$DOCKER_KAMERA_DIR/src:ro"
-    command: ["/entry/image_manager.sh"]
+    command: ["/entry/data_migration.sh"]
     restart: always
 ...

@@ -51,6 +51,7 @@ RUN     apt-get update -q && apt-get install --no-install-recommends -y \
             dnsutils \
             jq \
             rsync \
+            fd-find \
             redis-tools \
             sqlite3 \
             python3-pip \
