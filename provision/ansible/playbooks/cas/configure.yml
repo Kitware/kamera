@@ -71,14 +71,7 @@
 
       - name: Create repo dir symlink
         file:
-          src: "{{ kamera_dir }}/repo_dir.bash"
-          dest: ~/.config/kamera/repo_dir.bash
-          owner: "{{ ansible_user }}"
-          state: link
-
-      - name: Create bootstrap symlink
-        file:
-          src: "{{ kamera_dir }}/src/run_scripts/bootstrap_app.sh"
+          src: "{{ kamera_dir }}/.dir"
           dest: ~/.config/kamera/repo_dir.bash
           owner: "{{ ansible_user }}"
           state: link

@@ -127,7 +127,7 @@ fi
 declare -A PIDS
 for host in $(cq '.arch.hosts | keys | join("\n" )') ; do
     if [[ $(cq ".arch.hosts.${host}.enabled") == 'true' ]]; then
-	python3 system.py $host restart nas &
+	python3 ${KAM_REPO_DIR}/scripts/system.py $host restart nas &
         PIDS[${host}]=$!
     else
         echo "${host} disabled."
@@ -143,7 +143,7 @@ done
 # Bring up master and core nodes
 MASTER_HOST=$(cq '.master_host')
 blueprintf "done\nBringing up master $MASTER_HOST..."
-python3 system.py $MASTER_HOST "${ARGS[@]}" master
+python3 ${KAM_REPO_DIR}/scripts/system.py $MASTER_HOST "${ARGS[@]}" master
 
 # check that master is in fact up
 FAIL_COUNT=0
@@ -160,7 +160,7 @@ done
 
 # === === === === Checks have passed === === === ===
 blueprintf "done. Init checks are good! \nBringing up central..."
-python3 system.py $MASTER_HOST "${ARGS[@]}" central &
+python3 ${KAM_REPO_DIR}/scripts/system.py $MASTER_HOST "${ARGS[@]}" central &
 STAT_CENTRAL=$!
 
 
@@ -171,7 +171,7 @@ blueprintf "done\nLaunching pod nodes...\n"
 declare -A PIDS
 for host in $(cq '.arch.hosts | keys | join("\n" )') ; do
     if [[ $(cq ".arch.hosts.${host}.enabled") == 'true' ]]; then
-	python3 system.py $host "${ARGS[@]}" pod &
+	python3 ${KAM_REPO_DIR}/scripts/system.py $host "${ARGS[@]}" pod &
         PIDS[${host}]=$!
     else
         echo "${host} disabled."
@@ -182,7 +182,7 @@ echo " PIDS : ${PIDS[@]}"
 
 # === === === === Checks have passed === === === ===
 blueprintf "Bringing up monitor..."
-python3 system.py $MASTER_HOST "${ARGS[@]}" monitor &
+python3 ${KAM_REPO_DIR}/scripts/system.py $MASTER_HOST "${ARGS[@]}" monitor &
 STAT_MONITOR=$!
 
 blueprintf "done. \nPods launched. Starting GUI..."

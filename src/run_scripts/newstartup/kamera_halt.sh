@@ -2,7 +2,7 @@
 
 ## Like kamera_run, but opposite
 export COMPOSE_IGNORE_ORPHANS=True # make compose quiter
-source tmux/cas/env.sh
+source ${KAM_REPO_DIR}/tmux/cas/env.sh
 
 
 errcho() {
@@ -76,16 +76,16 @@ blueprintf "done\nGui down. Killing pods...\n"
 declare -A PIDS
 for host in $(cq '.arch.hosts | keys | join("\n" )') ; do
     if [[ $(cq ".arch.hosts.${host}.enabled") == 'true' ]]; then
-	python3 ${KAM_REPO_DIR}/system.py $host ${ARGS[@]} pod &
+	python3 ${KAM_REPO_DIR}/scripts/system.py $host ${ARGS[@]} pod &
         PIDS["${host}_pod"]=$!
-	python3 ${KAM_REPO_DIR}/system.py $host ${ARGS[@]} detector &
+	python3 ${KAM_REPO_DIR}/scripts/system.py $host ${ARGS[@]} detector &
         PIDS["${host}_det"]=$!
     fi
 done
 blueprintf "done\nBringing down central..."
-python3 ${KAM_REPO_DIR}/system.py $MASTER_HOST ${ARGS[@]} central &
+python3 ${KAM_REPO_DIR}/scripts/system.py $MASTER_HOST ${ARGS[@]} central &
 PIDS["${host}_cen"]=$!
-python3 ${KAM_REPO_DIR}/system.py $MASTER_HOST ${ARGS[@]} monitor &
+python3 ${KAM_REPO_DIR}/scripts/system.py $MASTER_HOST ${ARGS[@]} monitor &
 PIDS["${host}_mon"]=$!
 wait $STAT_GUI
 # wait for all pids
@@ -94,7 +94,7 @@ for pid in ${PIDS[*]}; do
 done
 
 blueprintf "done\nBringing down master..."
-python3 ${KAM_REPO_DIR}/system.py $MASTER_HOST ${ARGS[@]} master
+python3 ${KAM_REPO_DIR}/scripts/system.py $MASTER_HOST ${ARGS[@]} master
 blueprintf "done. ROS should be down\n"
 
 blueprintf "Dismounting drives..."
