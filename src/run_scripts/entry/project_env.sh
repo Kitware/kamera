@@ -36,7 +36,7 @@ source "${WS_DIR}/scripts/activate_ros.bash"
 export REDIS_HOST=${REDIS_HOST}
 export ARCH_KEY="/sys/arch/"
 # Try turning respawning back to roslaunch
-export NORESPAWN="false"
+export NORESPAWN="true"
 
 ## alternate path syntax
 #[ "${PATH#*$HOME/.local/bin:}" == "$PATH" ] && export PATH="$HOME/.local/bin:$PATH"

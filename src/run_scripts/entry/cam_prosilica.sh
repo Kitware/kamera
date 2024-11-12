@@ -22,11 +22,6 @@ fi
 
 if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/enable ) == "true" ]]; then
   export KAMERA_DEBUG=true
-  if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/norespawn ) == "true" ]]; then
-    export NORESPAWN=true
-  else
-    export NORESPAWN=false
-  fi
 fi
 
 
@@ -112,7 +107,7 @@ exec roslaunch "${ROSWAIT}" prosilica_camera prosilica.launch \
     cameratype:=${CAM_MODE} \
     cam_fov:=${CAM_FOV} \
     trigger_mode:=${TRIGGER_MODE} \
-    norespawn:="false" \
+    norespawn:=${NORESPAWN} \
     GainMode:=$(cq ".launch.cam.${CAM_MODE}.GainMode") \
     GainValue:=$(cq ".launch.cam.${CAM_MODE}.GainValue") 2> >(tee -a "${LOGFILE}" >&2) &
 
