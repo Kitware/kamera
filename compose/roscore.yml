@@ -5,7 +5,7 @@ services:
   ## =========================== headless nodes =============================
   roscore:
     container_name: roscore
-    image: kamera/final/core-cudaon
+    image: kitware/kamera:core
     tty: true
     network_mode: host
     environment:

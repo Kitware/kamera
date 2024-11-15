@@ -4,7 +4,7 @@ version: '3.7'
 services:
   daq:
     container_name: daq
-    image: kamera/final/core-cudaon
+    image: kitware/kamera:core
     tty: true
     devices:
       - "${MCC_DAQ}:${MCC_DAQ}"

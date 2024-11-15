@@ -4,7 +4,7 @@ version: '3.7'
 services:
   spoof_events:
     container_name: spoof_events
-    image: kamera/final/core-cudaon
+    image: kitware/kamera:core
     tty: true
     devices:
       - "${PULSE_TTY}:${PULSE_TTY}"

@@ -3,7 +3,7 @@ version: '3.7'
 services:
   imageview:
     container_name: "imageview-${CAM_FOV}"
-    image: kamera/final/core-cudaon
+    image: kitware/kamera:core
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"

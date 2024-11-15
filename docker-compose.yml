@@ -13,31 +13,20 @@ services:
   kamerad:
     build:
       context: ./src/core/kamerad
-    image: "kamera/kamerad:latest"
+    image: "kitware/kamera:kamerad"
     profiles:
       - nuvo
-      - all
-
-  # The core ROS image with basic APT packages, no KAMERA code.
-  core-ros-cudaoff:
-    build:
-      context: .
-      dockerfile: docker/base/core-ros.dockerfile
-    image: "kamera/base/core-ros-cudaoff:${TAG_KAMERA_DEPS:-latest}"
-    profiles:
-      - nuvo
-      - gui
       - all
 
   # The core ROS image with CUDA and basic APT packages, no KAMERA code.
-  core-ros-cudaon:
+  core-ros:
     build:
       context: .
-      dockerfile: docker/base/core-ros-cuda.dockerfile
-    image: "kamera/base/core-ros-cudaon:${TAG_KAMERA_DEPS:-latest}"
+      dockerfile: docker/base/core-ros.dockerfile
+    image: "kamera/base/core-ros:${TAG_KAMERA_DEPS:-latest}"
     profiles:
-      - cuda
       - nuvo
+      - gui
       - all
 
 ## =========================== main (full dependencies) =======================
@@ -48,15 +37,12 @@ services:
     build:
       context: .
       dockerfile: docker/base/core-deps.dockerfile
-      args:
-          CUDA: ${CUDA}
-    image: "kamera/base/core-deps-cuda${CUDA}:${TAG_KAMERA_DEPS:-latest}"
+    image: "kamera/base/core-deps:${TAG_KAMERA_DEPS:-latest}"
     depends_on:
-        - core-ros-cuda${CUDA}
+        - core-ros
     profiles:
       - nuvo
       - gui
-      - cuda
       - all
 
   core-gui-deps:
@@ -74,9 +60,7 @@ services:
     build:
       context: .
       dockerfile: docker/core.dockerfile
-      args:
-          CUDA: ${CUDA}
-    image: "kamera/final/core-cuda${CUDA}:${TAG_KAMERA_FINAL:-latest}"
+    image: "kitware/kamera:core"
     tty: true
     network_mode: host
     depends_on:
@@ -86,7 +70,6 @@ services:
     - "${PWD}/src:/root/kamera/src"
     profiles:
       - nuvo
-      - cuda
       - all
 
 ## =========================== gui =============================
@@ -95,7 +78,7 @@ services:
     build:
       context: .
       dockerfile: docker/gui.dockerfile
-    image: "kamera/final/gui:${TAG_KAMERA_GUI:-latest}"
+    image: "kitware/kamera:gui"
     depends_on:
         - core-gui-deps
     profiles:
@@ -107,7 +90,7 @@ services:
       dockerfile: ./docker/kamerapy.dockerfile
       args:
         BRANCH: $BRANCH
-    image: "kamera/final/postproc:${TAG_KAMERA_POSTPROC:-latest}"
+    image: "kitware/kamera:postproc"
     network_mode: host
     tty: true
     profiles:
@@ -137,7 +120,7 @@ services:
       network: host
       args:
         VIAME_BRANCH: "${VIAME_BRANCH:-latest}"
-    image: "kamera/final/viame:${TAG_VIAME_KAMERA:-latest}"
+    image: "kitware/kamera:viame"
     tty: true
     network_mode: host
     command: ["bash"]

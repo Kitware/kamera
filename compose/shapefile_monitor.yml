@@ -4,7 +4,7 @@ version: '3.7'
 services:
   shapefile_monitor:
     container_name: shapefile_monitor
-    image: kamera/final/core-cudaon
+    image: kitware/kamera:core
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"

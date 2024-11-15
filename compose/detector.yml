@@ -7,7 +7,7 @@ services:
 ## ========================== viame =============================
   detector:
     container_name: "viame-${CAM_FOV}"
-    image: kamera/final/viame
+    image: kitware/kamera:viame
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"

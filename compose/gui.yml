@@ -23,14 +23,16 @@ services:
       - kamera.systems
     network_mode: host
     volumes:
+      - "/mnt:/mnt"
       - "/tmp/.X11-unix:/tmp/.X11-unix"
-      - "/mnt/flight_data:/mnt/flight_data"
-      - "/home/user/kw/noaa_kamera:/home/user/kamera_ws"
-      - "${PWD}/src:/home/user/noaa_kamera/src:ro"
+      - "/home/user/kw/kamera/scripts:/home/user/kamera_ws/scripts"
+      - "${PWD}/src:/home/user/kamera_ws/src:ro"
+      - "/home/user/kw/backup_noaa_kamera/src/kitware-ros-pkg/wxpython_gui/:/home/user/kamera_ws/src/kitware-ros-pkg/wxpython_gui"
       - "save-gui:/home/user/.config/kamera/gui"
       - "${HOME}/.ssh:/home/user/.ssh"
     entrypoint: ["/bin/tini", "--"]
-    command: ["/entry/gui.sh"]
+      #    command: ["/entry/gui.sh"]
+    command: ["bash"]
 
 volumes:
   save-gui:

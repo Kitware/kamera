@@ -5,7 +5,7 @@ services:
   ## =========================== headless nodes =============================
   image_manager:
     container_name: "image_manager"
-    image: kamera/final/core-cudaon
+    image: kitware/kamera:core
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"

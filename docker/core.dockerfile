@@ -1,7 +1,6 @@
 ## This should not invoke ANY internet calls!
 
-ARG CUDA
-FROM kamera/base/core-deps-cuda${CUDA}:latest
+FROM kamera/base/core-deps:latest
 
 COPY . /root/kamera
 WORKDIR /root/kamera

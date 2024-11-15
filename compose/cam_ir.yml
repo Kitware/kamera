@@ -4,7 +4,7 @@ version: '3.7'
 services:
   cam_ir:
     container_name: "cam-ir-${CAM_FOV}"
-    image: kamera/final/core-cudaon
+    image: kitware/kamera:core
     tty: true
     environment:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"

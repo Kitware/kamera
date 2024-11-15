@@ -1,5 +1,4 @@
-ARG CUDA
-FROM kamera/base/core-ros-cuda${CUDA}:latest
+FROM kamera/base/core-ros:latest
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
         ros-noetic-compressed-image-transport \

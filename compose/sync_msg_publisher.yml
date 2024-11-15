@@ -4,7 +4,7 @@ version: "3.7"
 services:
   sync-publisher:
     container_name: "sync-publisher-${CAM_FOV}"
-    image: kamera/final/viame
+    image: kitware/kamera:viame
     tty: true
     environment:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"

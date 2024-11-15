@@ -4,7 +4,7 @@ version: '3.7'
 services:
   ## =========================== headless nodes =============================
   postproc:
-    image: kamera/final/postproc
+    image: kitware/kamera:postproc
     network_mode: host
     tty: true
     volumes:

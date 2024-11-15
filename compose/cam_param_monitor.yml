@@ -4,7 +4,7 @@ version: '3.7'
 services:
   cam_param_monitor:
     container_name: cam_param_monitor
-    image: kamera/final/core-cudaon
+    image: kitware/kamera:core
     tty: true
     environment:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"

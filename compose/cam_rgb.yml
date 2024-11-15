@@ -5,7 +5,7 @@ services:
   ## =========================== headless nodes =============================
   cam_rgb:
     container_name: "cam-rgb-${CAM_FOV}"
-    image: kamera/final/core-cudaon
+    image: kitware/kamera:core
     tty: true
     environment:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"
