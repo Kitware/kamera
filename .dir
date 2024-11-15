@@ -8,3 +8,5 @@
 
 HEREDIR=$(cd "$(dirname $(realpath ${0}))" && pwd)
 echo ${HEREDIR}
+KAM_REPO_DIR=${HEREDIR}
+export KAM_REPO_DIR

@@ -1,5 +1,5 @@
 # Build off the public VIAME docker build (with ITK support)
-FROM kitware/viame:gpu-algorithms-latest as vb
+FROM kitware/viame:gpu-algorithms-seal as vb
 
 WORKDIR /root
 # setup environment
