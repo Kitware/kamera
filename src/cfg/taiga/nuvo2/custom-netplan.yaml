@@ -1,0 +1,51 @@
+---
+## Netplan for nuvo2
+network:
+  version: 2
+  ethernets:
+    # IR Camera
+    mobo_top:
+      match:
+        macaddress: 78:d0:04:26:c7:2a
+      set-name: mobo_top
+      addresses:
+        - 192.168.1.12/24
+      optional: true
+    # UV Camera
+    mobo_btm:
+      match:
+        macaddress: 78:d0:04:26:c7:2b
+      set-name: mobo_btm
+      addresses:
+        - 192.168.2.12/24
+      optional: true
+    # LAN
+    1g_pci_bot:
+      match:
+        macaddress: 90:e2:ba:9f:fb:13
+      set-name: 1g_pci_bot
+      addresses:
+        - 192.168.88.12/24
+      gateway4: 192.168.88.1
+      nameservers:
+        addresses: [8.8.8.8, 192.168.88.12]
+      optional: true
+    # NAS
+    pci_top:
+      mtu: 9000
+      match:
+        macaddress: a0:36:9f:50:66:cc
+      set-name: pci_top
+      addresses: [192.168.198.102/24]
+      optional: true
+    # P1 Camera
+    pci_btm:
+      mtu: 9000
+      match:
+        macaddress: a0:36:9f:50:66:ce
+      set-name: pci_btm
+      addresses:
+        - 192.168.4.12/24
+      optional: true
+...
+
