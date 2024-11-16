@@ -128,7 +128,7 @@
         become: True
         lineinfile:
           path: /etc/fstab
-          line: /dev/disk/by-id/{{ ssd_id }}    /mnt/data          ext4     nofail,user,noatime   0   0
+          line: /dev/disk/by-uuid/{{ ssd_id }}    /mnt/data          ext4     nofail,user,noatime   0   0
           state: present
           insertbefore: EOF
 
@@ -193,13 +193,6 @@
           path: ~/.tmuxinator
           state: directory
           mode: '0755'
-
-      - name: Create repo dir symlink
-        file:
-          src: "{{ kamera_dir }}/repo_dir.bash"
-          dest: ~/.config/kamera/repo_dir.bash
-          owner: "{{ ansible_user }}"
-          state: link
 
       - name: Create bootstrap symlink
         file:
