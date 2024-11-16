@@ -25,7 +25,7 @@ network:
         macaddress: 90:e2:ba:5c:97:cf
       set-name: 1g_pci_bot
       addresses:
-        - 192.168.88.10/24
+        - 192.168.88.11/24
       gateway4: 192.168.88.1
       nameservers:
         addresses: [8.8.8.8, 192.168.88.10]
@@ -36,7 +36,7 @@ network:
         macaddress: a0:36:9f:21:3c:04
       set-name: pci_top
       addresses:
-        - 192.168.198.102/24
+        - 192.168.198.101/24
       optional: true
     # P1 Camera
     pci_btm:
