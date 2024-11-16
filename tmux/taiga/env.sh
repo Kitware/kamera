@@ -1,6 +1,6 @@
 #DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-export REDIS_HOST="cas0"
+export REDIS_HOST="nuvo0"
 
 # Uncomment this line if you wish to run the GUI in "offline" mode
 # (without nuvo0, 1, etc. hooked up)
