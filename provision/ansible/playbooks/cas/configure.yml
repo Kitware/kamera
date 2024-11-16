@@ -7,9 +7,9 @@
     block:
       - name: Clone kamera repo
         git:
-          repo: "https://github.com/Kitware/kamera.git"
+          repo: "git@github.com:Kitware/kamera.git"
           dest: "{{ kamera_dir }}"
-          version: develop
+          version: main
           recursive: True
           accept_hostkey: True
           update: True
@@ -19,7 +19,7 @@
         become: True
         when: redis_host
         copy:
-          src: "{{ kamera_dir }}/src/cfg/redis/redis.conf"
+          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/redis.conf"
           remote_src: true
           dest: /etc/redis/redis.conf
           owner: root
@@ -32,13 +32,13 @@
         # Sets all system-wide parameters (except for REDIS_HOST)
       - name: Set Redis defaults
         when: redis_host
-        shell: cat "{{ kamera_dir }}/src/cfg/redis/cas_system_config.conf" | xargs -n 2 bash -c 'redis-cli -h {{ inventory_hostname }} set $0 $1'
+        shell: cat "{{ kamera_dir }}/src/cfg/redis/{{ config_dir }}_system_config.conf" | xargs -n 2 bash -c 'redis-cli -h {{ inventory_hostname }} set $0 $1'
 
       - name: Set up supervisor trampoline
         become: True
         file:
           src: "/home/{{ ansible_user }}/supervisor.conf"
-          dest: /etc/supervisor/conf.d/cas.conf
+          dest: /etc/supervisor/conf.d/{{ config_dir }}.conf
           state: link
           force: True
           owner: root
@@ -54,7 +54,7 @@
       - name: Copy over supervisor config for sudoless and RPC
         become: True
         copy:
-          src: "{{ kamera_dir }}/src/cfg/cas/supervisord.conf"
+          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/supervisord.conf"
           remote_src: true
           dest: /etc/supervisor/supervisord.conf
           owner: root
@@ -80,7 +80,7 @@
       - name: Setup netplan configuration.
         become: True
         copy:
-          src: "{{ kamera_dir }}/src/cfg/cas/{{ inventory_hostname }}/custom-netplan.yaml"
+          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/{{ inventory_hostname }}/custom-netplan.yaml"
           remote_src: true
           dest: /etc/netplan/{{ inventory_hostname }}-netplan.yaml
           owner: root
@@ -88,7 +88,7 @@
       - name: Add mappings to /etc/hosts
         become: True
         copy:
-          src: "{{ kamera_dir }}/src/cfg/cas/{{ inventory_hostname }}/hosts"
+          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/{{ inventory_hostname }}/hosts"
           remote_src: true
           dest: /etc/hosts
           owner: root
@@ -136,7 +136,7 @@
         become: True
         when: leader or follower or gui
         copy:
-          src: "{{ kamera_dir }}/src/cfg/cas/{{ inventory_hostname }}/chrony.conf"
+          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/{{ inventory_hostname }}/chrony.conf"
           remote_src: true
           dest: /etc/chrony/chrony.conf
           owner: root
@@ -161,7 +161,7 @@
         become: True
         when: leader
         copy:
-          src: "{{ kamera_dir }}/src/cfg/cas/{{ inventory_hostname }}/ntp.conf"
+          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/{{ inventory_hostname }}/ntp.conf"
           remote_src: true
           dest: /etc/ntp.conf
 

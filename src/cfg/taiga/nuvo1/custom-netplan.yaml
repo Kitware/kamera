@@ -1,0 +1,40 @@
+# Important note! The ethernet device names are set by 70-persistent-net.rules on nuvo0 but netplan on nuvo1/2
+
+---
+## Netplan for nuvo1
+network:
+  version: 2
+  ethernets:
+    # IR Camera
+    mobo_top:
+      match:
+        macaddress: 78:d0:04:26:c7:28
+      set-name: mobo_top
+      addresses: [192.168.1.11/24]
+      optional: true
+    # UV Camera
+    mobo_btm:
+      match:
+        macaddress: 78:d0:04:26:c7:29
+      set-name: mobo_btm
+      addresses: [192.168.2.11/24]
+      optional: true
+    # NAS
+    pci_top:
+      match:
+        macaddress: a0:36:9f:21:3c:04
+      set-name: pci_top
+      addresses:
+        - 192.168.198.101/24
+      gateway4: 192.168.88.1
+      nameservers:
+        addresses: [8.8.8.8, 192.168.88.10]
+      optional: true
+    # P1 Camera
+    pci_btm:
+      match:
+        macaddress: a0:36:9f:21:3c:06
+      set-name: pci_btm
+      addresses: [192.168.4.11/24]
+      optional: true
+...
