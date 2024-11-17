@@ -264,7 +264,7 @@ namespace phase_one
                     iiqImage = event->FullImage();
                     P1::ImageSdk::RawImage image(iiqImage->Data(),
                             iiqImage->DataSizeBytes());
-                    std::unique_lock<std::mutex> lock(mtx);
+                    std::lock_guard<std::mutex> lock(mtx);
                     ROS_INFO("|CAPTURE| Entered lock!");
                     if ( !image_q_.empty() ) {
                         image_q_.pop();
@@ -419,7 +419,7 @@ namespace phase_one
                 filename_to_seq_map_.erase(filename);
             } else {
                 lock.unlock();
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
             lock.unlock();
@@ -475,7 +475,11 @@ namespace phase_one
             filename.replace(filename.find("IIQ"), 3, "jpg"); // Replaces "IIQ" with "jpg"
             filename.erase(filename.find("/iiq_buffer"), 11); // Removes buffer dir from path
             ROS_INFO_STREAM("|DEMOSAIC| write file: " << filename);
+            auto ticj = std::chrono::high_resolution_clock::now();
             bool success = dumpImage(imageFile, bitmap, filename, "jpg");
+            auto tocj = std::chrono::high_resolution_clock::now();
+            auto dtj = tocj - ticj;
+            ROS_INFO_STREAM("|DEMOSAIC| JPEG write time: " << dtj.count() / 1e9 << "s");
             if ( success ) {
                 // delete IIQ file that's been processed
                 remove(filename_iiq.c_str());
@@ -511,7 +515,28 @@ namespace phase_one
             if (format == "jpg") {
                 int quality = std::stoi(envoy_->get("/sys/arch/jpg/quality"));
                 jpegConfig.quality = quality;
-                P1::ImageSdk::JpegWriter(filename, bitmap, rawImage, jpegConfig);
+                auto ticj = std::chrono::high_resolution_clock::now();
+                int use_p1 = std::stoi(envoy_->get("/sys/arch/use_p1jpeg"));
+                // This function for some reason takes ~5x as long
+                if ( use_p1 == 1 ) {
+                  P1::ImageSdk::JpegWriter(filename, bitmap, rawImage, jpegConfig);
+                } else {
+                  cv::Mat cvImage_raw = cv::Mat(cv::Size(
+                                       bitmap.Width(), bitmap.Height()), CV_8UC3);
+                  cvImage_raw.data = bitmap.Data().get();
+                  cv::Mat cvImage = cv::Mat(cv::Size(
+                                      bitmap.Width(), bitmap.Height()), CV_8UC3);
+                  cv::cvtColor(cvImage_raw, cvImage, cv::COLOR_BGR2RGB);
+                  std::vector<int> compression_params;
+                  compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
+                  compression_params.push_back(quality);
+                  boost::filesystem::path path_filename{filename};
+                  boost::filesystem::create_directories(path_filename.parent_path());
+                  cv::imwrite(filename, cvImage, compression_params);
+                }
+                auto tocj = std::chrono::high_resolution_clock::now();
+                auto dtj = tocj - ticj;
+                ROS_WARN_STREAM("|DUMP| Image write time: " << dtj.count() / 1e9 << "s");
             } else if (format == "tiff") {
                 P1::ImageSdk::TiffConfig tiffConfig;
                 P1::ImageSdk::TiffWriter(filename, bitmap, rawImage, tiffConfig);
