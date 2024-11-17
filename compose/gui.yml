@@ -31,8 +31,8 @@ services:
       - "save-gui:/home/user/.config/kamera/gui"
       - "${HOME}/.ssh:/home/user/.ssh"
     entrypoint: ["/bin/tini", "--"]
-      #    command: ["/entry/gui.sh"]
-    command: ["bash"]
+    command: ["/entry/gui.sh"]
+    #command: ["bash"]
 
 volumes:
   save-gui:
