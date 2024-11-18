@@ -1,7 +1,7 @@
 **__pycache__
 **.swp
+**.pyc
 artifacts
 build
 devel
 provision/ansible/.password
-src/kitware-ros-pkg/wxpython_gui

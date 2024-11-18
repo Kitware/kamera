@@ -5,7 +5,7 @@ services:
 ## =========================== gui =============================
   gui:
     container_name: gui
-    image: gitlab.kitware.com:4567/noaa_uav/noaa_kamera/final/gui:latest
+    image: kitware/kamera:gui
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"
@@ -13,7 +13,7 @@ services:
       ROS_IP: "${ROS_IP:-}"
       ROS_HOSTNAME: "${ROS_HOSTNAME:-}"
       DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
-      GUI_CFG_DIR: /home/user/.config/kamera/gui
+      GUI_CFG_DIR: "${GUI_CFG_DIR}"
       DISPLAY: "${DISPLAY}"
       QT_X11_NO_MITSHM: "1"
       START_IN_SHELL: "${START_IN_SHELL}"
@@ -27,7 +27,8 @@ services:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
       - "/home/user/kw/kamera/scripts:/home/user/kamera_ws/scripts"
       - "${PWD}/src:/home/user/kamera_ws/src:ro"
-      - "/home/user/kw/backup_noaa_kamera/src/kitware-ros-pkg/wxpython_gui/:/home/user/kamera_ws/src/kitware-ros-pkg/wxpython_gui"
+      - "${PWD}/assets:/home/user/noaa_kamera/assets:ro"
+      - "/home/user/kw/kamera/src/kitware-ros-pkg/wxpython_gui/:/home/user/kamera_ws/src/kitware-ros-pkg/wxpython_gui"
       - "save-gui:/home/user/.config/kamera/gui"
       - "${HOME}/.ssh:/home/user/.ssh"
     entrypoint: ["/bin/tini", "--"]

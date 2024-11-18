@@ -4,7 +4,7 @@ version: '3.7'
 services:
   ## =========================== headless nodes =============================
   kamerad:
-    image: kamera/kamerad:latest
+    image: kitware/kamera:kamerad
     network_mode: host
     build: ../src/core/kamerad
     tty: true

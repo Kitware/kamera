@@ -23,10 +23,13 @@ services:
       - "/mnt:/mnt"
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     command: ["/entry/cam_phaseone.sh"]
+        #command: ["bash"]
     restart: unless-stopped
     deploy:
       resources:
         reservations:
           devices:
-            - capabilities: [gpu]
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 ...
