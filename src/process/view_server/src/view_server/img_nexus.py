@@ -279,13 +279,12 @@ class Nexus(object):
 
         """
         redis_host = os.environ.get('REDIS_HOST', 'nuvo0')
-        # print('redis established, term: {}'.format(self.rc.get('term')))
         node_host = rospy.get_namespace().strip('/')
-        self.rc = RedisEnvoy(redis_host, client_name=node_host + "_img_nexus")
-        cam_fov = self.rc.get(os.path.join('/sys',
+        self.envoy = RedisEnvoy(redis_host, client_name=node_host + "_img_nexus")
+        cam_fov = self.envoy.get(os.path.join('/sys',
                     'arch', 'hosts', node_host, 'fov'))
         try:
-            max_frame_rate = float(self.rc.get('/sys/arch/max_frame_rate'))
+            max_frame_rate = float(self.envoy.get('/sys/arch/max_frame_rate'))
         except Exception as e:
             print(e)
             max_frame_rate = 2.0
@@ -299,7 +298,7 @@ class Nexus(object):
 
         self.image_formats = {}
         for chan in ['rgb', 'uv', 'ir', 'evt', 'ins']:
-            self.image_formats[chan] = self.rc.get('/sys/arch/ext_%s' % chan)
+            self.image_formats[chan] = self.envoy.get('/sys/arch/ext_%s' % chan)
 
         max_wait = 1.0 / max_frame_rate
         rospy.loginfo("node host: {} fov: {}   max_wait: {:.3f}".format(node_host, cam_fov, max_wait))
@@ -318,12 +317,13 @@ class Nexus(object):
         self.rolling_success = LowpassIIR()
         self.topics = {'rgb_topic': rospy.resolve_name(rgb_topic), 'ir_topic': rospy.resolve_name(ir_topic),
                        'uv_topic': rospy.resolve_name(uv_topic), 'out_topic': rospy.resolve_name(out_topic)}
-
-        self.enabled = {
-            'rgb': rospy.get_param(os.path.join('/cfg/enabled', cam_fov, 'rgb'), True),
-            'ir': rospy.get_param(os.path.join('/cfg/enabled', cam_fov, 'ir'), True),
-            'uv': rospy.get_param(os.path.join('/cfg/enabled', cam_fov, 'uv'), True)
-        }
+        topic_base = f"/sys/enabled/{cam_fov}"
+        self.enabled = self.envoy.get(topic_base)
+        #self.enabled = {
+        #    'rgb': rospy.get_param(os.path.join('/cfg/enabled', cam_fov, 'rgb'), True),
+        #    'ir': rospy.get_param(os.path.join('/cfg/enabled', cam_fov, 'ir'), True),
+        #    'uv': rospy.get_param(os.path.join('/cfg/enabled', cam_fov, 'uv'), True)
+        #}
         self.enabled_list = [k for k, v in self.enabled.items() if v]
         self.full_packet_list = self.enabled_list + ['evt']
         self.skip_ir = not self.enabled['ir']
@@ -496,7 +496,7 @@ class Nexus(object):
             current_epoch = event_msg.header.stamp
             msg_dict = self.epoch_dict.get(current_epoch, {})
             if len(msg_dict):
-                # If there are already entries in the dict, that means they arrived 
+                # If there are already entries in the dict, that means they arrived
                 # before this event callback, which is concerning
                 rospy.logwarn("Messages beat event: {}".format(msg_dict.keys()))
             msg_dict.update({'evt': event_msg})
