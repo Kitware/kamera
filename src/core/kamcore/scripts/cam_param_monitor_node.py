@@ -15,8 +15,6 @@ from roskv.impl.redis_envoy import RedisEnvoy
 from phase_one.srv import GetPhaseOneParameter, SetPhaseOneParameter
 from custom_msgs.srv import CamGetAttr, CamSetAttr
 
-HOSTS = ["cas0", "cas1", "cas2"]
-MODES = ["ir", "rgb", "uv"]
 p1setsrv = "set_phaseone_parameter"
 p1getsrv = "get_phaseone_parameter"
 setsrv = "set_camera_attr"
@@ -32,6 +30,12 @@ class CamParamMonitor(object):
         print("Redis host: %s" % redis_host)
         self.envoy = RedisEnvoy(os.environ["REDIS_HOST"],
                                 client_name="cam_param_monitor")
+        self.hosts = self.envoy.get("/sys/arch/hosts").keys()
+        self.modes = self.envoy.get("/sys/channels").keys()
+        print("hosts: ")
+        print(self.hosts)
+        print("modes: ")
+        print(self.modes)
 
     def start_threads(self):
         t = threading.Thread(target=self.check_cam_params)
@@ -97,7 +101,6 @@ class CamParamMonitor(object):
                     except:
                         num,den = map(int, getsrv_val.split( '/' ))
                         getsrv_val = float(num / den)
-                        getsrv_val = int(getsrv_val)
             else:
                 dtype = resp.dtype
                 if isinstance(requested_val, float):
@@ -178,12 +181,13 @@ class CamParamMonitor(object):
         ros_rate = rospy.Rate(0.333)
         while not rospy.is_shutdown():
             tic = time.time()
-            for host in HOSTS:
-                for mode in MODES:
+            for host in self.hosts:
+                for mode in self.modes:
                     try:
                         requested_params = self.envoy.get_dict(
                             "/sys/requested_geni_params/%s/%s" % (host, mode))
-                    except KeyError:
+                    except KeyError as e:
+                        print(e)
                         continue
                     params_to_set = {}
                     for param, requested_val in requested_params.items():
