@@ -1,6 +1,7 @@
 #DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-export REDIS_HOST="cas0"
+source "${HOME}/kw/system.sh"
+export REDIS_HOST=$(cq ".redis_host")
 
 # Uncomment this line if you wish to run the GUI in "offline" mode
 # (without nuvo0, 1, etc. hooked up)
@@ -17,9 +18,9 @@ done
 
 echo "Redis successfully connected at $REDIS_HOST, starting."
 
+export ROS_MASTER="$(cq .master_host)"
 export NODE_HOSTNAME=$(hostname)
-export ROS_MASTER_URI="http://${REDIS_HOST}:11311"
-export KAMERA_DIR="/home/user/kw/kamera"
+export ROS_MASTER_URI="http://${ROS_MASTER}:11311"
 export DOCKER_KAMERA_DIR="/root/kamera"
 export DATA_MOUNT_POINT=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/base)
 export CAM_FOV=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/hosts/${NODE_HOSTNAME}/fov)

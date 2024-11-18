@@ -1,6 +1,14 @@
-#DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+#!/bin/bash
+source ~/kw/system.sh
+export SYSTEM_NAME
 
-export REDIS_HOST="nuvo0"
+KAMERA_DIR=$(${HOME}/.config/kamera/repo_dir.bash)
+CFG_FILE="${KAMERA_DIR}/src/cfg/${SYSTEM_NAME}/config.yaml"
+cq () {
+    CFG_FILE=${CFG_FILE} ${KAMERA_DIR}/src/cfg/get "$@"
+}
+
+export REDIS_HOST=$(cq ".redis_host")
 
 # Uncomment this line if you wish to run the GUI in "offline" mode
 # (without nuvo0, 1, etc. hooked up)
@@ -17,8 +25,9 @@ done
 
 echo "Redis successfully connected at $REDIS_HOST, starting."
 
+export ROS_HOSTNAME=$(cq ".master_host")
 export NODE_HOSTNAME=$(hostname)
-export ROS_MASTER_URI="http://${REDIS_HOST}:11311"
+export ROS_MASTER_URI="http://${ROS_HOSTNAME}:11311"
 export KAMERA_DIR="/home/user/kw/kamera"
 export DOCKER_KAMERA_DIR="/root/kamera"
 export DATA_MOUNT_POINT=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/base)
@@ -26,7 +35,6 @@ export CAM_FOV=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/hosts/${NODE_HOS
 
 export ROS_DISTRO="noetic"
 export KAMERA_DNS_IP="192.168.88.1"
-export PROJ_DIR="/root/kamera"
 export PULSE_TTY=/dev/ttyS0
 export MCC_DAQ="/dev/$(readlink /dev/mcc_daq)"
 

@@ -11,11 +11,6 @@ if [ ${REDIS_HOST} = "localhost" ]; then
     roscore&
 fi
 
-supervisorctl restart flight_summary
-
-echo "Setting default redis params."
-cat $DIR/default_params.conf | xargs -n 2 bash -c 'redis-cli -h ${REDIS_HOST} set $0 $1'
-
 echo "Start gui."
 cd $DIR/../..
 
