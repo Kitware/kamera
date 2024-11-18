@@ -395,6 +395,7 @@ namespace phase_one
         }
         catch (const std::exception& e) {
             ROS_ERROR_STREAM("|CAPTURE| Caught generic exception: " << e.what());
+            running_ = false;
             return 1;
         }
         catch (...)
