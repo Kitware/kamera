@@ -13,6 +13,7 @@ services:
       NODE_HOSTNAME: "${NODE_HOSTNAME}"
       CAM_MODE: "ir"
       CAM_FOV: "${CAM_FOV}"
+      SYSTEM_NAME: "${SYSTEM_NAME}"
     dns:
       - "${KAMERA_DNS_IP}"
     dns_search:

@@ -17,6 +17,7 @@ services:
       DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
       PULSE_TTY: "${PULSE_TTY}"
       CLOCK_SKEW: "0.0"
+      SYSTEM_NAME: "${SYSTEM_NAME}"
     dns:
       - "${KAMERA_DNS_IP}"
     dns_search:

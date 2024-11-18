@@ -13,6 +13,7 @@ services:
       DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
       SPOOF_RATE: "${SPOOF_RATE}"
       REDIS_HOST: "${REDIS_HOST}"
+      SYSTEM_NAME: "${SYSTEM_NAME}"
     dns:
       - "${KAMERA_DNS_IP}"
     dns_search:

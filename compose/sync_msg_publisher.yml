@@ -10,7 +10,8 @@ services:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"
       NODE_HOSTNAME: "${NODE_HOSTNAME:-}"
       ROS_IP: "${ROS_IP:-}"
-      DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
+      SATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
+      SYSTEM_NAME: "${SYSTEM_NAME}"
     dns:
       - "${KAMERA_DNS_IP}"
     dns_search:

@@ -17,6 +17,7 @@ services:
       DISPLAY: "${DISPLAY}"
       QT_X11_NO_MITSHM: "1"
       START_IN_SHELL: "${START_IN_SHELL}"
+      SYSTEM_NAME: "${SYSTEM_NAME}"
     dns:
       - "${KAMERA_DNS_IP}"
     dns_search:
@@ -27,8 +28,8 @@ services:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
       - "/home/user/kw/kamera/scripts:/home/user/kamera_ws/scripts"
       - "${PWD}/src:/home/user/kamera_ws/src:ro"
+      - "${PWD}/kamera:/home/user/kamera_ws/kamera:ro"
       - "${PWD}/assets:/home/user/noaa_kamera/assets:ro"
-      - "/home/user/kw/kamera/src/kitware-ros-pkg/wxpython_gui/:/home/user/kamera_ws/src/kitware-ros-pkg/wxpython_gui"
       - "save-gui:/home/user/.config/kamera/gui"
       - "${HOME}/.ssh:/home/user/.ssh"
     entrypoint: ["/bin/tini", "--"]
