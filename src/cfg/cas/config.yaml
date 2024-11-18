@@ -56,9 +56,9 @@ verbosity: 9
 max_mpix: 200000 # 0.2e6
 
 channels:
-  - ir
-  - rgb
-  - uv
+    rgb: 0
+    ir: 1
+    uv: 2
 interfaces:
   # map channels to ethernet interface names
   # this is gonna usurp the locations mapping
