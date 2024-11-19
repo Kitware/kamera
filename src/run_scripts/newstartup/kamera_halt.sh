@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 
 ## Like kamera_run, but opposite
-export COMPOSE_IGNORE_ORPHANS=True # make compose quiter
-source ${KAM_REPO_DIR}/tmux/cas/env.sh
+export COMPOSE_IGNORE_ORPHANS=True # make compose quieter
+KAM_REPO_DIR=$(/home/user/.config/kamera/repo_dir.bash)
+echo $KAM_REPO_DIR
+SYSTEM_NAME=$(cat /home/user/kw/SYSTEM_NAME)
+source "${KAM_REPO_DIR}/tmux/${SYSTEM_NAME}/env.sh"
 
 
 errcho() {
@@ -40,25 +43,11 @@ fi
 
 ## === === === === === ===   Env setup  === === === === === === ===
 blueprintf "Configuring main KAMERA entrypoint."
-source ~/.config/kamera/repo_dir.bash
 if [[ -z "${KAM_REPO_DIR}" ]]; then
     echo "ERROR: Could not resolve KAM_REPO_DIR. Check ~/.config/kamera"
     exit 1
 fi
 blueprintf "."
-
-# make our utility scripts runnable
-PATH="${KAM_REPO_DIR}/src/run_scripts/inpath:$PATH"
-export PATH
-blueprintf "."
-
-
-# load cq - ConfigQuery
-source ${KAM_REPO_DIR}/src/cfg/cfg-aliases.sh
-blueprintf "."
-
-STARTDIR=${KAM_REPO_DIR}/src/run_scripts/newstartup
-blueprintf ".done\n"
 
 MASTER_HOST=$(cq '.master_host')
 ## === === === === === ===   End Env setup  === === === === === ===
@@ -67,7 +56,7 @@ MASTER_HOST=$(cq '.master_host')
 OPTIONS=(${VERBOSE})
 
 blueprintf "done\nBringing down gui..."
-PREFIX_DC_BASH=xhost_disable wrap-docker-compose -f "${KAM_REPO_DIR}/compose/gui.yml" "${ARGS[@]}" &
+docker compose -f "${KAM_REPO_DIR}/compose/gui.yml" "${ARGS[@]}" &
 STAT_GUI=$!
 
 blueprintf "done\nGui down. Killing pods...\n"

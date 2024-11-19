@@ -39,32 +39,16 @@ fi
 
 ## === === === === === ===   Env setup  === === === === === === ===
 blueprintf "Configuring main KAMERA entrypoint."
-source ~/.config/kamera/repo_dir.bash
-KAM_REPO_DIR=${KAM_REPO_DIR:-}
-if [[ -z "${KAM_REPO_DIR}" ]]; then
-    errcho "ERROR: Could not resolve KAM_REPO_DIR. Check ~/.config/kamera"
-    exit 1
-fi
+KAM_REPO_DIR=$(/home/user/.config/kamera/repo_dir.bash)
+echo $KAM_REPO_DIR
+SYSTEM_NAME=$(cat /home/user/kw/SYSTEM_NAME)
+source "${KAM_REPO_DIR}/tmux/${SYSTEM_NAME}/env.sh"
 cd ${KAM_REPO_DIR}
-blueprintf "."
-
-source tmux/cas/env.sh
-
-# make our utility scripts runnable
-PATH="${KAM_REPO_DIR}/src/run_scripts/inpath:$PATH"
-export PATH
-blueprintf "."
-
-# load cq - ConfigQuery
-source ${KAM_REPO_DIR}/src/cfg/cfg-aliases.sh
 blueprintf "."
 
 # Add detector ENV variables to Redis
 source ${KAM_REPO_DIR}/src/cfg/set_detector_read_state.sh
 blueprintf "."
-
-STARTDIR=${KAM_REPO_DIR}/src/run_scripts/newstartup
-blueprintf ".done\n"
 
 MASTER_HOST=$(cq '.master_host')
 
@@ -147,12 +131,10 @@ python3 ${KAM_REPO_DIR}/scripts/system.py $MASTER_HOST "${ARGS[@]}" master
 
 # check that master is in fact up
 FAIL_COUNT=0
-source tmux/cas/env.sh
 until docker compose -f ${KAM_REPO_DIR}/compose/nodelist.yml run --rm nodelist; do
 	echo "Attempt $((++FAIL_COUNT))";
 	if [[ $FAIL_COUNT -gt 3 ]]; then
 	    errcho "Unable to contact ros master. Running WTF and aborting startup"
-	    source tmux/cas/env.sh
 	    docker compose -f ${KAM_REPO_DIR}/compose/nodelist.yml run --rm nodelist /entry/wat.sh
 	    exit 1
 	fi
@@ -189,7 +171,6 @@ blueprintf "done. \nPods launched. Starting GUI..."
 
 cd ${KAM_REPO_DIR}
 set -a # automatically export all variables
-source ${KAM_REPO_DIR}/tmux/cas/env.sh
 xhost +local:root
 docker compose -f "${KAM_REPO_DIR}/compose/gui.yml" "${ARGS[@]}" &
 STAT_GUI=$!
