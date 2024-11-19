@@ -1,0 +1,6 @@
+[Desktop Entry]
+Exec=gnome-terminal -e '/home/user/kw/kamera/turn_on_physical_shutters.sh'
+Name=turn_on_physical_shutters
+Terminal=true
+Type=Application
+Name[en_US]=TURN_ON_PHYSICAL_SHUTTERS

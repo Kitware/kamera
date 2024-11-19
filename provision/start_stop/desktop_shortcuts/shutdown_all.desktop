@@ -1,0 +1,6 @@
+[Desktop Entry]
+Exec=gnome-terminal -e '/home/user/kw/noaa_kamera/provision/start_stop/shutdown_all.sh'
+Name=shutdown_all
+Terminal=true
+Type=Application
+Name[en_US]=shutdown_all

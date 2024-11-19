@@ -1,0 +1,6 @@
+[Desktop Entry]
+Exec=gnome-terminal -e '/home/user/kw/kamera/tmux/taiga/start_gui.sh'
+Name=kamera_gui
+Terminal=true
+Type=Application
+Name[en_US]=kamera_gui.desktop

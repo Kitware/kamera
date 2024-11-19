@@ -1,0 +1,6 @@
+[Desktop Entry]
+Exec=gnome-terminal -e '/home/user/kw/noaa_kamera/provision/start_stop/reboot_cas1.sh'
+Name=reboot_cas1
+Terminal=true
+Type=Application
+Name[en_US]=reboot_cas1

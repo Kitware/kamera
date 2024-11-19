@@ -1,0 +1,6 @@
+[Desktop Entry]
+Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/reboot_nuvo2.sh'
+Name=reboot_nuvo2
+Terminal=true
+Type=Application
+Name[en_US]=reboot_nuvo2

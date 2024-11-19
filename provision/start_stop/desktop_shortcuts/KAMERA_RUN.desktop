@@ -1,0 +1,6 @@
+[Desktop Entry]
+Exec=gnome-terminal -e '/home/user/kw/kamera/scripts/kamera_run.sh'
+Name=kamera_gui
+Terminal=true
+Type=Application
+Name[en_US]=KAMERA_RUN.desktop

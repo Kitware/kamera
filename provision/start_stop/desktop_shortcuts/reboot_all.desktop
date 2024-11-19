@@ -1,0 +1,6 @@
+[Desktop Entry]
+Exec=gnome-terminal -e '/home/user/kw/noaa_kamera/provision/start_stop/reboot_all.sh'
+Name=reboot_all
+Terminal=true
+Type=Application
+Name[en_US]=reboot_all

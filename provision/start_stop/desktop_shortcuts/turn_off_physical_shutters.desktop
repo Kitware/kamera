@@ -1,0 +1,6 @@
+[Desktop Entry]
+Exec=gnome-terminal -e '/home/user/kw/noaa_kamera/turn_off_physical_shutters.sh'
+Name=turn_off_physical_shutters
+Terminal=true
+Type=Application
+Name[en_US]=TURN_OFF_PHYSICAL_SHUTTERS
