@@ -27,7 +27,8 @@ REAL_KAM_REPO_DIR = os.path.realpath(os.path.join(PKG_DIR, "../../.."))
 # This will *always* be loaded from disk and then pushed into redis
 # These never-changing values are placed under "/sys/arch", and will never
 # have to be backed up
-cfg_file = "%s/src/cfg/user-config.yml" % REAL_KAM_REPO_DIR
+system_name = os.getenv("SYSTEM_NAME")
+cfg_file = "%s/src/cfg/%s/config.yaml" % (REAL_KAM_REPO_DIR, system_name)
 with open(cfg_file, "r") as stream:
     try:
         USER_CFG = yaml.safe_load(stream)
