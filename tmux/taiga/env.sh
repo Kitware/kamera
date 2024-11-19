@@ -1,5 +1,5 @@
 #!/bin/bash
-source ~/kw/system.sh
+SYSTEM_NAME="$(cat ${HOME}/kw/SYSTEM_NAME)"
 export SYSTEM_NAME
 
 KAMERA_DIR=$(${HOME}/.config/kamera/repo_dir.bash)

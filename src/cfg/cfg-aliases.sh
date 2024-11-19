@@ -8,5 +8,5 @@ export CFG_ALIAS_SET=true
 
 # ConfigQuery
 cq () {
-    CFG_FILE=${CFG_DIR}/user-config.yml ${CFG_DIR}/get "$@"
+    CFG_FILE=${CFG_DIR}/${SYSTEM_NAME}/config.yaml ${CFG_DIR}/get "$@"
 }

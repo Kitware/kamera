@@ -1,6 +1,14 @@
-#DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+#!/bin/bash
 
-source "${HOME}/kw/system.sh"
+SYSTEM_NAME="$(cat ${HOME}/kw/SYSTEM_NAME)"
+export SYSTEM_NAME
+
+KAMERA_DIR=$(${HOME}/.config/kamera/repo_dir.bash)
+CFG_FILE="${KAMERA_DIR}/src/cfg/${SYSTEM_NAME}/config.yaml"
+cq () {
+    CFG_FILE=${CFG_FILE} ${KAMERA_DIR}/src/cfg/get "$@"
+}
+
 export REDIS_HOST=$(cq ".redis_host")
 
 # Uncomment this line if you wish to run the GUI in "offline" mode
