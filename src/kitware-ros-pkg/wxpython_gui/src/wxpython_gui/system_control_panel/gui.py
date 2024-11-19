@@ -208,7 +208,7 @@ class MainFrame(form_builder_output.MainFrame):
             "flight_summary": "Flight Summary",
         }
 
-        self.hosts = SYS_CFG["arch"]["hosts"].keys()
+        self.hosts = sorted(SYS_CFG["arch"]["hosts"].keys())
         print("HOSTS: ")
         print(self.hosts)
         self.last_busy = {h: False for h in self.hosts}
