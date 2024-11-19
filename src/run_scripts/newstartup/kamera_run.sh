@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 
 ## This script provides turnkey operation to spin up the whole system
-export COMPOSE_IGNORE_ORPHANS=True # make compose quiter
+export COMPOSE_IGNORE_ORPHANS=True # make compose quieter
+KAM_REPO_DIR=$(/home/user/.config/kamera/repo_dir.bash)
+echo $KAM_REPO_DIR
+SYSTEM_NAME=$(cat /home/user/kw/SYSTEM_NAME)
+source "${KAM_REPO_DIR}/tmux/${SYSTEM_NAME}/env.sh"
 
 errcho() {
     (>&2 echo -e "\e[31m$1\e[0m")
@@ -39,13 +43,6 @@ fi
 
 ## === === === === === ===   Env setup  === === === === === === ===
 blueprintf "Configuring main KAMERA entrypoint."
-KAM_REPO_DIR=$(/home/user/.config/kamera/repo_dir.bash)
-echo $KAM_REPO_DIR
-SYSTEM_NAME=$(cat /home/user/kw/SYSTEM_NAME)
-source "${KAM_REPO_DIR}/tmux/${SYSTEM_NAME}/env.sh"
-cd ${KAM_REPO_DIR}
-blueprintf "."
-
 # Add detector ENV variables to Redis
 source ${KAM_REPO_DIR}/src/cfg/set_detector_read_state.sh
 blueprintf "."
@@ -131,6 +128,7 @@ python3 ${KAM_REPO_DIR}/scripts/system.py $MASTER_HOST "${ARGS[@]}" master
 
 # check that master is in fact up
 FAIL_COUNT=0
+cd $KAM_REPO_DIR
 until docker compose -f ${KAM_REPO_DIR}/compose/nodelist.yml run --rm nodelist; do
 	echo "Attempt $((++FAIL_COUNT))";
 	if [[ $FAIL_COUNT -gt 3 ]]; then
