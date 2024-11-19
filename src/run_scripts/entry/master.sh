@@ -4,7 +4,7 @@
 
 echo "[ ] [ ] [ ] KAMCORE [ ] [ ] [ ] "
 # dump the global config as a debugging step
-cat /cfg/user-config.yml
+cat /cfg/${SYSTEM_NAME}/config.yaml
 
 source /entry/project_env.sh
 
@@ -38,6 +38,6 @@ until /entry/rosnode_list.sh; do
 	fi
 done
 
-rosparam load /cfg/user-config.yml /cfg
+rosparam load /cfg/${SYSTEM_NAME}/config.yaml /cfg
 exec roslaunch kamcore kamcore.launch data_mount_point:=$DATA_MOUNT_POINT \
     spoof_rate:="${SPOOF_RATE}"
