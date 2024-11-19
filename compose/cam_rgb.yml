@@ -10,7 +10,6 @@ services:
     environment:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"
       ROS_DISTRO: "noetic"
-      ROS_IP: "${ROS_IP}"
       REDIS_HOST: "${REDIS_HOST}"
       NODE_HOSTNAME: "${NODE_HOSTNAME}"
       CAM_MODE: "rgb"
