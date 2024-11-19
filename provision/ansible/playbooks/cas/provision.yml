@@ -43,6 +43,9 @@
                    'python3-catkin-tools'
                   ]
     pip_packages: [
+                    "ansible",
+                    "ruff",
+                    "black"
                   ]
 
   pre_tasks:

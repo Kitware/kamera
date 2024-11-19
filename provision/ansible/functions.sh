@@ -37,3 +37,11 @@ function kamera_cas_build() {
 function kamera_cas_all() {
 	ansible-playbook playbooks/cas/all.yml -i hosts.yml --ask-become-pass -u "user" -e 'ansible_python_interpreter=/usr/bin/python3' --limit $1
 }
+
+function kamera_shutdown() {
+	ansible-playbook playbooks/cas/stopstart.yml -i hosts.yml --become-password-file ".password" --tags "shutdown" --limit $1
+}
+
+function kamera_reboot() {
+	ansible-playbook playbooks/cas/stopstart.yml -i hosts.yml --become-password-file ".password" --tags "reboot" --limit $1
+}
