@@ -35,74 +35,56 @@ Library handling imagery simulation.
 
 """
 from __future__ import division, print_function
+import os
+
 import wx
-from wxpython_gui.system_control_panel.gui import MainFrame
 import rospy
 
+from wxpython_gui.system_control_panel.gui import MainFrame
+from roskv.impl.redis_envoy import RedisEnvoy
+
+
 def main():
-    node_name = 'system_control_panel_node'
+    node_name = "system_control_panel_node"
     name_space = rospy.get_namespace()
+
+    envoy = RedisEnvoy(os.environ["REDIS_HOST"], client_name=node_name)
+    channels = envoy.get("/sys/channels").keys()
+    hosts = envoy.get("/sys/arch/hosts")
 
     topic_names = {}
 
-    # --------------------- Remote Image Server Topics -----------------------
-    topic_names['left_rgb_srv_topic'] = '/nuvo1/rgb/rgb_view_service/get_image_view'
-    topic_names['center_rgb_srv_topic'] = '/nuvo0/rgb/rgb_view_service/get_image_view'
-    topic_names['right_rgb_srv_topic'] = '/nuvo2/rgb/rgb_view_service/get_image_view'
-
     # From the camera driver itself
-    topic_names['left_rgb_srv_topic'] = '/nuvo1/rgb/rgb_driver/get_image_view'
-    topic_names['center_rgb_srv_topic'] = '/nuvo0/rgb/rgb_driver/get_image_view'
-    topic_names['right_rgb_srv_topic'] = '/nuvo2/rgb/rgb_driver/get_image_view'
+    for host, d in hosts.items():
+        channel = "rgb"
+        fov = d["fov"]
+        topic_names["_".join([fov, channel, "srv", "topic"])] = "/".join(
+            ["", host, channel, "%s_view_service" % channel, "get_image_view"]
+        )
 
-    topic_names['left_uv_srv_topic'] = '/nuvo1/uv/uv_view_service/get_image_view'
-    topic_names['center_uv_srv_topic'] = '/nuvo0/uv/uv_view_service/get_image_view'
-    topic_names['right_uv_srv_topic'] = '/nuvo2/uv/uv_view_service/get_image_view'
-
-    topic_names['left_ir_srv_topic'] = '/nuvo1/synched/ir_view_service'
-    topic_names['center_ir_srv_topic'] = '/nuvo0/synched/ir_view_service'
-    topic_names['right_ir_srv_topic'] = '/nuvo2/synched/ir_view_service'
-
-    #topic_names['left_rgb_srv_topic'] = '/nuvo1/synched/rgb_view_service'
-    #topic_names['center_rgb_srv_topic'] = '/nuvo0/synched/rgb_view_service'
-    #topic_names['right_rgb_srv_topic'] = '/nuvo2/synched/rgb_view_service'
-
-    topic_names['left_uv_srv_topic'] = '/nuvo1/synched/uv_view_service'
-    topic_names['center_uv_srv_topic'] = '/nuvo0/synched/uv_view_service'
-    topic_names['right_uv_srv_topic'] = '/nuvo2/synched/uv_view_service'
+    # From the view_server sync node
+    for host, d in hosts.items():
+        channel = "rgb"
+        for channel in channels:
+            if channel == "rgb":
+                continue
+            fov = d["fov"]
+            topic_names["_".join([fov, channel, "srv", "topic"])] = "/".join(
+                ["", host, "synched", "%s_view_service" % channel]
+            )
     # ------------------------------------------------------------------------
 
     # ------------------- Add To Event Log Service Topics --------------------
-    topic_names['left_sys_event_log_srv'] = '/nuvo1/add_to_event_log'
-    topic_names['center_sys_event_log_srv'] = '/nuvo0/add_to_event_log'
-    topic_names['right_sys_event_log_srv'] = '/nuvo2/add_to_event_log'
+    for host, d in hosts.items():
+        fov = d["fov"]
+        topic_names["_".join([fov, "sys", "event", "log", "srv"])] = "/".join(
+            ["", host, "add_to_event_log"]
+        )
     # ------------------------------------------------------------------------
 
-    # ------------------------ Exposure Value Topics -------------------------
-    topic_names['left_rgb_exposure'] = '/nuvo1/rgb/rgb_driver/exposure'
-    topic_names['center_rgb_exposure'] = '/nuvo0/rgb/rgb_driver/exposure'
-    topic_names['right_rgb_exposure'] = '/nuvo2/rgb/rgb_driver/exposure'
+    topic_names["nav_odom_topic"] = "/ins"
 
-    topic_names['left_uv_exposure'] = '/nuvo1/uv/uv_driver/exposure'
-    topic_names['center_uv_exposure'] = '/nuvo0/uv/uv_driver/exposure'
-    topic_names['right_uv_exposure'] = '/nuvo2/uv/uv_driver/exposure'
-    # ------------------------------------------------------------------------
-
-    # --------------------------- Disk Space Topics --------------------------
-    topic_names['sys0_disk_space'] = '/nuvo0/disk_free_bytes'
-    topic_names['sys1_disk_space'] = '/nuvo1/disk_free_bytes'
-    topic_names['sys2_disk_space'] = '/nuvo2/disk_free_bytes'
-    # ------------------------------------------------------------------------
-
-    topic_names['frame_rate_topic'] = '/daq/trigger_freq'
-
-
-    topic_names['det_topic1'] = ''.join([name_space,
-                                         'sprokit_detector_adapter/detections_out'])
-
-    topic_names['nav_odom_topic'] = '/ins'
-
-    window_title = 'System Control Panel'
+    window_title = "System Control Panel"
 
     app = wx.App(False)
     frame = MainFrame(None, node_name, topic_names, False, window_title)
@@ -110,7 +92,8 @@ def main():
     app.MainLoop()
     return True
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # We get non-deterministic failures on initial launch. This keeps retrying
     # until a clean exit happens.
     resp = False
