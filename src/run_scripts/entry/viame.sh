@@ -165,7 +165,7 @@ roslaunch --wait sprokit_adapters sprokit_detector_fusion_adapter.launch \
                     uv_port_ind:=0 \
                     rgb_port_ind:=1 \
                     ir_port_ind:=2 \
-                    redis_uri:="tcp://192.168.88.100:6379" \
+                    redis_uri:="tcp://${REDIS_HOST}:6379" \
                     ocv_num_threads:=4 \
                     sync_q_size:=${SYNC_Q_SIZE} \
                     detection_csv_dir:=${DETECTION_CSV_DIR} \

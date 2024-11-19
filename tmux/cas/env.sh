@@ -35,13 +35,14 @@ export CAM_FOV=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/hosts/${NODE_HOS
 
 export ROS_DISTRO="noetic"
 export KAMERA_DNS_IP="192.168.88.1"
+export ROS_IP="192.168.88.10"
 export PROJ_DIR="/root/kamera"
 export PULSE_TTY=/dev/ttyS0
 export MCC_DAQ="/dev/$(readlink /dev/mcc_daq)"
 
 # Toggles reading detector images from NAS vs. reading from ROS msg
 # INCREASED I/O
-READ_FROM_NAS=1
+READ_FROM_NAS=0
 
 # Toggles the option to compress / decompress images within the nexus
 # To test the detector's performance on compressed imagery
