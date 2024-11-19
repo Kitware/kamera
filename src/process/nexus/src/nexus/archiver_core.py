@@ -6,6 +6,7 @@ import os
 import re
 import errno
 import datetime
+
 # import threading
 import time
 import json
@@ -17,6 +18,7 @@ from roskv.impl.redis_envoy import RedisEnvoy, StateService
 try:
     import rospy
     import genpy
+
     # from profilehooks import timecall
     from std_msgs.msg import Header
     from std_msgs.msg import UInt64 as MsgUInt64
@@ -28,19 +30,23 @@ try:
 
 except ImportError as exc:
     import sys
-    print("cannot import rospy or messages. if this is not a test environment, this is bad!", file=sys.stderr)
-    if not os.environ.get('IGNORE_ROS_IMPORT', False):
+
+    print(
+        "cannot import rospy or messages. if this is not a test environment, this is bad!",
+        file=sys.stderr,
+    )
+    if not os.environ.get("IGNORE_ROS_IMPORT", False):
         raise exc
 
 # from custom_msgs.srv import EraseDataDisk
 
-PAT_BRACED = re.compile(r'\{(\w+)\}')
+PAT_BRACED = re.compile(r"\{(\w+)\}")
 PAT_DOUBLE_SLASH = re.compile(r"//")
 
 
 def strip_double_slash(s):
     while re.search(PAT_DOUBLE_SLASH, s):
-        s = re.sub(PAT_DOUBLE_SLASH, '/', s)
+        s = re.sub(PAT_DOUBLE_SLASH, "/", s)
     return s
 
 
@@ -51,11 +57,11 @@ def get_template_keys(tmpl):
 def conformKwargsToFormatter(tmpl, kwargs):
     # type: (str, dict) -> dict
     """Return a dictionary which can be used to format the string. Fill any missing
-    values with placeholders, e.g. {"keyname": "(keyname)"} """
+    values with placeholders, e.g. {"keyname": "(keyname)"}"""
     required_keys = set(get_template_keys(tmpl))
     missing_keys = required_keys.difference(kwargs)
-    fmt_dict = {k:v for k,v in kwargs.items() if k in required_keys}
-    fmt_dict.update({k: '({})'.format(k) for k in missing_keys})
+    fmt_dict = {k: v for k, v in kwargs.items() if k in required_keys}
+    fmt_dict.update({k: "({})".format(k) for k in missing_keys})
     return fmt_dict
 
 
@@ -65,7 +71,7 @@ def msg_as_dict(msg):
     elif isinstance(msg, genpy.message.Message):
         return {str(k): msg_as_dict(getattr(msg, k)) for k in msg.__slots__}
     elif isinstance(msg, dict):
-        return {str(k): v for k,v in msg.items()}
+        return {str(k): v for k, v in msg.items()}
     return msg
 
 
@@ -159,32 +165,34 @@ class _Fmt(object):
 
     # @pysnooper.snoop()
     @staticmethod
-    def fmt_filename(proj, flight, ts, field=None, mode='{mode}', ext='{ext}', note=None):
+    def fmt_filename(
+        proj, flight, ts, field=None, mode="{mode}", ext="{ext}", note=None
+    ):
         # type: (str, str, str, str, str, str, str) -> str
-        if field is None or field == 'log':
-            fabr = ''
+        if field is None or field == "log":
+            fabr = ""
         else:
-            fabr = '_' + _Fmt.get_field_abr(field)
+            fabr = "_" + _Fmt.get_field_abr(field)
 
         if note is None:
-            note = ''
+            note = ""
         else:
-            note = '_' + note
+            note = "_" + note
 
         if ts:
-            ts = '_' + ts
+            ts = "_" + ts
 
-        out = fmt.filename_template.format(proj=proj, flight=flight,
-                                           fabr=fabr, note=note, ts=ts,
-                                           mode=mode, ext=ext)
+        out = fmt.filename_template.format(
+            proj=proj, flight=flight, fabr=fabr, note=note, ts=ts, mode=mode, ext=ext
+        )
         return out
 
     @staticmethod
     def fmt_log_filename():
         pass
 
-fmt = _Fmt()
 
+fmt = _Fmt()
 
 
 class ArchiverBase(object):
@@ -194,58 +202,69 @@ class ArchiverBase(object):
         Class for managing the archiving of data coming from the system.
         By convention, paths are '/' terminated.
         """
-        node_host = rospy.get_namespace().strip('/')
-        cam_fov = rospy.get_param(os.path.join('/cfg', 'hosts', node_host, 'fov'), 'node')
+        node_host = rospy.get_namespace().strip("/")
+        cam_fov = rospy.get_param(
+            os.path.join("/cfg", "hosts", node_host, "fov"), "node"
+        )
 
         self.node_host = node_host
-        self._redis_host        = os.environ.get('REDIS_HOST', "nuvo0")
-
+        self._redis_host = os.environ.get("REDIS_HOST", "nuvo0")
 
         ## deprecated
-        self.verbosity         = verbosity
-        self._name_system      = rospy.get_param('/system_name', 'default_system')
-        self._name_sync        = 'sync'
-        self._name_ins         = 'ins'
-        self._name_meta        = 'meta'
-        self._init_time        = datetime.datetime.now()
-        self._init_time_str    = pathsafe_timestamp(self._init_time)
+        self.verbosity = verbosity
+        self._name_system = rospy.get_param("/system_name", "default_system")
+        self._name_sync = "sync"
+        self._name_ins = "ins"
+        self._name_meta = "meta"
+        self._init_time = datetime.datetime.now()
+        self._init_time_str = pathsafe_timestamp(self._init_time)
 
         self.archive_service = None
         self.log_service = None
         self.erase_service = None
 
         self.bytes_halt_archiving = bytes_halt_archiving
-        rospy.Subscriber('/ins', GSOF_INS, self.ins_callback)
-        rospy.Subscriber('/event', GSOF_EVT, self.evt_callback)
+        rospy.Subscriber("/ins", GSOF_INS, self.ins_callback)
+        rospy.Subscriber("/event", GSOF_EVT, self.evt_callback)
 
-        self.pub_diskfree = rospy.Publisher('disk_free_bytes', MsgUInt64, queue_size=1)
+        self.pub_diskfree = rospy.Publisher("disk_free_bytes", MsgUInt64, queue_size=1)
         self.counter = 0
         self.image_formats = {}
-        default_types = {'rgb': 'jpg', 'ir': 'tif', 'uv': 'jpg', 'evt': 'json', 'ins': 'json'}
-        for chan in ['rgb', 'uv', 'ir', 'evt', 'ins']:
-            self.image_formats[chan] = rospy.get_param(os.path.join('/cfg/file_formats', chan), default_types[chan])
+        default_types = {
+            "rgb": "jpg",
+            "ir": "tif",
+            "uv": "jpg",
+            "evt": "json",
+            "ins": "json",
+        }
+        for chan in ["rgb", "uv", "ir", "evt", "ins"]:
+            self.image_formats[chan] = rospy.get_param(
+                os.path.join("/cfg/file_formats", chan), default_types[chan]
+            )
 
         self.last_ins = GSOF_INS()
         self.latch_ins = GSOF_INS()
-        print('\n\n VERSION CHECK 1 \n')
+        print("\n\n VERSION CHECK 1 \n")
 
-        self.envoy = RedisEnvoy(self._redis_host, client_name=node_host + '-nexus')
-        self.state_service = StateService(self.envoy.kv, node_host, 'nexus')
+        self.envoy = RedisEnvoy(self._redis_host, client_name=node_host + "-nexus")
+        self.state_service = StateService(self.envoy.kv, node_host, "nexus")
 
         # Get Redis Params
         arch = self.envoy.kv.get("/sys/arch")
         self.set_arch(arch)
         self._is_archiving = self.envoy.kv.get("/sys/arch/is_archiving")
-        self._project      = self.envoy.get('/sys/arch/project')
-        fl = self.envoy.get('/sys/arch/flight')
-        fl_number = ''.join([d for d in str(fl) if d.isdigit()])
-        self._flight  = 'fl{:0>2}'.format(fl_number)
-        self._effort       = self.envoy.get('/sys/arch/effort')
-        self._field        = os.environ.get('CAM_FOV', 'default_view')
-        self._collection_mode = rospy.get_param('/collection_mode', 'arch_core_no_collection_mode')
-        self._template     = self.envoy.get('/sys/arch/template')
-        self._base         = self.envoy.kv.get('/sys/arch/base')
-        self._data_mount_point = self.envoy.kv.get('/sys/arch/base', '/mnt/archiver_default')
+        self._project = self.envoy.get("/sys/arch/project")
+        fl = self.envoy.get("/sys/arch/flight")
+        fl_number = "".join([d for d in str(fl) if d.isdigit()])
+        self._flight = "fl{:0>2}".format(fl_number)
+        self._effort = self.envoy.get("/sys/arch/effort")
+        self._field = os.environ.get("CAM_FOV", "default_view")
+        self._collection_mode = self.envoy.get("/sys/collection_mode")
+        self._template = self.envoy.get("/sys/arch/template")
+        self._base = self.envoy.kv.get("/sys/arch/base")
+        self._data_mount_point = self.envoy.kv.get(
+            "/sys/arch/base", "/mnt/archiver_default"
+        )
         self.disk_check(self._base, every_nth=1)
 
         if verbosity > 0:
@@ -253,7 +272,9 @@ class ArchiverBase(object):
 
     def __str__(self):
         myid = str(id(self))
-        return 'Archiver {}/{}:{}'.format(self.project, self.flight, myid[:2] + myid[-2:])
+        return "Archiver {}/{}:{}".format(
+            self.project, self.flight, myid[:2] + myid[-2:]
+        )
 
     @property
     def is_archiving(self):
@@ -274,7 +295,7 @@ class ArchiverBase(object):
 
     @property
     def arch_dict(self):
-        arch = self.envoy.get_dict('/sys/arch')
+        arch = self.envoy.get_dict("/sys/arch")
         self.set_arch(arch)
         return arch
 
@@ -286,35 +307,44 @@ class ArchiverBase(object):
 
     def set_arch(self, arch_dict):
         self._arch_dict = arch_dict
-        self._project = str(arch_dict['project'])
-        self._effort = str(arch_dict['effort'])
-        fl_number = ''.join([d for d in str(arch_dict['flight']) if d.isdigit()])
-        self._flight  = 'fl{:0>2}'.format(fl_number)
-        self._is_archiving = arch_dict['is_archiving']
-        self._template = arch_dict['template']
-        self._base = arch_dict['base']
-        self._sys_cfg = arch_dict['sys_cfg']
-
+        self._project = str(arch_dict["project"])
+        self._effort = str(arch_dict["effort"])
+        fl_number = "".join([d for d in str(arch_dict["flight"]) if d.isdigit()])
+        self._flight = "fl{:0>2}".format(fl_number)
+        self._is_archiving = arch_dict["is_archiving"]
+        self._template = arch_dict["template"]
+        self._base = arch_dict["base"]
+        self._sys_cfg = arch_dict["sys_cfg"]
 
     def get_arch(self):
-        return {'project': self._project,
-                'effort': self._effort,
-                'flight': self._flight,
-                'is_archiving': self._is_archiving}
+        return {
+            "project": self._project,
+            "effort": self._effort,
+            "flight": self._flight,
+            "is_archiving": self._is_archiving,
+        }
 
     @property
     def now_gps(self):
         # type: () -> datetime.datetime
-        """ Returns GPS time of last received GPS packet"""
+        """Returns GPS time of last received GPS packet"""
         return datetime.datetime.utcfromtimestamp(self.last_ins.time)
 
-    def fmt_filename(self, ts, field=None, mode='{mode}', ext='{ext}', note=None):
+    def fmt_filename(self, ts, field=None, mode="{mode}", ext="{ext}", note=None):
         # type: (str, str, str, str, str) -> str
-        return fmt.fmt_filename(self._project, self._flight, ts=ts, field=field, mode=mode, ext=ext, note=note)
+        return fmt.fmt_filename(
+            self._project,
+            self._flight,
+            ts=ts,
+            field=field,
+            mode=mode,
+            ext=ext,
+            note=note,
+        )
 
     @property
     def data_mount_point(self):
-        #type: () -> str
+        # type: () -> str
         return self._data_mount_point
 
     def nomsg_set_archiving(self, state):
@@ -326,25 +356,35 @@ class ArchiverBase(object):
         """
         self._is_archiving = state
 
-    def advertise_services(self, namespace=None, name_archive='set_archiving', name_log='add_to_event_log',
-                           name_erase='erase_data_disk'):
+    def advertise_services(
+        self,
+        namespace=None,
+        name_archive="set_archiving",
+        name_log="add_to_event_log",
+        name_erase="erase_data_disk",
+    ):
         # type: (str, str, str, str) -> None
 
         if namespace is None:
             namespace = rospy.get_namespace()
 
         else:
-            if namespace not in ['/', '~'] and namespace[-1] != '/':
-                namespace += '/'
+            if namespace not in ["/", "~"] and namespace[-1] != "/":
+                namespace += "/"
         name_archive = namespace + name_archive
         name_log = namespace + name_log
         name_erase = namespace + name_erase
-        self.archive_service = rospy.Service(name_archive, SetArchiving, self.call_set_archiving)
-        self.log_service = rospy.Service(name_log, AddToEventLog, self.call_add_to_event_log)
+        self.archive_service = rospy.Service(
+            name_archive, SetArchiving, self.call_set_archiving
+        )
+        self.log_service = rospy.Service(
+            name_log, AddToEventLog, self.call_add_to_event_log
+        )
         # self.erase_service = rospy.Service(name_log, EraseDataDisk, self.call_erase_disk)
-        rospy.loginfo('Subscribing {} to {}'.format(namespace, name_archive))
-        rospy.loginfo('Subscribing {} to {}'.format(namespace, name_log))
-#        self.erase_service = rospy.Service(name_log, EraseDataDisk, self.call_erase_disk)
+        rospy.loginfo("Subscribing {} to {}".format(namespace, name_archive))
+        rospy.loginfo("Subscribing {} to {}".format(namespace, name_log))
+
+    #        self.erase_service = rospy.Service(name_log, EraseDataDisk, self.call_erase_disk)
 
     def fmt_flight_path(self):
         # type: () -> str
@@ -359,7 +399,14 @@ class ArchiverBase(object):
         fmt_dict = fmt_dict.copy()
         # leave mode and ext to be formatted by the image dump
         fmt_dict.update(
-            dict(cf=cam_fov[0].upper(), time=time_long, cam_fov=cam_fov, mode='{mode}', ext='{ext}'))
+            dict(
+                cf=cam_fov[0].upper(),
+                time=time_long,
+                cam_fov=cam_fov,
+                mode="{mode}",
+                ext="{ext}",
+            )
+        )
         fmt_dict = conformKwargsToFormatter(fn_template, fmt_dict)
         filename = fn_template.format(**fmt_dict)
         return strip_double_slash(filename)
@@ -400,7 +447,7 @@ class ArchiverBase(object):
         fn_template = self._template
         fmt_dict = self.arch_dict.copy()
         # leave mode and ext to be formatted by the image dump
-        fmt_dict.update({'sys_cfg': ''})
+        fmt_dict.update({"sys_cfg": ""})
         return self._fmt_sync_path(fn_template, fmt_dict, field, timestamp, note)
 
     def fmt_log_path(self, field):
@@ -420,7 +467,7 @@ class ArchiverBase(object):
         fn_template = self._template
         fmt_dict = self.arch_dict.copy()
         # leave mode and ext to be formatted by the image dump
-        fmt_dict.update({'sys_cfg': '', 'cam_fov': ''})
+        fmt_dict.update({"sys_cfg": "", "cam_fov": ""})
         return self._fmt_sync_path(fn_template, fmt_dict, field, self._init_time, None)
 
     def fmt_flight_file_path(self, field=None):
@@ -433,34 +480,31 @@ class ArchiverBase(object):
         Returns:
             Fully qualified path with {mode} and {ext} substitution points
         """
-        #init_time_short = pathsafe_timestamp(self._init_time, show_millis=True)
+        # init_time_short = pathsafe_timestamp(self._init_time, show_millis=True)
         # leave mode and ext to be formatted by the file dump
-        filename = self.fmt_filename('', field)
+        filename = self.fmt_filename("", field)
 
         # flight path now returns camera configuration, log should
         # be written to top level
-        return os.path.join(os.path.dirname(self.fmt_flight_path()),
-                            filename)
+        return os.path.join(os.path.dirname(self.fmt_flight_path()), filename)
 
     def fmt_meta_path(self, now=None):
         # type: (datetime.datetime) -> str
-        return self.fmt_async_path(field='meta', timestamp=now)
+        return self.fmt_async_path(field="meta", timestamp=now)
 
     def get_meta_path_now(self):
-        return self.fmt_async_path(field='meta', timestamp=datetime.datetime.now())
+        return self.fmt_async_path(field="meta", timestamp=datetime.datetime.now())
 
-    def get_raw_ins_path(self, field='raw'):
+    def get_raw_ins_path(self, field="raw"):
         # type: (str) -> str
         """
         Timestamp is pegged to start of INS node (and consequently start of its archiver object)
         :return: Fully qualified path
         """
-        filename = 'ins_{}_{}.dat'.format(field, self.init_time_str)
+        filename = "ins_{}_{}.dat".format(field, self.init_time_str)
         meta = self.fmt_async_path(field=field, timestamp=None)
         basename = os.path.dirname(os.path.dirname(meta))
-        return os.path.join(basename,
-                            'ins_raw',
-                            filename)
+        return os.path.join(basename, "ins_raw", filename)
 
     def get_ins_path(self, timestamp=None):
         # type: (datetime.datetime) -> str
@@ -469,107 +513,119 @@ class ArchiverBase(object):
         /$basepath/$proj/$flight/ins/$ts_ins.yml
         :return: Fully qualified path
         """
-        field = 'ins'
-        timestamp_long  = pathsafe_timestamp(now=timestamp, show_micros=True)
+        field = "ins"
+        timestamp_long = pathsafe_timestamp(now=timestamp, show_micros=True)
         filename = self.fmt_filename(timestamp_long, field)
-        return os.path.join(self.fmt_flight_path(),
-                            field,
-                            filename)
+        return os.path.join(self.fmt_flight_path(), field, filename)
 
-    def dump_json(self, data, time=None, mode='meta', make_dir=True):
+    def dump_json(self, data, time=None, mode="meta", make_dir=True):
         # type: (dict, datetime, str, bool) -> str
         # "{base}/{project}/fl{flight}/{cam_fov}_view/{project}_fl{flight}_{cf}_{time}_{mode}.{ext}"
         fn_template = self._template
         time_long = pathsafe_timestamp(now=time, show_micros=True)
         fmt_dict = self.arch_dict.copy()
-        fmt_dict.update(dict(cf=self._field[0].upper(), time=time_long, cam_fov=self._field, mode=mode, ext='json'))
+        fmt_dict.update(
+            dict(
+                cf=self._field[0].upper(),
+                time=time_long,
+                cam_fov=self._field,
+                mode=mode,
+                ext="json",
+            )
+        )
         fmt_dict = conformKwargsToFormatter(fn_template, fmt_dict)
         filename = fn_template.format(**fmt_dict)
         if make_dir:
             make_path(filename, from_file=True)
         else:
             if not os.path.exists(os.path.dirname(filename)):
-                rospy.logerr("Archiving directory not created yet and `make_dir` set to false. "
-                             "Could not write: {}".format(filename))
+                rospy.logerr(
+                    "Archiving directory not created yet and `make_dir` set to false. "
+                    "Could not write: {}".format(filename)
+                )
                 return filename
-        with open(filename, 'w') as fp:
+        with open(filename, "w") as fp:
             json.dump(data, fp)
         return filename
 
     def dump_log_json(self, data):
         # type: (dict) -> str
-        fn_template = self.fmt_log_path('meta')
-        filename = fn_template.format(mode='meta', ext='json')
+        fn_template = self.fmt_log_path("meta")
+        filename = fn_template.format(mode="meta", ext="json")
         make_path(filename, from_file=True)
-        with open(filename, 'a') as fp:
+        with open(filename, "a") as fp:
             json.dump(data, fp)
-            fp.write('\n')
-        print('wrote log: {}'.format(filename))
+            fp.write("\n")
+        print("wrote log: {}".format(filename))
         return filename
 
     def dump_log_yaml(self, data):
         # type: (dict) -> str
         """Write yaml-like text to a rolling log"""
-        data.update({'gps_time': self.now_gps})
-        fn_template = self.fmt_flight_file_path(field='log')
-        filename = fn_template.format(mode='log', ext='txt')
+        data.update({"gps_time": self.now_gps})
+        fn_template = self.fmt_flight_file_path(field="log")
+        filename = fn_template.format(mode="log", ext="txt")
         make_path(filename, from_file=True)
-        with open(filename, 'a') as fp:
+        with open(filename, "a") as fp:
             yaml.dump(data, fp)
-            fp.write('\n---\n')
-        print('wrote log: {}'.format(filename))
+            fp.write("\n---\n")
+        print("wrote log: {}".format(filename))
         return filename
 
-    def update_project_flight(self, project, flight, effort='', collection_mode='?'):
+    def update_project_flight(self, project, flight, effort="", collection_mode="?"):
         if not project:
             rospy.logwarn("Missing project string, setting to default")
-            project = 'arch_core_svc_no_project'
+            project = "arch_core_svc_no_project"
 
         if not flight:
             rospy.logwarn("Missing flight string, setting to default")
-            flight = '00'
+            flight = "00"
 
         if not effort:
             rospy.logwarn("Missing effort string, setting to default")
-            effort = 'arch_core_svc_no_effort'
+            effort = "arch_core_svc_no_effort"
 
         self._project = project
-        self._flight  = 'fl{:0>2}'.format(flight)
+        self._flight = "fl{:0>2}".format(flight)
         self._effort = effort
         self._collection_mode = collection_mode
         return project, flight, effort
 
     def call_set_archiving(self, req):
         # type: (SetArchiving) -> bool
-        rospy.loginfo('!! DEPRECATED !! call_set_archiving v2: {}'.format(req))
+        rospy.loginfo("!! DEPRECATED !! call_set_archiving v2: {}".format(req))
         return True
 
     def call_add_to_event_log(self, req):
         # type: (AddToEventLog) -> bool
-        rospy.loginfo('maybe deprecating? call_add_to_event_log: {}'.format(req))
-        self.update_project_flight(req.project, req.flight, req.effort, req.collection_mode)
+        rospy.loginfo("maybe deprecating? call_add_to_event_log: {}".format(req))
+        self.update_project_flight(
+            req.project, req.flight, req.effort, req.collection_mode
+        )
         now = pathsafe_timestamp(show_micros=True)
         data = {
-            'note': req.note, 'sys_time': now,
-            'project': req.project, 'flight': req.flight, 'effort': req.effort,
-            'collection_mode': req.collection_mode
+            "note": req.note,
+            "sys_time": now,
+            "project": req.project,
+            "flight": req.flight,
+            "effort": req.effort,
+            "collection_mode": req.collection_mode,
         }
         self.dump_log_yaml(data)
         return True
 
-
     def update_schema(self, msg):
         # type: (ArchiveSchemaDispatch) -> None
-        rospy.loginfo('Set schema: \n{}'.format(str(msg)))
+        rospy.loginfo("Set schema: \n{}".format(str(msg)))
         self._project = msg.project
-        fl_number = ''.join([d for d in msg.flight if d.isdigit()])
-        self._flight  = 'fl{:0>2}'.format(fl_number)
+        fl_number = "".join([d for d in msg.flight if d.isdigit()])
+        self._flight = "fl{:0>2}".format(fl_number)
 
     @staticmethod
     def call_erase_disk(req):
         print(req)
-        parent_host = rospy.get_namespace().strip('/')
-        rospy.logwarn('Deleting disk on {}: '.format(parent_host))
+        parent_host = rospy.get_namespace().strip("/")
+        rospy.logwarn("Deleting disk on {}: ".format(parent_host))
 
     def disk_check(self, dirname, every_nth=8):
         """
@@ -596,16 +652,18 @@ class ArchiverBase(object):
     def halt_if_disk_low(self, bytes_free):
         if bytes_free < self.bytes_halt_archiving:
             self.nomsg_set_archiving(False)
-            txt = 'ERROR {}: Archiving shut off due to low disk'.format(self.node_host)
+            txt = "ERROR {}: Archiving shut off due to low disk".format(self.node_host)
             self.fail(txt)
 
     def halt_if_unmounted(self):
         # if not os.path.ismount(self._base): # this is neat but doesn't work in containers with mounts
-        sentinel = os.path.join(self._base, '.flight_data_mounted')
+        sentinel = os.path.join(self._base, ".flight_data_mounted")
         if not os.path.isfile(sentinel):
             self.nomsg_set_archiving(False)
-            txt = "ERROR {}: NAS mount failed. Restart KAMERA immediately. If this continues, ensure the " \
-                  "file '{}' exists on the NAS".format(self.node_host, sentinel)
+            txt = (
+                "ERROR {}: NAS mount failed. Restart KAMERA immediately. If this continues, ensure the "
+                "file '{}' exists on the NAS".format(self.node_host, sentinel)
+            )
             self.fail(txt)
         else:
             rospy.loginfo("Mount OK: {}".format(sentinel))
@@ -614,12 +672,12 @@ class ArchiverBase(object):
         rospy.logwarn(txt)
         # if self.is_archiving:
         self.rawmsg_publish_err(txt)
-        self.envoy.put('/sys/arch/is_archiving', 0)
+        self.envoy.put("/sys/arch/is_archiving", 0)
 
     def rawmsg_publish_err(self, txt):
         msg = MsgString(txt)
         rospy.logerr_throttle(1, txt)
-        self.rawmsg_pub = rospy.Publisher('/rawmsg', MsgString, queue_size=99)
+        self.rawmsg_pub = rospy.Publisher("/rawmsg", MsgString, queue_size=99)
         self.rawmsg_pub.publish(msg)
 
     @property
@@ -658,6 +716,6 @@ class ArchiverBase(object):
     def collection_mode(self):
         return self._collection_mode
 
-if __name__ == '__main__':
-    raise NotImplementedError("Not for direct running at this time")
 
+if __name__ == "__main__":
+    raise NotImplementedError("Not for direct running at this time")
