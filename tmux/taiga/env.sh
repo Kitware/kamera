@@ -2,7 +2,7 @@
 SYSTEM_NAME="$(cat ${HOME}/kw/SYSTEM_NAME)"
 export SYSTEM_NAME
 
-KAMERA_DIR=$(${HOME}/.config/kamera/repo_dir.bash)
+export KAMERA_DIR=$(${HOME}/.config/kamera/repo_dir.bash)
 CFG_FILE="${KAMERA_DIR}/src/cfg/${SYSTEM_NAME}/config.yaml"
 cq () {
     CFG_FILE=${CFG_FILE} ${KAMERA_DIR}/src/cfg/get "$@"
@@ -28,7 +28,6 @@ echo "Redis successfully connected at $REDIS_HOST, starting."
 export ROS_HOSTNAME=$(cq ".master_host")
 export NODE_HOSTNAME=$(hostname)
 export ROS_MASTER_URI="http://${ROS_HOSTNAME}:11311"
-export KAMERA_DIR="/home/user/kw/kamera"
 export DOCKER_KAMERA_DIR="/root/kamera"
 export DATA_MOUNT_POINT=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/base)
 export CAM_FOV=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/hosts/${NODE_HOSTNAME}/fov)

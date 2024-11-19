@@ -3,7 +3,7 @@
 SYSTEM_NAME="$(cat ${HOME}/kw/SYSTEM_NAME)"
 export SYSTEM_NAME
 
-KAMERA_DIR=$(${HOME}/.config/kamera/repo_dir.bash)
+export KAMERA_DIR=$(${HOME}/.config/kamera/repo_dir.bash)
 CFG_FILE="${KAMERA_DIR}/src/cfg/${SYSTEM_NAME}/config.yaml"
 cq () {
     CFG_FILE=${CFG_FILE} ${KAMERA_DIR}/src/cfg/get "$@"
