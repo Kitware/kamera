@@ -1,0 +1,16 @@
+# Playbook for properly configuring individual systems
+- hosts: all
+
+  tasks:
+
+  - name: Reboot system.
+    reboot:
+    become: True
+    tags:
+        - reboot
+
+  - name: Shutdown system.
+    community.general.shutdown:
+    become: True
+    tags:
+        - shutdown
