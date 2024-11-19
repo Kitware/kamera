@@ -35,7 +35,7 @@ export CAM_FOV=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/hosts/${NODE_HOS
 
 export ROS_DISTRO="noetic"
 export KAMERA_DNS_IP="192.168.88.1"
-export ROS_IP="192.168.88.10"
+export ROS_IP="192.168.88.100"
 export PROJ_DIR="/root/kamera"
 export PULSE_TTY=/dev/ttyS0
 export MCC_DAQ="/dev/$(readlink /dev/mcc_daq)"
