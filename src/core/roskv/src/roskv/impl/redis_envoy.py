@@ -95,7 +95,7 @@ class RedisKV(redis.client.Redis, KV):
 
         tups = redis_encode(key, val)
         if len(tups) == 0:
-            return self.set(tups[0][0], tups[0][1], **kwargs)
+            return self.set(key, "", **kwargs)
 
         p = self.pipeline()
         for pair in tups:
@@ -141,7 +141,16 @@ class RedisHealth(Health):
         print("health object destroyed")
 
     def service(
-        self, service, index=None, wait=None, passing=None, tag=None, dc=None, near=None, token=None, node_meta=None,
+        self,
+        service,
+        index=None,
+        wait=None,
+        passing=None,
+        tag=None,
+        dc=None,
+        near=None,
+        token=None,
+        node_meta=None,
     ):
         # type: (str, int, str, bool, str, str, str, str, dict) -> Tuple[int, List[Dict]]
         """
@@ -150,7 +159,14 @@ class RedisHealth(Health):
         pass
 
     def checks(
-        self, service, index=None, wait=None, dc=None, near=None, token=None, node_meta=None,
+        self,
+        service,
+        index=None,
+        wait=None,
+        dc=None,
+        near=None,
+        token=None,
+        node_meta=None,
     ):
         # type: (str, int, str, str, str, str, dict) -> Tuple[int, List[Dict]]
         """
@@ -160,7 +176,14 @@ class RedisHealth(Health):
         pass
 
     def state(
-        self, name, index=None, wait=None, dc=None, near=None, token=None, node_meta=None,
+        self,
+        name,
+        index=None,
+        wait=None,
+        dc=None,
+        near=None,
+        token=None,
+        node_meta=None,
     ):
         # type: (str, int, str, str, str, str, dict) -> Tuple[int, List[Dict]]
         """
@@ -296,7 +319,7 @@ class RedisAgent(Agent):
 class RedisCatalog(Catalog):
     """This catalog is formed by aggregating information submitted by the agents. The catalog maintains the
     high-level view of the cluster, including which services are available, which nodes run those services,
-    health information, and more. """
+    health information, and more."""
 
     def __init__(self, agent_name, kv):
         self.agent_name = agent_name
@@ -327,7 +350,14 @@ class RedisCatalog(Catalog):
         raise NotImplementedError("this api is single-datacenter only")
 
     def nodes(
-        self, index=None, wait=None, consistency=None, dc=None, near=None, token=None, node_meta=None,
+        self,
+        index=None,
+        wait=None,
+        consistency=None,
+        dc=None,
+        near=None,
+        token=None,
+        node_meta=None,
     ):
         """
         Returns a tuple of (*index*, *nodes*) of all nodes known
@@ -340,7 +370,13 @@ class RedisCatalog(Catalog):
         """
 
     def services(
-        self, index=None, wait=None, consistency=None, dc=None, token=None, node_meta=None,
+        self,
+        index=None,
+        wait=None,
+        consistency=None,
+        dc=None,
+        token=None,
+        node_meta=None,
     ):
         """
         Returns a tuple of (*index*, *services*) of all services known
@@ -675,23 +711,28 @@ class StateService(ChildService):
 
 if __name__ == "__main__":
     import sys
+
     try:
         addr = sys.argv[1]
-        host, port = addr.split(':')
+        host, port = addr.split(":")
     except IndexError as exc:
         print("Warning: {}".format(exc), file=sys.stderr)
-        host = 'localhost'
-        port = '6379'
+        host = "localhost"
+        port = "6379"
     print("commence janky test on {}:{}".format(host, port), file=sys.stderr)
-    dd = {"name": "bar_from_bd", "nest": {"spam": "eggs", "num": 42, "deep": {"a": 0}}, "a_list": [1, 2, "three"]}
+    dd = {
+        "name": "bar_from_bd",
+        "nest": {"spam": "eggs", "num": 42, "deep": {"a": 0}},
+        "a_list": [1, 2, "three"],
+    }
     # rc = redis.Redis(host, port)
-    kv = RedisKV('foo', {'host': host, 'port': port})
-    print('keys at start: {}'.format(len(kv.keys())))
-    key = '/TEST_DO_NOT_USE'
+    kv = RedisKV("foo", {"host": host, "port": port})
+    print("keys at start: {}".format(len(kv.keys())))
+    key = "/TEST_DO_NOT_USE"
     kv.put(key, dd)
     out = kv.get(key)
-    print('{}'.format(kv.keys(key + '*')))
+    print("{}".format(kv.keys(key + "*")))
     print(out)
     print(out == dd)
     kv.delete_dict(key)
-    print('keys at end  : {}'.format(len(kv.keys())))
+    print("keys at end  : {}".format(len(kv.keys())))
