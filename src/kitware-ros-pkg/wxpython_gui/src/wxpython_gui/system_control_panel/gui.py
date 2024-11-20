@@ -1987,10 +1987,11 @@ class MainFrame(form_builder_output.MainFrame):
         del self.effort_metadata_dict[effort_name]
 
         if self.effort_combo_box.GetCount() == 1:
-            self.effort_combo_box.SetEditable(True)
-            self.effort_combo_box.SetString(ind, "")
-            self.effort_combo_box.Clear()
-            self.effort_combo_box.SetEditable(False)
+            msg = "Cannot have zero entries! Please create another effort before deleting this effort."
+            dlg = wx.MessageDialog(self, msg, "Error", wx.OK | wx.ICON_ERROR)
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
         else:
             if ind > 0:
                 self.effort_combo_box.SetSelection(ind - 1)
