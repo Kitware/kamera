@@ -63,7 +63,7 @@ import shapefile
 
 # Custom package imports.
 import sys
-sys.path.insert(0,'C:/Users/path_to/postflight_scripts/sensor_models/src')
+sys.path.insert(0,'C:/Users/cynthia.christman/Work/PEP/CameraModels/GitHub_Repo/kamera')
 from kamera.sensor_models import (
         quaternion_multiply,
         quaternion_from_matrix,
@@ -77,7 +77,7 @@ from kamera.sensor_models.nav_conversions import enu_to_llh, llh_to_enu
 from kamera.sensor_models.nav_state import NavStateINSJson
 
 # Adjust as necessary
-GEOD_FNAME = "/src/kamera/kamera/assets/geods/egm84-15.pgm"
+GEOD_FNAME = "C:/Users/cynthia.christman/Work/PEP/CameraModels/GitHub_Repo/kamera/assets/geods/egm84-15.pgm"
 
 SUFFIX_RGB = 'rgb.jpg'
 SUFFIX_IR = 'ir.tif'
@@ -158,10 +158,17 @@ def get_dir_type(dpath):
     subfiles = os.listdir(dpath)
     if 'sys_config.json' in subfiles:
         return 'sys_config'
-    fn_logs = [el for el in subfiles if '_log.txt' in el]
-    for fn_log in fn_logs:
-        if os.path.basename(dpath) in os.path.basename(fn_log):
-            return 'flight'
+   # fn_logs = [el for el in subfiles if '_log.txt' in el]
+   # for fn_log in fn_logs:
+   #     if os.path.basename(dpath) in os.path.basename(fn_log):
+   #         return 'flight'
+   # return 'unknown'
+    fn_log = [el for el in subfiles if '_log.txt' in el]
+    if len(fn_log) != 1:
+        return 'unknown'
+    fn_log = fn_log[0]
+    if os.path.basename(dpath) in os.path.basename(fn_log):
+        return 'flight'
     return 'unknown'
 
 
@@ -507,8 +514,8 @@ def parse_image_directory(image_dir, modality=None):
                 d = json.load(json_file)
 
                 # Time that the image was taken.
-                img_time_to_fname[d['evt']['time']] = img_fname
-                img_fname_to_time[img_fname] = d['evt']['time']
+                img_time_to_fname[d['ins']['time']] = img_fname
+                img_fname_to_time[img_fname] = d['ins']['time']
 
                 # Pull the effort type if available.
                 try:
@@ -559,14 +566,16 @@ def get_image_boundary(camera_model, frame_time, geod_filename=GEOD_FNAME):
     ray_pos[2] = h
     corner_enu = (ray_pos + ray_dir*(-alt_msl/ray_dir[2])).T
 
-    im_pts = im_pts.astype(np.float64)
+    #im_pts = im_pts.astype(np.float64)
+    im_pts = im_pts.astype(np.float)
 
     corner_ll = []
     for i in range(len(corner_enu)):
         corner_ll.append(enu_to_llh(*corner_enu[i], lat0=lat, lon0=lon,
                                     h0=0)[:2])
 
-    corner_ll = np.array(corner_ll, dtype=np.float64)
+    #corner_ll = np.array(corner_ll, dtype=np.float64)
+    corner_ll = np.array(corner_ll, dtype=np.float)
 
     return im_pts, corner_ll
 
@@ -594,12 +603,13 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
                 msg = "{}:{}\n{}: {}".format(fname, exc_tb.tb_lineno, exc_type.__name__, exc)
                 print(msg)
 
-    for _fn in img_fnames:
-        # Read first nonempty image to get img width/height
-        img = cv2.imread(_fn)
-        if img is not None:
-            image_height, image_width = img.shape[:2]
-            break
+    image_height, image_width = cv2.imread(img_fnames[0]).shape[:2]
+    # for _fn in img_fnames:
+        # # Read first nonempty image to get img width/height
+        # img = cv2.imread(_fn)
+        # if img is not None:
+            # image_height, image_width = img.shape[:2]
+            # break
 
     # Find the keypoints and descriptors and match them.
     orb = cv2.ORB_create(nfeatures=num_features, edgeThreshold=21,
@@ -619,16 +629,17 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
 
         h1 = lon_lat_homog.get(fname1, None)
         img1 = cv2.imread(img_fnames[i], -1)
-        if img1 is None:
-            continue
+        # if img1 is None:
+            # continue
 
-        # Empty image, don't process
-        if img1 is None:
-            print2("Image is empty, skipping.")
-            continue
+        # # Empty image, don't process
+        # if img1 is None:
+            # print2("Image is empty, skipping.")
+            # continue
 
         if img1.dtype == np.uint16:
-            img1 = img1.astype(np.float64)
+            #img1 = img1.astype(np.float64)
+            img1 = img1.astype(np.float)
             img1 -= np.percentile(img1.ravel(), 1)
             img1[img1 < 0] = 0
             img1 /= np.percentile(img1.ravel(), 99)/255
@@ -645,6 +656,9 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
         if i == 0:
             fname0, h0, img0, kp0, des0 = fname1, h1, img1, kp1, des1
             continue
+        
+        if des0 is None or len(des0) == 0 or des1 is None or len(des1) == 0:
+            continue        
 
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
         matches = bf.match(des0, des1)
@@ -752,7 +766,8 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
 
         # Use OpenCV homogrpahy fitting because it is fast, but it implicitly
         # uses a reprojection threshold of 2, which may be too strict.
-        h = cv2.estimateAffinePartial2D(pts0, pts1, False)[0]
+        #h = cv2.estimateAffinePartial2D(pts0, pts1, False)[0]
+        h = cv2.estimateRigidTransform(pts0, pts1, False)
         pts0h = np.vstack([pts0.T, np.ones(len(pts0))])
 
         h_valid = not affine_not_valid(h)
@@ -767,7 +782,8 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
             L = len(pts0)
             h = None
             num_inliers = 0
-            mask = np.zeros(len(pts0), bool)
+            #mask = np.zeros(len(pts0), bool)
+            mask = np.zeros(len(pts0), np.bool)
             k = 0
             tic = time.time()
             k2 = 0
@@ -824,7 +840,8 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
                 fname0, img0, kp0, des0 = fname1, img1, kp1, des1
                 continue
 
-            mask = mask.ravel().astype(bool)
+            #mask = mask.ravel().astype(bool)
+            mask = mask.ravel().astype(np.bool)
 
             # Verify whether homography is acceptable. If not, do RANSAC with
             # only acceptable test cases.
@@ -876,7 +893,8 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
 
         # Try to reconstruct mapping to previous images by composing
         # homographies. Look at most 10 images back.
-        for k in range(1, 10):
+        #for k in range(1, 10):
+        for k in range(1, 3):
             key_desired = (i - k, i)
             try:
                 last_h = homog_ij[key_desired]
@@ -1141,7 +1159,8 @@ def debayer_dir_tree(src_dir, dst_dir=None, num_threads=1):
 
 
 def stretch_constrast(img):
-    img = img.astype(np.float32)
+    #img = img.astype(np.float32)
+    img = img.astype(np.float)
     img -= np.percentile(img.ravel(), 0.1)
     img[img < 0] = 0
     img /= np.percentile(img.ravel(), 99.9)/255
@@ -1178,7 +1197,8 @@ def save_geotiff(img, camera_model, frame_time, geotiff_fname,
     corner_ll = corner_ll[:, ::-1]
 
     # Affine transform warping image coordinates to latitude/longitude.
-    A, inliers = cv2.estimateAffine2D(np.reshape(im_pts, (1, -1, 2)),
+    #A, inliers = cv2.estimateAffine2D(np.reshape(im_pts, (1, -1, 2)),
+    A = cv2.estimateRigidTransform(np.reshape(im_pts, (1, -1, 2)),
                                    np.reshape(corner_ll, (1, -1, 2)), True)
 
     if A is None:
@@ -1188,7 +1208,8 @@ def save_geotiff(img, camera_model, frame_time, geotiff_fname,
         scale = np.max(np.abs(corners))
         corners /= scale
 
-        A, inliers = cv2.estimateAffine2D(np.reshape(im_pts, (1, -1, 2)),
+        #A, inliers = cv2.estimateAffine2D(np.reshape(im_pts, (1, -1, 2)),
+        A = cv2.estimateRigidTransform(np.reshape(im_pts, (1, -1, 2)),
                                        np.reshape(corners, (1, -1, 2)),
                                        True)
         A = np.vstack([A, [0, 0, 1]])
@@ -1207,6 +1228,8 @@ def save_geotiff(img, camera_model, frame_time, geotiff_fname,
     # Xp = padfTransform[0] + P*padfTransform[1] + L*padfTransform[2]
     # Yp = padfTransform[3] + P*padfTransform[4] + L*padfTransform[5]
     geotrans = [A[0, 2], A[0, 0], A[0, 1], A[1, 2], A[1, 0], A[1, 1]]
+
+    geotrans[1]
 
     ds.SetGeoTransform(geotrans)
 
@@ -1271,8 +1294,8 @@ def create_geotiffs_glob(image_dir, modality, output_dir, camera_model_fname,
             print2('Processing \'%s\'' % src_img_fname)
         img = cv2.imread(src_img_fname)
 
-        if img is None:
-            continue
+        # if img is None:
+            # continue
 
         if img.ndim == 3:
             img = img[:, :, ::-1]
@@ -1301,21 +1324,34 @@ def fac_geotiff_thunk(image_dir, modality, output_dir, camera_model_fname,
     """Create a callback to be passed to thread"""
 
     def thread_thunk():
-        #try:
-        create_geotiffs_glob(image_dir=image_dir, modality=modality,
-                             output_dir=output_dir,
-                             camera_model_fname=camera_model_fname,
-                             compression_quality=compression_quality,
-                             verbosity=verbosity)
-    #    except FileNotFoundError as exc:
-    #        print2(repr(exc))
+        # #try:
+        # create_geotiffs_glob(image_dir=image_dir, modality=modality,
+                             # output_dir=output_dir,
+                             # camera_model_fname=camera_model_fname,
+                             # compression_quality=compression_quality,
+                             # verbosity=verbosity)
+    # #    except FileNotFoundError as exc:
+    # #        print2(repr(exc))
 
-    #    except Exception as exc:
-    #        exc_type, value, traceback = sys.exc_info()
-    #        print2(
-    #            'Unexpected exception: {}\n{}\n{}'.format(exc_type, value, traceback))
+    # #    except Exception as exc:
+    # #        exc_type, value, traceback = sys.exc_info()
+    # #        print2(
+    # #            'Unexpected exception: {}\n{}\n{}'.format(exc_type, value, traceback))
+    # return thread_thunk
+        try:
+            create_geotiffs_glob(image_dir=image_dir, modality=modality,
+                                 output_dir=output_dir,
+                                 camera_model_fname=camera_model_fname,
+                                 compression_quality=compression_quality,
+                                 verbosity=verbosity)
+        except FileNotFoundError as exc:
+            print2(repr(exc))
+
+        except Exception as exc:
+            exc_type, value, traceback = sys.exc_info()
+            print2(
+                'Unexpected exception: {}\n{}\n{}'.format(exc_type, value, traceback))
     return thread_thunk
-
 
 def create_all_geotiff(flight_dir, output_dir=None, quality=75,
                        multi_threaded=False, verbosity=0):
@@ -1357,7 +1393,8 @@ def create_all_geotiff(flight_dir, output_dir=None, quality=75,
         for modality in ['ir', 'uv','rgb']:
             for fov_dirname in get_fov_dirs(sys_config_dir):
                 sys_str = first_wordlike(fov_dirname)
-                image_dir = os.path.join(sys_config_dir, fov_dirname)
+                #image_dir = os.path.join(sys_config_dir, fov_dirname)
+                image_dir = os.path.join(flight_dir, fov_dirname)
 
                 sys_str = sys_str.lower()
 
@@ -1427,10 +1464,11 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
     <flight_dir>/<sys_config>/center_view
 
     """
-    flight_id = os.path.basename(flight_dir)
-    project_id = os.path.basename(os.path.dirname(flight_dir))
-    print("FLIGHT_ID: %s" % flight_id)
-    print("PROJECT_ID: %s" % project_id)
+    # flight_id = os.path.basename(flight_dir)
+    # project_id = os.path.basename(os.path.dirname(flight_dir))
+    # print("FLIGHT_ID: %s" % flight_id)
+    # print("PROJECT_ID: %s" % project_id)
+    flight_id = os.path.split(flight_dir)[1]
     process_summary = {'fovs': {}, 'models': [], 'shapefile_count': 0, 'fails': {}}
 
     camera_models = {}
@@ -1601,7 +1639,8 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
 
     # ------------------------------------------------------------------------
     for sys_str in fnames_by_system:
-        flid_sys_str = "%s_%s_%s" % (project_id, flight_id, sys_str)
+        #flid_sys_str = "%s_%s_%s" % (project_id, flight_id, sys_str)
+        flid_sys_str = "%s_%s" % (flight_id, sys_str)
         print2('Processing image footprints for system:', sys_str)
         img_fnames = fnames_by_system[sys_str]
 
@@ -1807,15 +1846,18 @@ def visualize_registration_homographies(flight_dir, sys_str='rgb'):
             base_dir = os.path.join(flight_dir, fov)
             fnames = glob.glob('%s/%s.tif' % (base_dir, fname))
             if len(fnames) > 0:
-                img = cv2.imread(fnames[0])
-                if img is not None:
-                    return img
+                # img = cv2.imread(fnames[0])
+                # if img is not None:
+                    # return img
+                 return cv2.imread(fnames[0])
+                 
+    image_height, image_width = get_image(img_fnames[0]).shape[:2]             
 
-    for _fn in img_fnames:
-        img = get_image(_fn)
-        if img is not None:
-            image_height, image_width = img.shape[:2]
-            break
+    # for _fn in img_fnames:
+        # img = get_image(_fn)
+        # if img is not None:
+            # image_height, image_width = img.shape[:2]
+            # break
 
     for i in range(1, len(img_fnames)):
         fname1 = img_fnames[i - 1]
@@ -1840,8 +1882,8 @@ def visualize_registration_homographies(flight_dir, sys_str='rgb'):
         img1 = get_image(fname1)
         img2 = get_image(fname2)
 
-        if img1 is None or img2 is None:
-            continue
+        # if img1 is None or img2 is None:
+            # continue
 
         fname_out = '%s/%s_to_%s.gif' % (dir_out, fname1, fname2)
 
@@ -1882,8 +1924,8 @@ def visualize_registration_homographies(flight_dir, sys_str='rgb'):
         img1 = get_image(fname1)
         img2 = get_image(fname2)
 
-        if img1 is None or img2 is None:
-            continue
+        # if img1 is None or img2 is None:
+            # continue
 
         fname_out = '%s/%s_to_%s.gif' % (dir_out, fname1, fname2)
 
@@ -2042,10 +2084,13 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
     num_dets = 0
 
     # Read the detection csv and populate 'detections'.
-    with open(detection_csv) as csvfile:
+    #with open(detection_csv) as csvfile:
+    with open(detection_csv, newline='') as csvfile:
         csv_reader = csv.reader(csvfile, delimiter=',', quotechar='#')
         for row in csv_reader:
-            if len(row) == 1:
+            #if len(row) == 1:
+            if len(row) == 1 or row[0] == '#':
+                print('Read a line of length 1')
                 continue
 
             uid = row[0]   # Detection or Track-id
@@ -2059,8 +2104,10 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
             bottom = float(row[6])
             image_bbox = np.array([(left, top), (right, bottom)])
 
-            confidence = row[7]         # Detection confidence
-            length = row[8]             # Fish Length (0 or -1 if invalid)
+            #confidence = row[7]         # Detection confidence
+            confidence = float(row[7])   # Detection confidence
+            #length = row[8]             # Fish Length (0 or -1 if invalid)
+            length = float(row[8])       # Fish Length (0 or -1 if invalid)
             confidence_pairs = row[9:]
 
             img_fname = os.path.splitext(os.path.split(image_fname)[1])[0]
@@ -2068,9 +2115,11 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
             try:
                 h = img_to_lonlat_homog[img_fname]
             except KeyError:
-                print2('Could not find a homography for \'%s\'. Skipping '
+                #print2('Could not find a homography for \'%s\'. Skipping '
+                print('Could not find a homography for \'%s\'. Skipping '
                        'processing of detections from that image' %
                        image_fname)
+                print('img_fname',img_fname)
                 continue
 
             xc, yc = np.mean(image_bbox, axis=0)
@@ -2138,9 +2187,10 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
             base_dir = os.path.join(flight_dir, fov)
             fnames = glob.glob('%s/%s.tif' % (base_dir, fname))
             if len(fnames) > 0:
-                img = cv2.imread(fnames[0])
-                if img is not None:
-                    return img
+                # img = cv2.imread(fnames[0])
+                # if img is not None:
+                    # return img
+                return cv2.imread(fnames[0])
 
     # Track redundant detections.
     print2('Comparing detections between frames to identify redundant '
@@ -2378,7 +2428,8 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
     w.field('width_m', 'N', decimal=5)
     w.field('latitude', 'N', decimal=7)
     w.field('longitude', 'N', decimal=7)
-    w.field('suppressed', 'C', decimal=5)
+    #w.field('suppressed', 'C', decimal=5)
+    w.field('suppressed', 'C', size=5)
 
     for i in range(len(img_fnames)):
         for det in detections[img_fnames[i]]:
@@ -2428,8 +2479,8 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
 
         for i in range(len(img_fnames)):
             img = get_image(img_fnames[i])
-            if img is None:
-                continue
+            # if img is None:
+                # continue
             for det in detections[img_fnames[i]]:
                 xl = int(det.image_bbox[0, 0])
                 xr = int(det.image_bbox[1, 0])
