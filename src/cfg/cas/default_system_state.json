@@ -11,7 +11,7 @@
                 "ISO Min": 0, 
                 "ISO_Max": 200, 
                 "ISO_Min": 200, 
-                "Sensor_Temperature": 45.3, 
+                "Sensor_Temperature": 40.6, 
                 "Shutter_Speed": 0.25, 
                 "Shutter_Speed_Max": 0.00025, 
                 "Shutter_Speed_Min": 0.25
@@ -81,7 +81,7 @@
         "archive_all_ir_images": 0, 
         "base": "/mnt/data", 
         "base_template": "{base}/{project}/fl{flight}/{sys_cfg}/", 
-        "effort": "TEST", 
+        "effort": "OFF", 
         "ext_evt": "json", 
         "ext_ins": "json", 
         "ext_ir": "tif", 
@@ -121,7 +121,7 @@
         "min_fps": 0.1, 
         "min_frame_rate": 0.1, 
         "overlap_percent": 25.0, 
-        "project": "SEA_MML_1124", 
+        "project": "glacial_2024", 
         "rgb": {
             "format": "jpg"
         }, 
@@ -274,7 +274,7 @@
     "cas0": {
         "cam_fov": "center", 
         "detector": {
-            "actual": "stalled", 
+            "actual": "failed", 
             "desired": "running", 
             "health": {
                 "frame": 0, 
@@ -495,17 +495,17 @@
         "center": {
             "ir": true, 
             "rgb": true, 
-            "uv": true
+            "uv": false
         }, 
         "left": {
             "ir": true, 
             "rgb": true, 
-            "uv": true
+            "uv": false
         }, 
         "right": {
             "ir": true, 
             "rgb": true, 
-            "uv": true
+            "uv": false
         }
     }, 
     "flight_number_str": "02", 
@@ -809,8 +809,8 @@
     "show_rgb": true, 
     "show_right": true, 
     "show_saturated_pixels": true, 
-    "show_uv": true, 
-    "syscfg_dir": "/mnt/data/SEA_MML_1124/fl02/images_30deg_N68RF/", 
+    "show_uv": false, 
+    "syscfg_dir": "/mnt/data/glacial_2024/fl02/images_30deg_N68RF/", 
     "uas0": {
         "cam_fov": "center"
     }, 
