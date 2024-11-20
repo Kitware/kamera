@@ -95,7 +95,7 @@ class RedisKV(redis.client.Redis, KV):
 
         tups = redis_encode(key, val)
         if len(tups) == 0:
-            return self.set(key, "", **kwargs)
+            return self.set(key, val, **kwargs)
 
         p = self.pipeline()
         for pair in tups:
