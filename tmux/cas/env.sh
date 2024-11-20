@@ -41,18 +41,18 @@ export MCC_DAQ="/dev/$(readlink /dev/mcc_daq)"
 
 # Toggles reading detector images from NAS vs. reading from ROS msg
 # INCREASED I/O
-READ_FROM_NAS=0
+export READ_FROM_NAS=0
 
 # Toggles the option to compress / decompress images within the nexus
 # To test the detector's performance on compressed imagery
 # INCREASED LATENCY (~0.7s)
-COMPRESS_IMAGERY=0
+export COMPRESS_IMAGERY=0
 
 # Sets the compression used on the phase on imagery
 # Best to keep within 80-100 for optimal quality
-JPEG_QUALITY=90
+export JPEG_QUALITY=90
 
 # If in a GPS-denied environment, this will publish events on each event
 # trigger to simulated the GPS timestamp
 # BE SURE TO SET TO 0 BEFORE FLIGHT
-SPOOF_EVENTS=1
+export SPOOF_EVENTS=1

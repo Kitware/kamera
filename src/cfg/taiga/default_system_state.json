@@ -493,6 +493,16 @@
                 "Shutter_Speed": 0,
                 "Shutter_Speed_Max": 0.1,
                 "Shutter_Speed_Min": 0.008
+            },
+            "uv": {
+                "ExposureAuto": "Continuous", 
+                "ExposureAutoMax": 2400.0, 
+                "ExposureAutoMin": 400.0, 
+                "ExposureValue": 0, 
+                "GainAuto": "Auto", 
+                "GainAutoMax": 30, 
+                "GainAutoMin": 0, 
+                "GainValue": 0
             }
         },
         "nuvo1": {
@@ -509,6 +519,16 @@
                 "Shutter_Speed": 0,
                 "Shutter_Speed_Max": 0.1,
                 "Shutter_Speed_Min": 0.008
+            },
+            "uv": {
+                "ExposureAuto": "Continuous", 
+                "ExposureAutoMax": 2400.0, 
+                "ExposureAutoMin": 400.0, 
+                "ExposureValue": 0, 
+                "GainAuto": "Auto", 
+                "GainAutoMax": 30, 
+                "GainAutoMin": 0, 
+                "GainValue": 0
             }
         },
         "nuvo2": {
@@ -525,6 +545,16 @@
                 "Shutter_Speed": 0,
                 "Shutter_Speed_Max": 0.1,
                 "Shutter_Speed_Min": 0.008
+            },
+            "uv": {
+                "ExposureAuto": "Continuous", 
+                "ExposureAutoMax": 2400.0, 
+                "ExposureAutoMin": 400.0, 
+                "ExposureValue": 0, 
+                "GainAuto": "Auto", 
+                "GainAutoMax": 30, 
+                "GainAutoMin": 0, 
+                "GainValue": 0
             }
         }
     },

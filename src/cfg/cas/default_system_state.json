@@ -1,0 +1,824 @@
+{
+    "actual_geni_params": {
+        "cas0": {
+            "ir": {
+                "CorrectionAutoEnabled": 1, 
+                "CorrectionAutoUseDeltaTime": 0
+            }, 
+            "rgb": {
+                "ISO": 200, 
+                "ISO Max": 500, 
+                "ISO Min": 0, 
+                "ISO_Max": 200, 
+                "ISO_Min": 200, 
+                "Sensor_Temperature": 45.3, 
+                "Shutter_Speed": 0.25, 
+                "Shutter_Speed_Max": 0.00025, 
+                "Shutter_Speed_Min": 0.25
+            }, 
+            "uv": {
+                "ExposureAuto": "error", 
+                "ExposureAutoMax": 2400.0, 
+                "ExposureAutoMin": 400.0, 
+                "ExposureValue": 2400, 
+                "GainAuto": "Auto", 
+                "GainAutoMax": 30, 
+                "GainAutoMin": 0, 
+                "GainValue": 30
+            }
+        }, 
+        "cas1": {
+            "ir": {
+                "CorrectionAutoEnabled": 1
+            }, 
+            "rgb": {
+                "ISO": 200, 
+                "ISO_Max": 200, 
+                "ISO_Min": 200, 
+                "Sensor_Temperature": 43.3, 
+                "Shutter_Speed": 0.008, 
+                "Shutter_Speed_Max": 0.00025, 
+                "Shutter_Speed_Min": 0.008
+            }, 
+            "uv": {
+                "ExposureAuto": "error", 
+                "ExposureAutoMax": 5760.0, 
+                "ExposureAutoMin": 400.0, 
+                "ExposureValue": 5760, 
+                "GainAuto": "Auto", 
+                "GainAutoMax": 30, 
+                "GainAutoMin": 2, 
+                "GainValue": 30
+            }
+        }, 
+        "cas2": {
+            "ir": {
+                "CorrectionAutoEnabled": 1
+            }, 
+            "rgb": {
+                "ISO": 200, 
+                "ISO_Max": 200, 
+                "ISO_Min": 200, 
+                "Sensor_Temperature": 44.0, 
+                "Shutter_Speed": 0.008, 
+                "Shutter_Speed_Max": 0.00025, 
+                "Shutter_Speed_Min": 0.008
+            }, 
+            "uv": {
+                "ExposureAuto": "error", 
+                "ExposureAutoMax": 2454.0, 
+                "ExposureAutoMin": 400.0, 
+                "ExposureValue": 2454, 
+                "GainAuto": "Auto", 
+                "GainAutoMax": 30, 
+                "GainAutoMin": 0, 
+                "GainValue": 30
+            }
+        }
+    }, 
+    "arch": {
+        "allow_ir_nuc": 1, 
+        "archive_all_ir_images": 0, 
+        "base": "/mnt/data", 
+        "base_template": "{base}/{project}/fl{flight}/{sys_cfg}/", 
+        "effort": "TEST", 
+        "ext_evt": "json", 
+        "ext_ins": "json", 
+        "ext_ir": "tif", 
+        "ext_p1": "jpg", 
+        "ext_rgb": "jpg", 
+        "ext_uv": "jpg", 
+        "flight": "02", 
+        "hosts": {
+            "cas0": {
+                "enabled": true, 
+                "fov": "center", 
+                "idx": 0
+            }, 
+            "cas1": {
+                "enabled": true, 
+                "fov": "left", 
+                "idx": 1
+            }, 
+            "cas2": {
+                "enabled": true, 
+                "fov": "right", 
+                "idx": 2
+            }
+        }, 
+        "is_archiving": 0, 
+        "jpeg": {
+            "quality": 90
+        }, 
+        "jpg": {
+            "quality": 95
+        }, 
+        "kamera_dir": "/home/user/kw/kamera", 
+        "load_shapefile": 0, 
+        "max_exposure_ms": 120, 
+        "max_fps": 2.5, 
+        "max_frame_rate": 2.0, 
+        "min_fps": 0.1, 
+        "min_frame_rate": 0.1, 
+        "overlap_percent": 25.0, 
+        "project": "SEA_MML_1124", 
+        "rgb": {
+            "format": "jpg"
+        }, 
+        "rgb_vfov": 14, 
+        "sys_cfg": "images_30deg_N68RF", 
+        "template": "{base}/{project}/fl{flight}/{sys_cfg}/{cam_fov}_view/{project}_fl{flight}_{cf}_{time}_{mode}.{ext}", 
+        "trigger_freq": 1.0, 
+        "turn_off_nuc_in_shapefile": 1, 
+        "use_archive_region": 0, 
+        "use_p1jpeg": 0
+    }, 
+    "base": "/mnt/data", 
+    "camera_cfgs": {
+        "100mm_25_5deg_DualRegionTrigger": {
+            "center_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/center_ir.yaml", 
+            "center_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/center_rgb.yaml", 
+            "center_sys_pipe": "/mnt/flight_data/detector_models/viame-configs/pipelines/embedded_dual_stream/Dual_Region_Trigger_Otter_C_100mm_0deg.pipe", 
+            "center_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/center_uv.yaml", 
+            "description": "JoBSS configuration: color cameras mounted with 100mm zeiss lenses, side camera mounts set to 25.5 deg, running IR to RGB region trigger model with thresholds set to 1.0", 
+            "left_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/left_ir.yaml", 
+            "left_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/left_rgb.yaml", 
+            "left_sys_pipe": "/mnt/flight_data/detector_models/viame-configs/pipelines/embedded_dual_stream/Dual_Region_Trigger_Otter_L_100mm_25deg.pipe", 
+            "left_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/left_uv.yaml", 
+            "right_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/right_ir.yaml", 
+            "right_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/right_rgb.yaml", 
+            "right_sys_pipe": "/mnt/flight_data/detector_models/viame-configs/pipelines/embedded_dual_stream/Dual_Region_Trigger_Otter_R_100mm_25deg.pipe", 
+            "right_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/right_uv.yaml"
+        }, 
+        "85mm_12_0deg_NoDetectionModel": {
+            "center_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_12_0deg/85mm_center_ir.yaml", 
+            "center_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_12_0deg/85mm_center_rgb.yaml", 
+            "center_sys_pipe": "", 
+            "center_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_12_0deg/85mm_center_uv.yaml", 
+            "description": "Configuration for 85mm lenses at 12.0* angles. No detectors installed. Intended for glacial mosaic sites.", 
+            "left_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_12_0deg/85mm_12deg_left_ir.yaml", 
+            "left_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_12_0deg/85mm_12deg_left_rgb.yaml", 
+            "left_sys_pipe": "", 
+            "left_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_12_0deg/85mm_12deg_left_uv.yaml", 
+            "right_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_12_0deg/85mm_12deg_right_ir.yaml", 
+            "right_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_12_0deg/85mm_12deg_right_rgb.yaml", 
+            "right_sys_pipe": "", 
+            "right_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_12_0deg/85mm_12deg_right_uv.yaml"
+        }, 
+        "85mm_21_0deg_IRDetector_P1": {
+            "center_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_center_ir.yaml", 
+            "center_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_center_rgb.yaml", 
+            "center_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/detector_ir_yolo.pipe", 
+            "center_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_center_uv.yaml", 
+            "description": "Configuration for 85mm lenses at 21.0* angles. Placeholder for Phase One cameras, IR-only detectors installed for Nth image saving.", 
+            "left_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_21deg_left_ir.yaml", 
+            "left_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_21deg_left_rgb.yaml", 
+            "left_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/detector_ir_yolo.pipe", 
+            "left_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_21deg_left_uv.yaml", 
+            "right_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_21deg_right_ir.yaml", 
+            "right_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_21deg_right_rgb.yaml", 
+            "right_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/detector_ir_yolo.pipe", 
+            "right_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_21deg_right_uv.yaml"
+        }, 
+        "85mm_21_0deg_NoDetectionModel": {
+            "center_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_center_ir.yaml", 
+            "center_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_center_rgb.yaml", 
+            "center_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/detector_ir_yolo.pipe", 
+            "center_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_center_uv.yaml", 
+            "description": "Configuration for 85mm lenses at 21.0* angles. Placeholder for Phase One cameras, IR-only detectors installed for Nth image saving.", 
+            "left_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_21deg_left_ir.yaml", 
+            "left_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_21deg_left_rgb.yaml", 
+            "left_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/detector_ir_yolo.pipe", 
+            "left_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_21deg_left_uv.yaml", 
+            "right_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_21deg_right_ir.yaml", 
+            "right_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_21deg_right_rgb.yaml", 
+            "right_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/detector_ir_yolo.pipe", 
+            "right_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_21_0deg/85mm_21deg_right_uv.yaml"
+        }, 
+        "85mm_25_5deg_NoDetectionModel": {
+            "center_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_25_5deg/85mm_center_ir.yaml", 
+            "center_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_25_5deg/85mm_center_rgb.yaml", 
+            "center_sys_pipe": "", 
+            "center_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_25_5deg/85mm_center_uv.yaml", 
+            "description": "Configuration for 85mm lenses at 25.5* angles. No detectors installed. Intended for glacial LATTE sites.", 
+            "left_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_25_5deg/85mm_25_5deg_left_ir.yaml", 
+            "left_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_25_5deg/85mm_25_5deg_left_rgb.yaml", 
+            "left_sys_pipe": "", 
+            "left_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_25_5deg/85mm_25_5deg_left_uv.yaml", 
+            "right_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_25_5deg/85mm_25_5deg_right_ir.yaml", 
+            "right_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_25_5deg/85mm_25_5deg_right_rgb.yaml", 
+            "right_sys_pipe": "", 
+            "right_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/85mm_25_5deg/85mm_25_5deg_right_uv.yaml"
+        }, 
+        "cam1": {
+            "center_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/center_ir.yaml", 
+            "center_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/center_rgb.yaml", 
+            "center_sys_pipe": "/mnt/flight_data/detector_models/viame-configs/pipelines/embedded_dual_stream/Dual_Region_Trigger_Otter_C_100mm_0deg.pipe", 
+            "center_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/center_uv.yaml", 
+            "description": "JoBSS configuration: color cameras mounted with 100mm zeiss lenses, side camera mounts set to 25.5 deg, running IR to RGB region trigger model with thresholds set to 1.0", 
+            "left_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/left_ir.yaml", 
+            "left_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/left_rgb.yaml", 
+            "left_sys_pipe": "/mnt/flight_data/detector_models/viame-configs/pipelines/embedded_dual_stream/Dual_Region_Trigger_Otter_L_100mm_25deg.pipe", 
+            "left_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/left_uv.yaml", 
+            "right_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/right_ir.yaml", 
+            "right_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/right_rgb.yaml", 
+            "right_sys_pipe": "/mnt/flight_data/detector_models/viame-configs/pipelines/embedded_dual_stream/Dual_Region_Trigger_Otter_R_100mm_25deg.pipe", 
+            "right_uv_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/right_uv.yaml"
+        }, 
+        "images_21deg_N56RF": {
+            "center_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/center_ir.yaml", 
+            "center_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/2024_AOC_Calibration_center_rgb.yaml", 
+            "center_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/embedded_dual_stream/JoBBS_ir_hotspot_yolo_detector.pipe", 
+            "center_uv_yaml_path": "", 
+            "description": "Yaml files from JoBSS other than center color from Florida. These need to be reprocessed with ANC callibration files. IR only model loaded from JoBSS 2021.", 
+            "left_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/left_ir.yaml", 
+            "left_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/left_rgb.yaml", 
+            "left_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/embedded_dual_stream/JoBBS_ir_hotspot_yolo_detector.pipe", 
+            "left_uv_yaml_path": "", 
+            "right_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/right_ir.yaml", 
+            "right_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/right_rgb.yaml", 
+            "right_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/embedded_dual_stream/JoBBS_ir_hotspot_yolo_detector.pipe", 
+            "right_uv_yaml_path": ""
+        }, 
+        "images_25deg_N56RF": {
+            "center_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/center_ir.yaml", 
+            "center_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/2024_AOC_Calibration_center_rgb.yaml", 
+            "center_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/embedded_dual_stream/JoBBS_ir_hotspot_yolo_detector.pipe", 
+            "center_uv_yaml_path": "", 
+            "description": "Yaml files from JoBSS other than center color from Florida. These need to be reprocessed with ANC callibration files. IR only model loaded from JoBSS 2021.", 
+            "left_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/left_ir.yaml", 
+            "left_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/left_rgb.yaml", 
+            "left_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/embedded_dual_stream/JoBBS_ir_hotspot_yolo_detector.pipe", 
+            "left_uv_yaml_path": "", 
+            "right_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/right_ir.yaml", 
+            "right_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/right_rgb.yaml", 
+            "right_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/embedded_dual_stream/JoBBS_ir_hotspot_yolo_detector.pipe", 
+            "right_uv_yaml_path": ""
+        }, 
+        "images_30deg_N68RF": {
+            "center_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/center_ir.yaml", 
+            "center_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/2024_AOC_Calibration_center_rgb.yaml", 
+            "center_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/embedded_dual_stream/JoBBS_ir_hotspot_yolo_detector.pipe", 
+            "center_uv_yaml_path": "", 
+            "description": "calibration imagery from JoBSS other than center color from Florida. These need to be reprocessed with ANC callibration files. IR only model loaded from JoBSS 2021.", 
+            "left_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/left_ir.yaml", 
+            "left_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/left_rgb.yaml", 
+            "left_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/embedded_dual_stream/JoBBS_ir_hotspot_yolo_detector.pipe", 
+            "left_uv_yaml_path": "", 
+            "right_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/right_ir.yaml", 
+            "right_rgb_yaml_path": "/mnt/flight_data/detector_models/camera_models/100mm_25_5deg/right_rgb.yaml", 
+            "right_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/embedded_dual_stream/JoBBS_ir_hotspot_yolo_detector.pipe", 
+            "right_uv_yaml_path": ""
+        }
+    }, 
+    "cas0": {
+        "cam_fov": "center", 
+        "detector": {
+            "actual": "stalled", 
+            "desired": "running", 
+            "health": {
+                "frame": 0, 
+                "time": 0.0
+            }, 
+            "last_change_desired": 1732034348.769255, 
+            "pipefile": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/embedded_dual_stream/JoBBS_ir_hotspot_yolo_detector.pipe"
+        }, 
+        "p1debayerq": {
+            "processed": 0, 
+            "total": 0
+        }
+    }, 
+    "cas1": {
+        "cam_fov": "right", 
+        "detector": {
+            "actual": "stalled", 
+            "desired": "running", 
+            "health": {
+                "frame": 0, 
+                "time": 0.0
+            }, 
+            "last_change_desired": 1732034348.765598, 
+            "pipefile": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/embedded_dual_stream/JoBBS_ir_hotspot_yolo_detector.pipe"
+        }, 
+        "p1debayerq": {
+            "processed": 0, 
+            "total": 0
+        }
+    }, 
+    "cas2": {
+        "cam_fov": "left", 
+        "detector": {
+            "actual": "stalled", 
+            "desired": "running", 
+            "health": {
+                "frame": 0, 
+                "time": 0.0
+            }, 
+            "last_change_desired": 1732034348.775121, 
+            "pipefile": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/embedded_dual_stream/JoBBS_ir_hotspot_yolo_detector.pipe"
+        }, 
+        "p1debayerq": {
+            "processed": 0, 
+            "total": 0
+        }
+    }, 
+    "channels": {
+        "ir": 1, 
+        "rgb": 0, 
+        "uv": 2
+    }, 
+    "collection_mode": "fixed rate", 
+    "detector": {
+        "read_from_nas": false
+    }, 
+    "devices": {
+        "ir_n0": {
+            "ip_mode": "fixed", 
+            "mac": "00:11:1c:02:40:46", 
+            "model": "flir_a6750", 
+            "prefer_ip": "192.168.1.50"
+        }, 
+        "ir_n1": {
+            "ip_mode": "fixed", 
+            "mac": "00:11:1c:01:ec:f7", 
+            "model": "flir_a6750", 
+            "prefer_ip": "192.168.1.51"
+        }, 
+        "ir_n2": {
+            "ip_mode": "fixed", 
+            "mac": "00:11:1c:01:c8:5b", 
+            "model": "flir_a6750", 
+            "prefer_ip": "192.168.1.52"
+        }, 
+        "ir_nb0": {
+            "ip_mode": "dhcp", 
+            "mac": "00:11:1c:00:e6:d1", 
+            "model": "flir_a645", 
+            "prefer_ip": "192.168.1.53"
+        }, 
+        "ir_nb1": {
+            "ip_mode": "dhcp", 
+            "mac": "00:11:1c:00:bf:6a", 
+            "model": "flir_a645", 
+            "prefer_ip": "192.168.1.54"
+        }, 
+        "ir_nb2": {
+            "ip_mode": "dhcp", 
+            "mac": "00:11:1c", 
+            "model": "flir_a645", 
+            "prefer_ip": "192.168.1.55"
+        }, 
+        "rgb_n0": {
+            "guid": 145260, 
+            "ip_mode": "fixed", 
+            "label": "PORT", 
+            "mac": "00:0f:31:02:37:6c", 
+            "model": "allied_gt6600_rgb", 
+            "prefer_ip": "169.254.151.51"
+        }, 
+        "rgb_n1": {
+            "guid": 180877, 
+            "ip_mode": "fixed", 
+            "label": "unknown", 
+            "mac": "00:0f:31:02:c2:8d", 
+            "model": "allied_gt6600_rgb", 
+            "prefer_ip": "192.168.4.41"
+        }, 
+        "rgb_n2": {
+            "guid": 180876, 
+            "ip_mode": "fixed", 
+            "label": "CENTER", 
+            "mac": "00:0f:31:02:c2:8c", 
+            "model": "allied_gt6600_rgb", 
+            "prefer_ip": "192.168.4.42"
+        }, 
+        "rgb_nb0": {
+            "guid": 145260, 
+            "ip_mode": "fixed", 
+            "label": "CENTER", 
+            "mac": "00:0f:31:02:37:6c", 
+            "model": "allied_gt6600_rgb", 
+            "prefer_ip": "192.168.4.40"
+        }, 
+        "rgb_nb1": {
+            "guid": 180877, 
+            "ip_mode": "fixed", 
+            "label": "unknown", 
+            "mac": "00:0f:31:02:c2:8d", 
+            "model": "allied_gt6600_rgb", 
+            "prefer_ip": "192.168.4.41"
+        }, 
+        "rgb_nb2": {
+            "guid": 180876, 
+            "ip_mode": "fixed", 
+            "label": "CENTER", 
+            "mac": "00:0f:31:02:c2:8c", 
+            "model": "allied_gt6600_rgb", 
+            "prefer_ip": "192.168.4.42"
+        }, 
+        "rgb_p0": {
+            "guid": 145260, 
+            "ip_mode": "fixed", 
+            "label": "CENTER", 
+            "mac": "00:0f:31:02:37:6c", 
+            "model": "gsm-ix120", 
+            "prefer_ip": "192.168.1.6"
+        }, 
+        "rgb_p1": {
+            "guid": 180877, 
+            "ip_mode": "fixed", 
+            "label": "unknown", 
+            "mac": "00:0f:31:02:c2:8d", 
+            "model": "allied_gt6600_rgb", 
+            "prefer_ip": "192.168.4.41"
+        }, 
+        "rgb_p2": {
+            "guid": 180876, 
+            "ip_mode": "fixed", 
+            "label": "CENTER", 
+            "mac": "00:0f:31:02:c2:8c", 
+            "model": "allied_gt6600_rgb", 
+            "prefer_ip": "192.168.4.42"
+        }, 
+        "uv_n0": {
+            "guid": 222298, 
+            "ip_mode": "linklocal", 
+            "label": "unknown", 
+            "mac": "00:0f:31:03:64:5a", 
+            "model": "allied_gt4907_uv", 
+            "prefer_ip": "192.168.2.60"
+        }, 
+        "uv_n1": {
+            "guid": 222672, 
+            "ip_mode": "linklocal", 
+            "label": "unknown", 
+            "mac": "00:0f:31:03:65:d0", 
+            "model": "allied_gt4907_uv", 
+            "prefer_ip": "192.168.2.61"
+        }, 
+        "uv_n2": {
+            "guid": 222246, 
+            "ip_mode": "linklocal", 
+            "label": "unknown", 
+            "mac": "00:0f:31:03:64:26", 
+            "model": "allied_gt4907_uv", 
+            "prefer_ip": "192.168.2.62"
+        }
+    }, 
+    "effort_metadata_dict": {
+        "OFF": {
+            "aircraft": "N56RF", 
+            "delete_old_images_sec": 1, 
+            "field_notes": "OFF effort but still collecting at tails of survey lines or other imagery of interest", 
+            "project_name": "glacial_2024", 
+            "save_every_x_image": 1, 
+            "wait_time_sec": 1
+        }, 
+        "ON": {
+            "aircraft": "N56RF", 
+            "delete_old_images_sec": 1, 
+            "field_notes": "Collecting imagery continuously on glacial harbor seal tracklines via COCOA and LATTE survey techniques", 
+            "project_name": "glacial_2024", 
+            "save_every_x_image": 1, 
+            "wait_time_sec": 1
+        }, 
+        "TEST": {
+            "aircraft": "N56RF", 
+            "delete_old_images_sec": 1, 
+            "field_notes": "Lab testing in Seattle during 11/24 integration.", 
+            "project_name": "SEA_MML_1124", 
+            "save_every_x_image": 1, 
+            "wait_time_sec": 1
+        }
+    }, 
+    "enabled": {
+        "center": {
+            "ir": true, 
+            "rgb": true, 
+            "uv": true
+        }, 
+        "left": {
+            "ir": true, 
+            "rgb": true, 
+            "uv": true
+        }, 
+        "right": {
+            "ir": true, 
+            "rgb": true, 
+            "uv": true
+        }
+    }, 
+    "flight_number_str": "02", 
+    "gui_cfg_dir": "/home/user/.config/kamera/gui", 
+    "gui_config": {
+        "collection_mode": "fixed rate", 
+        "collection_mode_parameter": 1.0, 
+        "effort_metadata_dict": {
+            "BEAR": {
+                "aircraft": "N56RF", 
+                "field_notes": "Breaking survey track to conduct flyover of polar bear detected outside the survey swath to collect multispectral imagery of the bear for estimating detection probability.", 
+                "project_name": "jobss_2021"
+            }, 
+            "CALIBRATION": {
+                "aircraft": "N56RF", 
+                "field_notes": "Backup calibration image set for ice seal configuration (100mm, 25.5deg) to be used for new camera models or h5 files as needed. flown at 1000 ft, 2000 ft, 3000 ft with heavy overlap.", 
+                "project_name": "jobss_2021"
+            }, 
+            "IR_max": {
+                "aircraft": "N56RF", 
+                "field_notes": "Determine the altitude limit of both the existing IR detection model as well as the hotspot integrity within the IR imagery. Mount configuration: 25.5 deg angle with 85 mm lens on color cameras.", 
+                "project_name": "pv_2021_test"
+            }, 
+            "NUC_temp": {
+                "aircraft": "N56RF", 
+                "field_notes": "Test whether the NUC control based on temperature provides necessary NUC events when the ambient temperature changes.", 
+                "project_name": "kamera_2021_test"
+            }, 
+            "NUC_time": {
+                "aircraft": "N56RF", 
+                "field_notes": "Test whether the NUC clock resets with each time change.", 
+                "project_name": "kamera_2021_test"
+            }, 
+            "OFF": {
+                "aircraft": "N56RF", 
+                "field_notes": "Images collected while OFF effort during surveys for glacial harbor seals.", 
+                "project_name": "glacial_2021"
+            }, 
+            "ON": {
+                "aircraft": "N56RF", 
+                "field_notes": "Images collected for counting glacial harbor seals.", 
+                "project_name": "glacial_2021"
+            }, 
+            "TEST": {
+                "aircraft": "N56RF", 
+                "field_notes": "Test utility of KAMERA system for both coastal and glacial harbor seal surveys.", 
+                "project_name": "pv_2021_test"
+            }, 
+            "TEST_ON": {
+                "aircraft": "N56RF", 
+                "field_notes": "test on effort", 
+                "project_name": "test0205"
+            }, 
+            "UV_test": {
+                "aircraft": "N56RF", 
+                "field_notes": "", 
+                "project_name": "kamera_2021_test"
+            }, 
+            "VISUAL_COUNT": {
+                "aircraft": "N56RF", 
+                "field_notes": "", 
+                "project_name": "glacial_2020"
+            }, 
+            "aoc_fl_test": {
+                "aircraft": "N56RF", 
+                "field_notes": "Full system test following revamp of electrical and mechanical design of big kamera system", 
+                "project_name": "aoc_2022_test"
+            }, 
+            "aoc_fl_test_fixed_overlap": {
+                "aircraft": "N56RF", 
+                "field_notes": "Full system test following revamp of electrical and mechanical design of big kamera system", 
+                "project_name": "aoc_2022_test"
+            }, 
+            "compression_NAS": {
+                "aircraft": "N56RF", 
+                "field_notes": "Test impact of compression on detection output. KAMERA set to run compressed imagery through the detector pipeline by routing images through the NAS. (COMPRESS_IMAGERY=0 and READ_FROM_NAS=1)", 
+                "project_name": "kamera_2021_test"
+            }, 
+            "compression_jobss": {
+                "aircraft": "N56RF", 
+                "field_notes": "Test impact of compression on detection output. KAMERA set to run raw imagery through the detector pipeline and only save compressed imagery. (COMPRESS_IMAGERY=0 and READ_FROM_NAS=0)", 
+                "project_name": "kamera_2021_test"
+            }, 
+            "compression_nexus": {
+                "aircraft": "N56RF", 
+                "field_notes": "Test impact of compression on detection output. KAMERA set to compress and then uncompress color imagery to achieve the compression artifact in the image for the detector pipeline, while providing the image format the rest of the system is expecting. (COMPRESS_IMAGERY=1 and READ_FROM_NAS=0)", 
+                "project_name": "kamera_2021_test"
+            }, 
+            "kw_lab": {
+                "aircraft": "N/A", 
+                "field_notes": "Testing in KHQ lab.", 
+                "project_name": "kw_012023_test"
+            }, 
+            "test": {
+                "aircraft": "N56RF", 
+                "field_notes": "Full system test following revamp of electrical and mechanical design of big kamera system", 
+                "project_name": "aoc_2022_test"
+            }
+        }, 
+        "effort_selection": 0, 
+        "flight_number_str": "00", 
+        "ir_contrast_strength": 200.0, 
+        "observer": "", 
+        "rgb_vfov": 14, 
+        "shapefile_fname": null, 
+        "show_center": true, 
+        "show_ir": true, 
+        "show_left": true, 
+        "show_rgb": true, 
+        "show_right": true, 
+        "show_uv": true, 
+        "sys_cfg": null, 
+        "sys_config_selection": "cam9"
+    }, 
+    "interfaces": {
+        "ir": "mobo_top", 
+        "p1": "pci_bot", 
+        "rgb": "pci_btm", 
+        "uv": "mobo_btm"
+    }, 
+    "ir_contrast_strength": 1000.0, 
+    "kamera_dir": "/home/user/kw/noaa_kamera", 
+    "latch_frame_rate_msg": false, 
+    "launch": {
+        "cam": {
+            "rgb": {
+                "GainMode": "Auto", 
+                "GainValue": 0
+            }, 
+            "uv": {
+                "GainMode": "Auto", 
+                "GainValue": 0
+            }
+        }
+    }, 
+    "load_shapefile": 0, 
+    "local_ssd_mnt": "/mnt/data", 
+    "locations": {
+        "center": {
+            "ir": "ir_n0", 
+            "p1": "rgb_p0", 
+            "rgb": "rgb_n0", 
+            "uv": "uv_n0"
+        }, 
+        "left": {
+            "ir": "ir_n1", 
+            "p1": "rgb_p1", 
+            "rgb": "rgb_n1", 
+            "uv": "uv_n1"
+        }, 
+        "right": {
+            "ir": "ir_n2", 
+            "p1": "rgb_p2", 
+            "rgb": "rgb_n2", 
+            "uv": "uv_n2"
+        }
+    }, 
+    "master_host": "cas0", 
+    "max_mpix": 200000, 
+    "models": {
+        "allied_gt4907_uv": {
+            "mac_prefix": "00:0f:31", 
+            "mfgr": "allied vision", 
+            "nic_mfgr": "", 
+            "specs": {
+                "height": 3232, 
+                "width": 4864
+            }, 
+            "spectrum": "uv"
+        }, 
+        "allied_gt6600_rgb": {
+            "mac_prefix": "00:0f:31", 
+            "mfgr": "allied vision", 
+            "nic_mfgr": "", 
+            "specs": {
+                "height": 4384, 
+                "width": 6576
+            }, 
+            "spectrum": "rgb"
+        }, 
+        "flir_645": {
+            "mac_prefix": "", 
+            "mfgr": "flir", 
+            "nic_mfgr": "", 
+            "specs": {
+                "height": 480, 
+                "width": 640
+            }, 
+            "spectrum": "ir"
+        }, 
+        "flir_a6750": {
+            "mac_prefix": "00:11:1c", 
+            "mfgr": "flir", 
+            "nic_mfgr": "pleora", 
+            "specs": {
+                "height": 512, 
+                "width": 640
+            }, 
+            "spectrum": "ir"
+        }, 
+        "gsm_ix120": {
+            "mac_prefix": "", 
+            "mfgr": "phase one", 
+            "nic_mfgr": "", 
+            "specs": {
+                "height": 9654, 
+                "width": 12768
+            }, 
+            "spectrum": "rgb"
+        }
+    }, 
+    "nas_mnt": "/mnt/flight_data", 
+    "observer": "AR", 
+    "postproc_commands": [
+        "flight_summary", 
+        "homography", 
+        "detections"
+    ], 
+    "redis_host": "cas0", 
+    "requested_geni_params": {
+        "cas0": {
+            "ir": {
+                "CorrectionAutoEnabled": 1, 
+                "CorrectionAutoUseDeltaTime": 0
+            }, 
+            "rgb": {
+                "ISO": 200, 
+                "ISO_Max": 200, 
+                "ISO_Min": 200, 
+                "Sensor_Temperature": 1.0, 
+                "Shutter_Speed": 0.01, 
+                "Shutter_Speed_Max": 6.25e-05, 
+                "Shutter_Speed_Min": 0.25
+            }, 
+            "uv": {
+                "ExposureAuto": "Continuous", 
+                "ExposureAutoMax": 2400.0, 
+                "ExposureAutoMin": 400.0, 
+                "ExposureValue": 0, 
+                "GainAuto": "Auto", 
+                "GainAutoMax": 30, 
+                "GainAutoMin": 0, 
+                "GainValue": 0
+            }
+        }, 
+        "cas1": {
+            "ir": {
+                "CorrectionAutoEnabled": 1
+            }, 
+            "rgb": {
+                "ISO": 200, 
+                "ISO_Max": 200, 
+                "ISO_Min": 200, 
+                "Sensor_Temperature": 1.0, 
+                "Shutter_Speed": 0.01, 
+                "Shutter_Speed_Max": 6.25e-05, 
+                "Shutter_Speed_Min": 0.008
+            }, 
+            "uv": {
+                "ExposureAuto": "Continuous", 
+                "ExposureAutoMax": 5760.0, 
+                "ExposureAutoMin": 400.0, 
+                "ExposureValue": 0, 
+                "GainAuto": "Auto", 
+                "GainAutoMax": 30, 
+                "GainAutoMin": 2, 
+                "GainValue": 0
+            }
+        }, 
+        "cas2": {
+            "ir": {
+                "CorrectionAutoEnabled": 1
+            }, 
+            "rgb": {
+                "ISO": 200, 
+                "ISO_Max": 200, 
+                "ISO_Min": 200, 
+                "Sensor_Temperature": 1.0, 
+                "Shutter_Mode": 0, 
+                "Shutter_Speed": 0.01, 
+                "Shutter_Speed_Max": 6.25e-05, 
+                "Shutter_Speed_Min": 0.008
+            }, 
+            "uv": {
+                "ExposureAuto": "Continuous", 
+                "ExposureAutoMax": 2454.0, 
+                "ExposureAutoMin": 400.0, 
+                "ExposureValue": 0, 
+                "GainAuto": "Auto", 
+                "GainAutoMax": 30, 
+                "GainAutoMin": 0, 
+                "GainValue": 0
+            }
+        }
+    }, 
+    "rgb_vfov": 17.266922854601024, 
+    "shapefile_fname": "/home/user/kamera_ws/src/kitware-ros-pkg/wxpython_gui/shapefiles/KotzTestAndUAS.shp", 
+    "show_center": true, 
+    "show_ir": true, 
+    "show_left": true, 
+    "show_rgb": true, 
+    "show_right": true, 
+    "show_saturated_pixels": true, 
+    "show_uv": true, 
+    "syscfg_dir": "/mnt/data/SEA_MML_1124/fl02/images_30deg_N68RF/", 
+    "uas0": {
+        "cam_fov": "center"
+    }, 
+    "uas1": {
+        "cam_fov": "right"
+    }, 
+    "uas2": {
+        "cam_fov": "left"
+    }, 
+    "verbosity": 9
+}
