@@ -5,6 +5,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <sys/stat.h>
 #include <thread>
 #include <mutex>
 #include <algorithm>
@@ -413,7 +414,11 @@ namespace phase_one
             auto tic1 = std::chrono::high_resolution_clock::now();
             std::string filename;
             std::unique_lock<std::mutex> lock(mtx);
-            if ( !filename_to_seq_map_.empty() ) {
+            // Add in (at least) a 1 image delay so that detection can keep up
+            // This does always leave the last image not debayered, but that's
+            // generally of the tarmac, so not a serious concern.
+            int delay = 1;
+            if ( filename_to_seq_map_.size() > delay ) {
                 // grab most-recent filename (could make a LIFO queue?)
                 filename = filename_to_seq_map_.begin()->first;
                 // remove from map
@@ -963,26 +968,38 @@ namespace phase_one
                 // there's no detections, and it's not a modulo N image, so we want to
                 // delete the IIQ image without ever processing, and 'touch' a file on the
                 // local dir for footprint generation
-                // WARNING: the inherent assumption here is that detection will never
-                // fall behind image processing. If that happens, more logic will have
-                // to be here
-                // guard access to filename map
-                //
-                // first "touch" jpeg file
-                std::ofstream output(fname);
+                // If the IIQ image has already been debayered, we need to delete the
+                // local copy before it reaches the NAS (ideally)
                 lock.lock();
                 // remove IIQ from processing queue
-                filename_to_seq_map_.erase(filename_iiq);
-                // add to 'processed' file so that it won't attempt to be processed
-                // after a reboot
-                processed_out << filename_iiq << std::endl;
-                processed_counter++;
+                // erase will return 0 if the key (iiq image) does not exist
+                // else 1
+                int count = filename_to_seq_map_.erase(filename_iiq);
+                if ( count > 0 ) {
+                  // add to 'processed' file so that it won't attempt to be processed
+                  // after a reboot
+                  processed_out << filename_iiq << std::endl;
+                  processed_counter++;
+                  // then remove IIQ file
+                  remove(filename_iiq.c_str());
+                } else {
+                  // this image has already been debayered and saved to disk,
+                  // WARNING: assuming we're faster than the delay (5 minutes)
+                  // of the image copy node.
+                  struct stat buffer;
+                  if ( stat (fname.c_str(), &buffer) == 0 ) {
+                    // color image exists, remove it
+                    remove(fname.c_str());
+                  } else {
+                    ROS_WARN("Detections were found on an image that does not exist locally.");
+                  }
+                } 
                 lock.unlock();
+                // "touch" jpeg file, so timestamp still exists
+                std::ofstream output(fname);
 
-                // then remove IIQ file
-                remove(filename_iiq.c_str());
             }
-        }
+        } // else image has detections, so save regardless
     };
 }
 
