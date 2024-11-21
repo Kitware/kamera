@@ -53,4 +53,4 @@ export JPEG_QUALITY=90
 # If in a GPS-denied environment, this will publish events on each event
 # trigger to simulated the GPS timestamp
 # BE SURE TO SET TO 0 BEFORE FLIGHT
-export SPOOF_EVENTS=1
+export SPOOF_EVENTS=0
