@@ -273,107 +273,117 @@ class MainFrame(form_builder_output.MainFrame):
         # These will all be compressed images fit to the panel.
         self.remote_image_panels = []
 
+        self.enabled = kv.get("/sys/enabled")
         # RGB images.
-        ret = RemoteImagePanelFit(
-            self.left_rgb_panel,
-            topic_names["left_rgb_srv_topic"],
-            None,
-            self.left_rgb_status_text,
-            compressed,
-            self.left_rgb_histogram_panel,
-            attrs={"chan": "rgb", "fov": "left"},
-        )
-        self.remote_image_panels.append(ret)
+        if self.enabled["left"]["rgb"]:
+            ret = RemoteImagePanelFit(
+                self.left_rgb_panel,
+                topic_names["left_rgb_srv_topic"],
+                None,
+                self.left_rgb_status_text,
+                compressed,
+                self.left_rgb_histogram_panel,
+                attrs={"chan": "rgb", "fov": "left"},
+            )
+            self.remote_image_panels.append(ret)
 
-        ret = RemoteImagePanelFit(
-            self.center_rgb_panel,
-            topic_names["center_rgb_srv_topic"],
-            None,
-            self.center_rgb_status_text,
-            compressed,
-            self.center_rgb_histogram_panel,
-            attrs={"chan": "rgb", "fov": "center"},
-        )
-        self.remote_image_panels.append(ret)
+        if self.enabled["center"]["rgb"]:
+            ret = RemoteImagePanelFit(
+                self.center_rgb_panel,
+                topic_names["center_rgb_srv_topic"],
+                None,
+                self.center_rgb_status_text,
+                compressed,
+                self.center_rgb_histogram_panel,
+                attrs={"chan": "rgb", "fov": "center"},
+            )
+            self.remote_image_panels.append(ret)
 
-        ret = RemoteImagePanelFit(
-            self.right_rgb_panel,
-            topic_names["right_rgb_srv_topic"],
-            None,
-            self.right_rgb_status_text,
-            compressed,
-            self.right_rgb_histogram_panel,
-            attrs={"chan": "rgb", "fov": "right"},
-        )
-        self.remote_image_panels.append(ret)
+        if self.enabled["right"]["rgb"]:
+            ret = RemoteImagePanelFit(
+                self.right_rgb_panel,
+                topic_names["right_rgb_srv_topic"],
+                None,
+                self.right_rgb_status_text,
+                compressed,
+                self.right_rgb_histogram_panel,
+                attrs={"chan": "rgb", "fov": "right"},
+            )
+            self.remote_image_panels.append(ret)
 
         # IR images.
-        ret = RemoteImagePanelFit(
-            self.left_ir_panel,
-            topic_names["left_ir_srv_topic"],
-            None,
-            self.left_ir_status_text,
-            compressed,
-            self.left_ir_histogram_panel,
-            attrs={"chan": "ir", "fov": "left"},
-        )
-        self.remote_image_panels.append(ret)
+        if self.enabled["left"]["ir"]:
+            ret = RemoteImagePanelFit(
+                self.left_ir_panel,
+                topic_names["left_ir_srv_topic"],
+                None,
+                self.left_ir_status_text,
+                compressed,
+                self.left_ir_histogram_panel,
+                attrs={"chan": "ir", "fov": "left"},
+            )
+            self.remote_image_panels.append(ret)
 
-        ret = RemoteImagePanelFit(
-            self.center_ir_panel,
-            topic_names["center_ir_srv_topic"],
-            None,
-            self.center_ir_status_text,
-            compressed,
-            self.center_ir_histogram_panel,
-            attrs={"chan": "ir", "fov": "center"},
-        )
-        self.remote_image_panels.append(ret)
+        if self.enabled["center"]["ir"]:
+            ret = RemoteImagePanelFit(
+                self.center_ir_panel,
+                topic_names["center_ir_srv_topic"],
+                None,
+                self.center_ir_status_text,
+                compressed,
+                self.center_ir_histogram_panel,
+                attrs={"chan": "ir", "fov": "center"},
+            )
+            self.remote_image_panels.append(ret)
 
-        ret = RemoteImagePanelFit(
-            self.right_ir_panel,
-            topic_names["right_ir_srv_topic"],
-            None,
-            self.right_ir_status_text,
-            compressed,
-            self.right_ir_histogram_panel,
-            attrs={"chan": "ir", "fov": "right"},
-        )
-        self.remote_image_panels.append(ret)
+        if self.enabled["right"]["ir"]:
+            ret = RemoteImagePanelFit(
+                self.right_ir_panel,
+                topic_names["right_ir_srv_topic"],
+                None,
+                self.right_ir_status_text,
+                compressed,
+                self.right_ir_histogram_panel,
+                attrs={"chan": "ir", "fov": "right"},
+            )
+            self.remote_image_panels.append(ret)
 
         # UV images.
-        ret = RemoteImagePanelFit(
-            self.left_uv_panel,
-            topic_names["left_uv_srv_topic"],
-            None,
-            self.left_uv_status_text,
-            compressed,
-            self.left_uv_histogram_panel,
-            attrs={"chan": "uv", "fov": "left"},
-        )
-        self.remote_image_panels.append(ret)
+        if self.enabled["left"]["uv"]:
+            ret = RemoteImagePanelFit(
+                self.left_uv_panel,
+                topic_names["left_uv_srv_topic"],
+                None,
+                self.left_uv_status_text,
+                compressed,
+                self.left_uv_histogram_panel,
+                attrs={"chan": "uv", "fov": "left"},
+            )
+            self.remote_image_panels.append(ret)
 
-        ret = RemoteImagePanelFit(
-            self.center_uv_panel,
-            topic_names["center_uv_srv_topic"],
-            None,
-            self.center_uv_status_text,
-            compressed,
-            self.center_uv_histogram_panel,
-            attrs={"chan": "uv", "fov": "center"},
-        )
-        self.remote_image_panels.append(ret)
+        if self.enabled["center"]["uv"]:
+            ret = RemoteImagePanelFit(
+                self.center_uv_panel,
+                topic_names["center_uv_srv_topic"],
+                None,
+                self.center_uv_status_text,
+                compressed,
+                self.center_uv_histogram_panel,
+                attrs={"chan": "uv", "fov": "center"},
+            )
+            self.remote_image_panels.append(ret)
 
-        ret = RemoteImagePanelFit(
-            self.right_uv_panel,
-            topic_names["right_uv_srv_topic"],
-            None,
-            self.right_uv_status_text,
-            compressed,
-            self.right_uv_histogram_panel,
-            attrs={"chan": "uv", "fov": "right"},
-        )
-        self.remote_image_panels.append(ret)
+        if self.enabled["right"]["uv"]:
+            ret = RemoteImagePanelFit(
+                self.right_uv_panel,
+                topic_names["right_uv_srv_topic"],
+                None,
+                self.right_uv_status_text,
+                compressed,
+                self.right_uv_histogram_panel,
+                attrs={"chan": "uv", "fov": "right"},
+            )
+            self.remote_image_panels.append(ret)
         # --------------------------------------------------------------------
 
         # Subscribe to /stat topic to monitor driver FPS
