@@ -36,14 +36,14 @@ class FullAndZoomView(object):
             wx_histogram_panel=histogram_panel,
         )
         # self.zoom_panel.start_image_thread()
-        # if "rgb" in srv_topic:
-        #    self.zoom_enabled = False
-        #    parent._image_inspection_frame.m_panel37.Hide()
-        #    parent._image_inspection_frame.cueing_left_image_title3.Hide()
-        # else:
-        self.zoom_enabled = True
-        self.zoom_panel.start_image_thread()
-        self.fit_panel.start_image_thread()
+        if "rgb" in srv_topic:
+            self.zoom_enabled = False
+            parent._image_inspection_frame.m_panel37.Hide()
+            parent._image_inspection_frame.cueing_left_image_title3.Hide()
+        else:
+            self.zoom_enabled = True
+            self.zoom_panel.start_image_thread()
+            self.fit_panel.start_image_thread()
 
     def set_zoom(self, zoom):
         """
