@@ -6,6 +6,12 @@ services:
   postproc:
     image: kitware/kamera:postproc
     network_mode: host
+    environment:
+      REDIS_HOST: "${REDIS_HOST}"
+      SYSTEM_NAME: "${SYSTEM_NAME}"
+      DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
+      NODE_HOSTNAME: "${NODE_HOSTNAME}"
+      CAM_FOV: "${CAM_FOV}"
     tty: true
     volumes:
         - "/mnt:/mnt"

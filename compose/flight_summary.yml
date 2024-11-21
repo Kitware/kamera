@@ -6,9 +6,15 @@ services:
   flight_summary:
     image: kitware/kamera:postproc
     network_mode: host
+    environment:
+      REDIS_HOST: "${REDIS_HOST}"
+      SYSTEM_NAME: "${SYSTEM_NAME}"
+      DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
+      NODE_HOSTNAME: "${NODE_HOSTNAME}"
+      CAM_FOV: "${CAM_FOV}"
     tty: true
     volumes:
       - "/mnt:/mnt"
-      - "${PWD}/src/run_scripts/entry:/entry"
-      - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
+      - "${KAMERA_DIR}/src/run_scripts/entry:/entry"
+      - "${KAMERA_DIR}:${DOCKER_KAMERA_DIR}:ro"
     entrypoint: ["/entry/postproc_summary.sh"]
