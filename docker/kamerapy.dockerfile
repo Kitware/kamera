@@ -15,6 +15,6 @@ RUN pip install setuptools==57.0.0
 
 COPY ./ /src/kamera
 WORKDIR /src/kamera
-RUN pip install .
+RUN pip install -e .
 
 ENTRYPOINT ["bash"]
