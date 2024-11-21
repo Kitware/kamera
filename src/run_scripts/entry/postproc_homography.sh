@@ -2,7 +2,6 @@
 ## === === === ===  env configuration  === === === ===
 
 # Not sure why this is necassary. Docker should already handle this.
-source /entry/env.sh
 export KAM_FLIGHT_DIR=$(redis-cli --raw -h ${REDIS_HOST} get /postproc/${NODE_HOSTNAME}/homography/flight_dir)
 
 ## grab params - HOPEFULLY these are set up
