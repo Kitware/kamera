@@ -48,6 +48,7 @@ from shutil import copyfile
 import exifread
 import csv
 from PIL import Image
+import pathlib
 from collections import defaultdict
 from scipy.optimize import linear_sum_assignment
 from datetime import datetime
@@ -476,7 +477,7 @@ def match_image_to_json(img_fname):
         .replace(SUFFIX_UV, SUFFIX_META)
 
     if not os.path.isfile(json_fname):
-        warnings.warn('Could not find {} for {}'.format(SUFFIX_META, img_fname))
+        print('Could not find {} for {}'.format(SUFFIX_META, img_fname))
         return ''
     return json_fname
 
@@ -487,7 +488,8 @@ def parse_image_directory(image_dir, modality=None):
 
     """
     # Read in the nav binary.
-    platform_pose_provider = NavStateINSJson('%s/*meta.json' % image_dir)
+    json_glob = pathlib.Path(image_dir).rglob('*_meta.json')
+    platform_pose_provider = NavStateINSJson(json_glob)
 
     img_fname_to_time = {}
     img_time_to_fname = {}
@@ -495,7 +497,7 @@ def parse_image_directory(image_dir, modality=None):
     effort_type = {}
     trigger_type = {}
 
-    print2('parse_image_directory({},\n  {})'.format(image_dir, modality))
+    print('parse_image_directory({},\n  {})'.format(image_dir, modality))
 
     if modality is not None:
         suffixes = [SUFFIX_DICT[modality]]
@@ -517,7 +519,11 @@ def parse_image_directory(image_dir, modality=None):
 
         try:
             with open(json_fname) as json_file:
-                d = json.load(json_file)
+                try:
+                    d = json.load(json_file)
+                except json.decoder.JSONDecodeError as e:
+                    print("Failed to decode file %s." % json_file)
+                    continue
 
                 # Time that the image was taken.
                 img_time_to_fname[d['evt']['time']] = img_fname
@@ -969,12 +975,12 @@ def measure_image_to_image_homographies_flight_dir(flight_dir,
     for sys_config in os.listdir(flight_dir):
         sys_config_dir = '%s/%s' % (flight_dir, sys_config)
         if not os.path.isdir(sys_config_dir):
-            warnings.warn("skipping because it's not a real sys_config_dir: {}".format(sys_config_dir))
+            print("skipping because it's not a real sys_config_dir: {}".format(sys_config_dir))
             continue
 
         sys_config_dtype = get_dir_type(sys_config_dir)
         if sys_config_dtype != 'sys_config':
-            warnings.warn("skipping because it's not a real sys_config_dir: {}".format(sys_config_dir))
+            print("skipping because it's not a real sys_config_dir: {}".format(sys_config_dir))
             continue
 
         print('measure_image_to_image_homographies_flight_dir: sys_config_dir: {}'.format(sys_config_dir))
@@ -1385,7 +1391,7 @@ def create_all_geotiff(flight_dir, output_dir=None, quality=75,
                 try:
                     load_from_file(camera_model_fname)
                 except IOError:
-                    warnings.warn('Could not load the camera model '
+                    print('Could not load the camera model '
                                   'yaml specified to be located: %s. '
                                   'Skipping' % camera_model_fname)
                     continue
@@ -1507,9 +1513,11 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
         for sys_str in get_fov_dirs(sys_config_dir):
             image_dir = '%s/%s' % (sys_config_dir, sys_str)
 
+            ret = parse_image_directory(image_dir)
             try:
                 ret = parse_image_directory(image_dir)
-            except:
+            except Exception as e:
+                print(e)
                 print('Not considering: \'%s\'' % image_dir)
                 continue
 
@@ -1548,7 +1556,7 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
                         camera_model = load_from_file(camera_model_fname,
                                                       platform_pose_provider)
                     except IOError:
-                        warnings.warn('Could not load the camera model '
+                        print('Could not load the camera model '
                                       'yaml specified to be located: %s. '
                                       'Skipping' % camera_model_fname)
                         continue
@@ -1572,7 +1580,7 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
         img_fnames = fnames_by_system[sys_str]
 
         if len(img_fnames) == 0:
-            warnings.warn('No images found for {}'.format(sys_str))
+            print(f"No images found for {sys_str}")
             continue
 
         num_images = len(img_fnames)
@@ -1582,7 +1590,7 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
             try:
                 frame_time = img_fname_to_time[img_fname]
             except KeyError:
-                warnings.warn('Missing time for image: {}'.format(img_fname))
+                print(f"Missing time for image: {img_fname}")
                 failcount = process_summary['fails'].get(sys_str, 0)
                 process_summary['fails'][sys_str] = failcount + 1
 
@@ -1591,7 +1599,7 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
             try:
                 camera_model = camera_models[img_fname]
             except KeyError:
-                warnings.warn('No camera model for {}'.format(img_fname))
+                print(f"No camera model for {img_fname}")
                 continue
 
             ret = get_image_boundary(camera_model, frame_time)
@@ -1766,7 +1774,7 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
                          pitch, roll, effort_type[shp_shapes_fnames[i]],
                          trigger_type[shp_shapes_fnames[i]], reviewed, fate)
                 except Exception as e:
-                    warnings.warn('{}: {}'.format(e.__class__.__name__, e))
+                    print(e)
 
             w.close()
 

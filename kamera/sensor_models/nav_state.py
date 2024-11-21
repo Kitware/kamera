@@ -262,7 +262,11 @@ class NavStateINSJson(NavStateINSBinary):
         json_counter = 0
         for fname in json_paths:
             with open(fname) as json_file:
-                d = json.load(json_file)
+                try:
+                    d = json.load(json_file)
+                except json.decoder.JSONDecodeError:
+                    print("Failed to decode json file %s." % json_file)
+                    continue
 
                 if d['ins']['time'] in nav_pose_dict:
                     continue
