@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
         ros-noetic-diagnostic-updater \
         ros-noetic-self-test \
         ros-noetic-polled-camera \
+        ros-noetic-message-generation \
+        ros-noetic-message-runtime \
         libgtkmm-2.4-1v5 \
         libglademm-2.4-1v5 \
         libgtkglextmm-x11-1.2-dev \
@@ -120,8 +122,10 @@ RUN ln -sf $WS_DIR/src/cfg /cfg
 RUN mkdir -p /root/.config/kamera && \
     ln -sf $WS_DIR/.dir /root/.config/kamera/repo_dir.bash
 
-RUN [ "/bin/bash", "-c", "source /entry/project.sh && catkin build backend"]
+# Need to build phase one first to generate SRV
 RUN ln -sv /usr/bin/python3 /usr/bin/python || true
+RUN [ "/bin/bash", "-c", "source ${WS_DIR}/activate_ros.bash && catkin build phase_one"]
+RUN [ "/bin/bash", "-c", "source /entry/project.sh && catkin build backend"]
 
 ENTRYPOINT ["/entry/project.sh"]
 CMD ["bash"]
