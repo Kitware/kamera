@@ -25,8 +25,8 @@ services:
     volumes:
       - "/mnt:/mnt"
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
-    restart: on-failure
     command: ["/entry/viame.sh"]
+    restart: unless-stopped
     deploy:
       resources:
         reservations:
