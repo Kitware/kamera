@@ -258,6 +258,9 @@ class ArchiverBase(object):
         fl_number = "".join([d for d in str(fl) if d.isdigit()])
         self._flight = "fl{:0>2}".format(fl_number)
         self._effort = self.envoy.get("/sys/arch/effort")
+        self._save_every_x_image = self.envoy.kv.get(
+            f"/sys/effort_metadata_dict/{self._effort}/save_every_x_image"
+        )
         self._field = os.environ.get("CAM_FOV", "default_view")
         self._collection_mode = self.envoy.get("/sys/collection_mode")
         self._template = self.envoy.get("/sys/arch/template")
@@ -714,7 +717,15 @@ class ArchiverBase(object):
 
     @property
     def collection_mode(self):
+        self._collection_mode = self.envoy.get("/sys/collection_mode")
         return self._collection_mode
+
+    @property
+    def save_every_x_image(self):
+        self._save_every_x_image = self.envoy.kv.get(
+            f"/sys/effort_metadata_dict/{self.effort}/save_every_x_image"
+        )
+        return self._save_every_x_image
 
 
 if __name__ == "__main__":
