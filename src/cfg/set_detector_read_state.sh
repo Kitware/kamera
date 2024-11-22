@@ -7,7 +7,7 @@ source "${KAM_REPO_DIR}/tmux/${SYSTEM_NAME}/env.sh"
 # Pull from .env, and set globally in Redis
 echo "Setting global redis params."
 echo "Setting read_from_nas to ${READ_FROM_NAS}."
-redis-cli -h ${REDIS_HOST} set "/detector/read,_from_nas" "${READ_FROM_NAS}"
+redis-cli -h ${REDIS_HOST} set "/detector/read_from_nas" "${READ_FROM_NAS}"
 echo "Setting compress_imagery to ${COMPRESS_IMAGERY}."
 redis-cli -h ${REDIS_HOST} set "/imageview/compress_imagery" "${COMPRESS_IMAGERY}"
 echo "Setting jpeg_quality to ${JPEG_QUALITY}."

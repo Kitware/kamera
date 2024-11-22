@@ -53,6 +53,7 @@ from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 from tf.transformations import quaternion_multiply, quaternion_matrix, \
     quaternion_from_euler, quaternion_inverse, euler_matrix
+from wxpython_gui.nav_state import NavStateFixed
 
 
 # Instantiate CvBridge
