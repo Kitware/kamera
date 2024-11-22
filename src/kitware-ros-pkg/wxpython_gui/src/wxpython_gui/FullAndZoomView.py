@@ -43,15 +43,15 @@ class FullAndZoomView(object):
         else:
             self.zoom_enabled = True
             self.zoom_panel.start_image_thread()
-            self.fit_panel.start_image_thread()
+        self.fit_panel.start_image_thread()
 
     def set_zoom(self, zoom):
         """
         :param zoom: Zoom percentage.
         :type zoom: float
         """
-        # if not zoom_enabled:
-        #    return
+        if not self.zoom_enabled:
+           return
         self._zoom = zoom
         self.zoom_label.SetLabel("{}%".format(int(np.round(zoom))))
         self.zoom_panel.update_all()
@@ -61,12 +61,12 @@ class FullAndZoomView(object):
         :param center: Location for the zoom center in the original image's coordinates.
         :type center: 2-array
         """
-        # if not zoom_enabled:
-        #    return
+        if not zoom_enabled:
+           return
         self._center = center
         self.zoom_panel.update_all()
 
     def release(self):
         self.fit_panel.release()
-        # if self.zoom_enabled:
-        #    self.zoom_panel.release()
+        if self.zoom_enabled:
+           self.zoom_panel.release()

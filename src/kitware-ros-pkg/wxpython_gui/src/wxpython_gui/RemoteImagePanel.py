@@ -201,8 +201,11 @@ class RemoteImagePanel(object):
            self.inverse_remote_homography is not None:
             pos = list(event.GetPosition())
             panel_width, panel_height = self.wx_panel.GetSize()
-            pos[0] -= (panel_width - self.panel_image_width)//2
-            pos[1] -= (panel_height - self.panel_image_height)//2
+            try:
+                pos[0] -= (panel_width - self.panel_image_width)//2
+                pos[1] -= (panel_height - self.panel_image_height)//2
+            except:
+                return
 
             pos = np.dot(self.inverse_homography, [pos[0],pos[1],1])
             pos = np.dot(self.inverse_remote_homography, pos)
