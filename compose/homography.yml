@@ -16,4 +16,5 @@ services:
     volumes:
       - "/mnt:/mnt"
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
+      - "${PWD}/src/run_scripts/entry:/entry:ro"
     entrypoint: ["/entry/postproc_homography.sh"]
