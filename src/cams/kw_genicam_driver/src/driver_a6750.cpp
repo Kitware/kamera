@@ -66,7 +66,7 @@ private:
 typedef std::pair<ros::Time, cv::Mat> TimeMat;
 
 
-int purge_stale(std::map<ros::Time, sensor_msgs::ImagePtr> &image_map, ros::Time t) 
+int purge_stale(std::map<ros::Time, sensor_msgs::ImagePtr> &image_map, ros::Time t)
 {
     int stale = 0;
     for (const auto pair: image_map) {
@@ -780,7 +780,7 @@ public:
 
         GEV_STATUS call_status = GevWaitForNextImage(camera_handle, &img_buff_obj_ptr, 10000);
         ros::Time t_image_received = ros::Time::now(); // maybe
-        
+
     	auto nodeName = ros::this_node::getName();
     	custom_msgs::Stat stat_msg;
     	stat_msg.header.stamp = ros::Time::now();
@@ -844,7 +844,7 @@ public:
                           << " type: "<<  raw_image.type() << std::endl;
                 auto imgp = cv_ptr->toImageMsg();
                 ROS_INFO("success at making image message");
-                
+
                 std::string link = "/" + nodeName + "/event/NA"; // link this trace to the event trace
                 stat_msg.trace_header.seq = 0;
                 stat_msg.link = link;
@@ -889,19 +889,18 @@ public:
         ros::Time img_key;
         bool hit = false;
         std_msgs::Header gps_header;
-        for (auto img_it = image_map.begin(); img_it != image_map.end(); ++img_it ) {
+        for ( const auto pair: image_map ) {
             // iterate through every image in the map to find
             // nearest event to image received
-            bool success = event_cache.search(img_it->first, gps_header);
+            bool success = event_cache.search(pair.first, gps_header);
             if (success == 1) {
                 // found a hit
-                img_key = img_it->first;
+                img_key = pair.first;
                 hit = true;
                 break;
             }
         }
         if (!hit) {
-//            ROS_WARN("nothing found to match");
             return;
         }
 
@@ -990,6 +989,12 @@ private:
         losses += purge_stale(image_map, old);
         for (auto i = 0; i < losses; i++ ) {
             watchdog.kick();
+        }
+        if ( event_cache.size() > image_map.size() ) {
+            int diff = event_cache.size() - image_map.size();
+            for (int i = 0; i < diff; ++i) {
+                watchdog.kick();
+            }
         }
         watchdog.check();
     }
