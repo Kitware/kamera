@@ -11,7 +11,7 @@ redis-cli -h ${REDIS_HOST} set "/detector/read_from_nas" "${READ_FROM_NAS}"
 echo "Setting compress_imagery to ${COMPRESS_IMAGERY}."
 redis-cli -h ${REDIS_HOST} set "/imageview/compress_imagery" "${COMPRESS_IMAGERY}"
 echo "Setting jpeg_quality to ${JPEG_QUALITY}."
-redis-cli -h ${REDIS_HOST} set "/sys/arch/jpeg/quality" "${JPEG_QUALITY}"
+redis-cli -h ${REDIS_HOST} set "/sys/arch/jpg/quality" "${JPEG_QUALITY}"
 echo "Setting spoof_events to ${SPOOF_EVENTS}."
 redis-cli -h ${REDIS_HOST} set "/debug/spoof_events" "${SPOOF_EVENTS}"
 # These keys are needed to allow spoof events to work
