@@ -26,6 +26,8 @@ ubelt = "^1.3.6"
 rich = "^13.9.1"
 gdal = {url = "https://github.com/girder/large_image_wheels/raw/wheelhouse/GDAL-3.9.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl#sha256=0ccdfd68893818a86d2225c1efe6b4a64a6d84676f6fb1e7ec5a4138f70d837b"}
 ipdb = "^0.13.13"
+bottle = "^0.13.2"
+pycolmap = "^3.11.1"
 
 
 [build-system]
