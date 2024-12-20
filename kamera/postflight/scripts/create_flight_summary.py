@@ -36,44 +36,41 @@ Library handling projection operations of a standard camera model.
 """
 from __future__ import division, print_function
 import argparse
-import json
-import numpy as np
-import matplotlib.pyplot as plt
-from numpy import pi
-from mpl_toolkits.mplot3d import Axes3D
-from scipy.optimize import minimize
 
 # Custom package imports.
-from sensor_models import (
-        quaternion_multiply,
-        quaternion_from_matrix,
-        quaternion_from_euler,
-        quaternion_slerp,
-        quaternion_inverse,
-        quaternion_matrix
-        )
-from postflight_scripts import utilities
+from kamera.postflight import utilities
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Convert all images from a '
-                                     'flight into GeoTIFF.')
-    parser.add_argument("flight_dir", help='Flight directory containing '
-                        'subdirectories \'LEFT\', \'CENT\', and \'RIGHT\', '
-                        'each containing imagery and meta.json files.',
-                        type=str)
-    parser.add_argument('-output_dir', help='Output directory (defaults to '
-                        '\'geotiffs\' inside the flight directory.).',
-                        type=str, default=None)
+    parser = argparse.ArgumentParser(
+        description="Convert all images from a " "flight into shapefiles."
+    )
+    parser.add_argument(
+        "flight_dir",
+        help="Flight directory containing "
+        "subdirectories 'left_view', 'center_view', and 'right_view', "
+        "each containing imagery and meta.json files. Defaults to None.",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "-output_dir",
+        help="Output directory (defaults to " "'None'.).",
+        type=str,
+        default=None,
+    )
 
     args = parser.parse_args()
 
-    utilities.create_flight_summary(args.flight_dir, args.output_dir)
+    flight_dir = args.flight_dir
+    output_dir = args.output_dir
+
+    # uncomment these if you wish to skip the argument assigment
+    # flight_dir = '/example_flight_dir'
+    # output_dir = '/example_output_dir'
+
+    utilities.create_flight_summary(flight_dir, output_dir)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-
-#flight_dir = '/host_filesystem/media/mattb/7e7167ba-ad6f-4720-9ced-b699f49ba3aa/kamera/calibration_2019/03'
-#create_all_geotiff(flight_dir)

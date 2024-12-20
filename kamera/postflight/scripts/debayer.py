@@ -38,7 +38,7 @@ from __future__ import division, print_function
 import argparse
 
 # KAMERA imports.
-from postflight_scripts import utilities
+from kamera.postflight import utilities
 
 
 def main():
