@@ -1,0 +1,434 @@
+import os
+import json
+import pathlib
+import cv2
+import PIL.Image
+import numpy as np
+import os.path as osp
+import ubelt as ub
+from posixpath import basename
+from re import I
+
+from shapely import points
+import pycolmap as pc
+from dataclasses import dataclass
+from typing import Tuple, List, Dict
+from kamera.sensor_models.nav_state import NavStateINSJson
+from kamera.colmap_processing.camera_models import StandardCamera
+from kamera.colmap_processing.image_renderer import render_view
+from kamera.postflight.alignment import (
+    VisiblePoint,
+    weighted_horn_alignment_partial,
+    analyze_rotation_estimate,
+    register_camera_horn_ransac,
+    verify_alignment,
+    iterative_alignment,
+)
+
+
+@dataclass(frozen=True)
+class ColmapCalibrationData:
+    sfm_poses: List[np.ndarray]
+    ins_poses: List[np.ndarray]
+    img_fnames: List[np.ndarray]
+    img_times: List[np.ndarray]
+    llhs: List[np.ndarray]
+    points_per_image: List[List[VisiblePoint]]
+    basename_to_time: Dict[str, float]
+    fname_to_time_channel_modality: Dict[float, Dict[str, str]]
+    best_cameras: Dict[str, pc._core.Camera]
+
+
+class ColmapCalibration(object):
+    def __init__(
+        self, flight_dir: str | os.PathLike, colmap_dir: str | os.PathLike
+    ) -> None:
+        self.flight_dir = flight_dir
+        self.colmap_dir = colmap_dir
+        # contains the images, 3D points, and cameras of the colmap database
+        self.R = pc.Reconstruction(self.colmap_dir)
+        self.ccd = ColmapCalibrationData
+        self.nav_state_provider = self.load_nav_state_provider()
+        print(self.R.summary())
+
+    def load_nav_state_provider(self):
+        # Create navigation stream
+        json_glob = pathlib.Path(self.flight_dir).rglob("*_meta.json")
+        try:
+            next(json_glob)
+        except StopIteration:
+            raise SystemExit("No meta jsons were found, please check your filepaths.")
+        return NavStateINSJson((json_glob))
+
+    def get_base_name(self, fname: str | os.PathLike) -> str:
+        """Given an arbitrary filename (could be UV, IR, RGB, json),
+        extract the portion of the filename that is just the time, flight,
+        machine (C, L, R), and effort name.
+        """
+        # get base
+        base = osp.basename(fname)
+        # get it without an extension and modality
+        modality_agnostic = "_".join(base.split("_")[:-1])
+        return modality_agnostic
+
+    def get_modality(self, fname: str | os.PathLike) -> str:
+        """Extract image modality (e.g. ir/meta) from a given kamera filename."""
+        base = osp.basename(fname)
+        modality = base.split("_")[-1].split(".")[0]
+        return modality
+
+    def get_channel(self, fname: str | os.PathLike) -> str:
+        """Extract channel (e.g. L/R/C) from a given kamera filename."""
+        base = osp.basename(fname)
+        channel = base.split("_")[3]
+        return channel
+
+    def get_basename_to_time(self, flight_dir: str | os.PathLike) -> dict:
+        # Establish correspondence between real-world exposure times base of file
+        # names.
+        basename_to_time = {}
+        for json_fname in pathlib.Path(flight_dir).rglob("*_meta.json"):
+            try:
+                with open(json_fname) as json_file:
+                    d = json.load(json_file)
+                    # Time that the image was taken.
+                    basename = self.get_base_name(json_fname)
+                    basename_to_time[basename] = float(d["evt"]["time"])
+            except (OSError, IOError):
+                pass
+        return basename_to_time
+
+    def prepare_calibration_data(self):
+        img_fnames = []
+        img_times = []
+        ins_poses = []
+        sfm_poses = []
+        llhs = []
+        points_per_image = []
+        basename_to_time = self.get_basename_to_time(self.flight_dir)
+        best_cameras = {}
+        most_points = {}
+        for image_num, image in self.R.images.items():
+            base_name = self.get_base_name(image.name)
+            try:
+                t = basename_to_time[base_name]
+            except KeyError:
+                print(
+                    "Couldn't find a _meta.json file associated with '%s'" % base_name
+                )
+                continue
+
+            # Query the navigation state recorded by the INS for this time.
+            pose = self.nav_state_provider.pose(t)
+            llh = self.nav_state_provider.llh(t)
+
+            # Query Colmaps pose for the camera.
+            R = image.cam_from_world.rotation.matrix()
+            pos = -np.dot(R.T, image.cam_from_world.translation)
+
+            image.cam_from_world.rotation.normalize()
+            quat = image.cam_from_world.rotation.quat
+
+            sfm_pose = [pos, quat]
+
+            img_times.append(t)
+            ins_poses.append(pose)
+            img_fnames.append(image.name)
+            sfm_poses.append(sfm_pose)
+            llhs.append(llh)
+            points = []
+            # associate all the 2D and 3D points seen by this image
+            for pt in image.points2D:
+                if pt.has_point3D():
+                    point_2d = pt.xy
+                    uncertainty = self.R.points3D[pt.point3D_id].error
+                    point_3d = self.R.points3D[pt.point3D_id].xyz
+                    visible = True
+                    vpt = VisiblePoint(point_3d, point_2d, uncertainty, t, visible)
+                    points.append(vpt)
+            points_per_image.append(points)
+            camera_name = os.path.basename(os.path.dirname(image.name))
+            if camera_name in best_cameras:
+                if image.num_points3D > most_points[camera_name]:
+                    best_cameras[camera_name] = image.camera
+                    most_points[camera_name] = image.num_points3D
+            else:
+                best_cameras[camera_name] = image.camera
+                most_points[camera_name] = image.num_points3D
+
+        # sort all entries
+        ind = np.argsort(img_fnames)
+        img_fnames = [img_fnames[i] for i in ind]
+        img_times = [img_times[i] for i in ind]
+        ins_poses = [ins_poses[i] for i in ind]
+        sfm_poses = [sfm_poses[i] for i in ind]
+        points_per_image = [points_per_image[i] for i in ind]
+        llhs = [llhs[i] for i in ind]
+
+        fname_to_time_channel_modality = self.create_fname_to_time_channel_modality(
+            img_fnames, basename_to_time
+        )
+
+        ccd = ColmapCalibrationData(
+            sfm_poses=sfm_poses,
+            ins_poses=ins_poses,
+            img_fnames=img_fnames,
+            img_times=img_times,
+            llhs=llhs,
+            points_per_image=points_per_image,
+            basename_to_time=basename_to_time,
+            fname_to_time_channel_modality=fname_to_time_channel_modality,
+            best_cameras=best_cameras,
+        )
+        self.ccd = ccd
+        return ccd
+
+    def calibrate_camera(
+        self, camera_name: str, error_threshold: float
+    ) -> StandardCamera:
+        sfm_quats = np.array([pose[1] for pose in self.ccd.sfm_poses])
+        ins_quats = np.array([pose[1] for pose in self.ccd.ins_poses])
+        # Find all valid indices of current camera
+        cam_idxs = [
+            1 if camera_name == os.path.basename(os.path.dirname(im)) else 0
+            for im in self.ccd.img_fnames
+        ]
+        print(f"Number of images in camera {camera_name}.")
+        print(np.sum(cam_idxs))
+        observations = [
+            pts for i, pts in enumerate(self.ccd.points_per_image) if cam_idxs[i] == 1
+        ]
+        cam_sfm_quats = [q for i, q in enumerate(sfm_quats) if cam_idxs[i] == 1]
+        cam_ins_quats = [q for i, q in enumerate(ins_quats) if cam_idxs[i] == 1]
+        if len(observations) < 10:
+            print(f"Only {len(observations)} seen for camera {camera_name}, skipping.")
+        cam = self.ccd.best_cameras[camera_name]
+        camera_model = iterative_alignment(
+            cam_sfm_quats, cam_ins_quats, observations, cam, self.nav_state_provider
+        )
+        # best_rotation = weighted_horn_alignment_partial(
+        #    observations,
+        #    cam_sfm_quats,
+        #    cam_ins_quats,
+        #    min_points_per_image=10,
+        #    ransac_iters=100,
+        #    error_threshold=error_threshold,
+        # )
+        # analyze_rotation_estimate(best_rotation)
+        # best_quat = best_rotation.quaternion
+        # K = cam.calibration_matrix()
+        # if cam.model.name == "OPENCV":
+        #    fx, fy, cx, cy, d1, d2, d3, d4 = cam.params
+        # elif cam.model.name == "SIMPLE_RADIAL":
+        #    d1 = d2 = d3 = d4 = 0
+        # elif cam.model.name == "PINHOLE":
+        #    d1 = d2 = d3 = d4 = 0
+        # else:
+        #    raise SystemError(f"Unexpected camera model found: {cam.model.name}")
+
+        # dist = np.array([d1, d2, d3, d4])
+        # camera_model = StandardCamera(
+        #    cam.width,
+        #    cam.height,
+        #    K,
+        #    dist,
+        #    [0, 0, 0],
+        #    best_quat,
+        #    platform_pose_provider=self.nav_state_provider,
+        # )
+
+        return camera_model
+
+    def create_fname_to_time_channel_modality(
+        self, img_fnames, basename_to_time
+    ) -> Dict[float, Dict[str, str]]:
+        print("Creating mapping between RGB and UV images...")
+        time_to_modality = ub.AutoDict()
+        for fname in img_fnames:
+            base_name = self.get_base_name(fname)
+            try:
+                t = basename_to_time[base_name]
+            except Exception as e:
+                print(e)
+                print(f"No ins time found for image {base_name}.")
+                continue
+            modality = self.get_modality(fname)
+            channel = self.get_channel(fname)
+            time_to_modality[t][channel][modality] = fname
+        return time_to_modality
+
+    def write_gifs(
+        self,
+        gif_dir: str | os.PathLike,
+        colmap_dir: str | os.PathLike,
+        rgb_str: str,
+        camera_str: str,
+        cm_rgb: StandardCamera,
+        cm_uv: StandardCamera,
+    ) -> None:
+        print(f"Writing a registration gif for cameras {rgb_str} " f"and {camera_str}.")
+        # Pick an image pair and register.
+        ub.ensuredir(gif_dir)
+
+        img_fnames = self.ccd.img_fnames
+        for k in range(10):
+            inds = list(range(len(img_fnames)))
+            np.random.shuffle(inds)
+            for i in range(len(img_fnames)):
+                uv_img = rgb_img = None
+                fname1 = img_fnames[inds[i]]
+                if osp.basename(osp.dirname(fname1)) != rgb_str:
+                    continue
+                t1 = self.ccd.basename_to_time[self.get_base_name(fname1)]
+                channel = self.get_channel(fname1)  # L/C/R
+                try:
+                    rgb_fname = self.ccd.fname_to_time_channel_modality[t1][channel][
+                        "rgb"
+                    ]
+                    abs_rgb_fname = os.path.join(colmap_dir, "images0", rgb_fname)
+                    rgb_img = cv2.imread(abs_rgb_fname, cv2.IMREAD_COLOR)[:, :, ::-1]
+                except Exception as e:
+                    print(f"No rgb image found at time {t1}")
+                    continue
+                try:
+                    uv_fname = self.ccd.fname_to_time_channel_modality[t1][channel][
+                        "uv"
+                    ]
+                    abs_uv_fname = os.path.join(colmap_dir, "images0", uv_fname)
+                    uv_img = cv2.imread(abs_uv_fname, cv2.IMREAD_COLOR)[:, :, ::-1]
+                    break
+                except Exception as e:
+                    print(f"No uv image found at time {t1}")
+                    continue
+
+            if uv_img is None or rgb_img is None:
+                print("Failed to find matching image pair, skipping.")
+                continue
+            print(f"Writing {rgb_fname} and {uv_fname} to gif.")
+
+            # Warps the color image img1 into the uv camera model cm_uv
+            warped_rgb_img, mask = render_view(
+                cm_rgb, rgb_img, 0, cm_uv, 0, block_size=10
+            )
+
+            ds_warped_rgb_img = PIL.Image.fromarray(
+                cv2.pyrDown(cv2.pyrDown(cv2.pyrDown(warped_rgb_img)))
+            )
+            ds_uv_img = PIL.Image.fromarray(
+                cv2.pyrDown(cv2.pyrDown(cv2.pyrDown(uv_img)))
+            )
+            fname_out = osp.join(
+                gif_dir, f"{rgb_str}_to_{camera_str}_registration_{k}.gif"
+            )
+            print(f"Writing gif to {fname_out}.")
+            ds_uv_img.save(
+                fname_out,
+                save_all=True,
+                append_images=[ds_warped_rgb_img],
+                duration=350,
+                loop=0,
+            )
+
+    def align_model(self, output_dir: str | os.PathLike) -> None:
+        img_fnames = [im.name for im in self.R.images().values()]
+        points = []
+        ins_poses = []
+        for image_name in img_fnames:
+            base_name = self.get_base_name(image_name)
+            t = self.basename_to_time[base_name]
+            # Query the navigation state recorded by the INS for this time.
+            pose = self.nav_state_provider.pose(t)
+            ins_poses.append(pose)
+            x, y, z = pose[0]
+            points.append([x, y, z])
+        points = np.array(points)
+        locations_txt = os.path.join(output_dir, "image_locations.txt")
+        self.write_image_locations(locations_txt, img_fnames, ins_poses)
+        print(
+            f"Aligning model given {len(img_fnames)} images and their ENU coordinates."
+        )
+        ransac_options = pc.RANSACOptions(
+            max_error=4.0,  # for example, the reprojection error in pixels
+            min_inlier_ratio=0.01,
+            confidence=0.9999,
+            min_num_trials=1000,
+            max_num_trials=100000,
+        )
+        min_common_observations = 5
+        tform = pc.align_reconstruction_to_locations(
+            self.R, img_fnames, points, min_common_observations, ransac_options
+        )
+        print("Transformation after alignment: ")
+        print(tform.scale, tform.rotation, tform.translation)
+        # Apply transform to self
+        self.R.transform(tform)
+        print(f"Saving aligned model to {output_dir}...")
+        self.R.write(output_dir)
+
+    def read_image_locations(
+        self, fname: str | os.PathLike
+    ) -> Tuple[List[str], np.ndarray]:
+        with open(fname, "r") as f:
+            lines = f.readlines()
+        points = []
+        image_fnames = []
+        for line in lines:
+            # Pull x,y,z out in ENU
+            try:
+                img_fname, x, y, z = line.split(" ")
+            except Exception as e:
+                print(e)
+                print("Skipping location line.")
+                continue
+            image_fnames.append(img_fname.strip())
+            points.append((float(x), float(y), float(z)))
+        points = np.array(points)
+
+    def write_image_locations(
+        self,
+        locations_fname: str | os.PathLike,
+        img_fnames: List[str],
+        ins_poses: List[np.ndarray],
+    ) -> None:
+        print(f"Writing image locations to {locations_fname}")
+        img_fnames = sorted(img_fnames)
+        with open(locations_fname, "w") as fo:
+            for i in range(len(img_fnames)):
+                name = img_fnames[i]
+                pos = ins_poses[i][0]
+                fo.write("%s %0.8f %0.8f %0.8f\n" % (name, pos[0], pos[1], pos[2]))
+
+    def calibrate_ir(self):
+        pass
+
+
+def find_best_sparse_model(sparse_dir: str | os.PathLike):
+    if os.listdir(sparse_dir) == 0:
+        raise SystemError(
+            f"Sparse directory given ({sparse_dir}) is empty, please verify your model built correctly."
+        )
+    all_models = sorted(os.listdir(sparse_dir))
+    print(f"All Models: {all_models}")
+    best_model = ""
+    most_images_aligned = 0
+    for subdir in all_models:
+        R = pc.Reconstruction(subdir)
+        num_images = len(R.images.keys())
+        print(f"Number of images in {subdir}: {num_images}")
+        if num_images > most_images_aligned:
+            best_model = subdir
+    print(f"Selecting {subdir} as the best model.")
+    return best_model
+
+
+def main():
+    flight_dir = "/home/local/KHQ/adam.romlein/noaa/data/2024_AOC_AK_Calibration/fl09"
+    colmap_dir = (
+        "/home/local/KHQ/adam.romlein/noaa/data/2024_AOC_AK_Calibration/fl09/colmap_ir"
+    )
+    cc = ColmapCalibration(flight_dir, colmap_dir)
+    cc.calibrate_ir()
+
+
+if __name__ == "__main__":
+    main()
