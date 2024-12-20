@@ -46,5 +46,5 @@ def main():
     utilities.create_flight_summary(flight_dir, output_dir)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
