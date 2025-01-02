@@ -511,6 +511,9 @@ def iterative_alignment(
 
         err = []
 
+        # Update uncertainty based on errors
+        max_uncertainty = np.inf
+        num_skipped = 0
         # check quaternion alignment over all images
         for pts in points_per_image:
             xys = []
@@ -518,11 +521,15 @@ def iterative_alignment(
             # uncertainties = []
             # time is the same for all points
             t = pts[0].time
-            max_uncertainty = 1
             for pt in pts:
                 if pt.uncertainty < max_uncertainty:
                     xys.append(pt.point_2d)
                     xyzs.append(pt.point_3d)
+                else:
+                    num_skipped += 1
+            if num_skipped > 1:
+                print(f"NUMBER of pts skipped: {num_skipped:.3f}")
+                    
             xys = np.array(xys)
             xyzs = np.array(xyzs)
             # Error in meters.
@@ -543,6 +550,9 @@ def iterative_alignment(
             err_ = np.sin(theta) * d
             # err.append(np.percentile(err_, 90))
             err.append(np.median(err_))
+
+            # Eliminate points 10x the distance away from median
+            max_uncertainty = np.median(err) * 10
 
         # print("Average uncertainty: ")
         # print(np.mean(uncertainties))
