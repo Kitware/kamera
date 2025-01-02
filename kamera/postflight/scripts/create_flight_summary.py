@@ -1,79 +1,50 @@
 #!/usr/bin/env python
-"""
-ckwg +31
-Copyright 2019 by Kitware, Inc.
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
- * Redistributions of source code must retain the above copyright notice,
-   this list of conditions and the following disclaimer.
-
- * Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
- * Neither name of Kitware, Inc. nor the names of any contributors may be used
-   to endorse or promote products derived from this software without specific
-   prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS''
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-==============================================================================
-
-Library handling projection operations of a standard camera model.
-
-"""
 from __future__ import division, print_function
 import argparse
-import json
-import numpy as np
-import matplotlib.pyplot as plt
-from numpy import pi
-from mpl_toolkits.mplot3d import Axes3D
-from scipy.optimize import minimize
+import os
+import pathlib
 
 # Custom package imports.
-from sensor_models import (
-        quaternion_multiply,
-        quaternion_from_matrix,
-        quaternion_from_euler,
-        quaternion_slerp,
-        quaternion_inverse,
-        quaternion_matrix
-        )
-from postflight_scripts import utilities
+from kamera.postflight import utilities
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Convert all images from a '
-                                     'flight into GeoTIFF.')
-    parser.add_argument("flight_dir", help='Flight directory containing '
-                        'subdirectories \'LEFT\', \'CENT\', and \'RIGHT\', '
-                        'each containing imagery and meta.json files.',
-                        type=str)
-    parser.add_argument('-output_dir', help='Output directory (defaults to '
-                        '\'geotiffs\' inside the flight directory.).',
-                        type=str, default=None)
+    parser = argparse.ArgumentParser(
+        description="Convert all images from a " "flight into shapefiles."
+    )
+    parser.add_argument(
+        "-flight_dir",
+        help="Flight directory containing "
+        "subdirectories 'left_view', 'center_view', and 'right_view', "
+        "each containing imagery and meta.json files. Defaults to None.",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "-output_dir",
+        help="Output directory (defaults to 'processed_results'.).",
+        type=str,
+        default=None,
+    )
 
     args = parser.parse_args()
 
-    utilities.create_flight_summary(args.flight_dir, args.output_dir)
+    flight_dir = args.flight_dir
+    output_dir = args.output_dir
+
+    # uncomment these if you wish to skip the argument assigment
+    # flight_dir = '/example_flight_dir'
+    # output_dir = '/example_output_dir'
+
+    if not output_dir:
+      base_dir = pathlib.Path(flight_dir).parents[0]
+      output_dir = os.path.join(base_dir, "processed_results")
+
+    if not flight_dir:
+      raise SystemError("No flight dir specified! Please pass one as an argument or hardcode one in the file.")
+
+    utilities.create_flight_summary(flight_dir, output_dir)
 
 
 if __name__ == '__main__':
     main()
-
-
-#flight_dir = '/host_filesystem/media/mattb/7e7167ba-ad6f-4720-9ced-b699f49ba3aa/kamera/calibration_2019/03'
-#create_all_geotiff(flight_dir)

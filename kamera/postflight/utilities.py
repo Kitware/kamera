@@ -1,44 +1,7 @@
 #!/usr/bin/env python3
-"""
-ckwg +31
-Copyright 2021 by Kitware, Inc.
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
- * Redistributions of source code must retain the above copyright notice,
-   this list of conditions and the following disclaimer.
-
- * Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
- * Neither name of Kitware, Inc. nor the names of any contributors may be used
-   to endorse or promote products derived from this software without specific
-   prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS''
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-==============================================================================
-
-Library handling projection operations of a standard camera model.
-
-"""
-from __future__ import division, print_function
 import os
 from errno import EEXIST
 import sys
-from typing import Callable, Any, Dict, Tuple
 import json
 import time
 import glob
@@ -855,17 +818,6 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
             # Make a 3x3 affine homography.
             h = np.vstack([h, [0, 0, 1]])
 
-        if False:
-            plt.figure()
-            plt.subplot('211')
-            plt.imshow(img0, cmap='gray', interpolation='none')
-            plt.plot(pts0.T[0], pts0.T[1], 'ro')
-            plt.title(str(i - 1), fontsize=18)
-            plt.subplot('212')
-            plt.imshow(img1, cmap='gray', interpolation='none')
-            plt.plot(pts1.T[0], pts1.T[1], 'bo')
-            plt.title(str(i), fontsize=18)
-
         if save_viz_gif:
             dir_out = ('%s/refined_registration_viz' %
                        '/'.join(fname_out.split('/')[:-3]))
@@ -1217,11 +1169,6 @@ def save_geotiff(img, camera_model, frame_time, geotiff_fname,
         T[:2, 2] = center
         A = np.dot(T, A)[:2]
 
-        if False:
-            corner_ll2 = np.dot(A, np.vstack([im_pts.T, [1, 1, 1, 1]])).T
-            plt.plot(corner_ll.T[0], corner_ll.T[1])
-            plt.plot(corner_ll2.T[0], corner_ll2.T[1])
-
     # Xp = padfTransform[0] + P*padfTransform[1] + L*padfTransform[2]
     # Yp = padfTransform[3] + P*padfTransform[4] + L*padfTransform[5]
     geotrans = [A[0, 2], A[0, 0], A[0, 1], A[1, 2], A[1, 0], A[1, 1]]
@@ -1427,6 +1374,62 @@ def create_all_geotiff(flight_dir, output_dir=None, quality=75,
         for thread in threads:
             if thread.is_alive():
                 any_alive = True
+            
+def get_review_fate(nav_state_provider: NavStateINSJson,
+                    basename_to_time: dict[str, float],
+                    sets_detector_processed: set[str],
+                    sets_with_detections: set[str],
+                    image_name: str | os.PathLike,
+                    ) -> tuple[str, str]:
+    base_name = get_base(image_name)
+    t = basename_to_time[base_name]
+    try:
+        nth = nav_state_provider.save_nth_per_t[t]
+    except KeyError:
+       print(f"Could not find 'save_every_x_image' for time {t}.") 
+       nth = 1
+
+    seq = nav_state_provider.time_to_seq[t]
+
+    if base_name in sets_detector_processed:
+        reviewed = "True"
+        if base_name in sets_with_detections:
+            if os.stat(image_name).st_size == 0:
+                print("ERROR: Image with detections was discarded.")
+                fate = "ERR_img_with_detections_discarded"
+            elif seq % nth == 0:
+                # Make sure we assign it via nth first, even if it has detections
+                fate = "collected_via_nth"
+            else:
+                fate = "collected_via_detections"
+        else:
+            if os.stat(image_name).st_size == 0:
+                fate = "discarded"
+            else:
+                fate = "collected_via_nth"
+    else:
+        reviewed = "False"
+        if os.stat(image_name).st_size == 0:
+            fate = "ERR_img_not_reviewed_discarded"
+        else:
+            fate = "collected"
+    return reviewed, fate
+
+
+def get_basename_to_time(flight_dir) -> dict:
+    # Establish correspondence between real-world exposure times base of file
+    # names.
+    basename_to_time = {}
+    for json_fname in pathlib.Path(flight_dir).rglob('*_meta.json'):
+        try:
+            with open(json_fname) as json_file:
+                d = json.load(json_file)
+                # Time that the image was taken.
+                basename = get_base(json_fname)
+                basename_to_time[basename] = float(d['evt']['time'])
+        except (OSError, IOError):
+            pass
+    return basename_to_time
 
 
 def create_flight_summary(flight_dir, save_shapefile_per_image=False):
@@ -1479,6 +1482,8 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
     sets_detector_processed = set(sets_detector_processed)
     print("Number of sets of images detected on: %s" % len(sets_detector_processed))
 
+    basename_to_time = get_basename_to_time(flight_dir=flight_dir)
+
     det_csvs = glob.glob(os.path.join(flight_dir, 'detections', '*.csv'))
     sets_with_detections = []
     for f in det_csvs:
@@ -1489,6 +1494,13 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
             sets_with_detections += files
     sets_with_detections = set(sets_with_detections)
     print("Number of sets with detections: %s" % len(sets_with_detections))
+    
+    json_glob = pathlib.Path(flight_dir).rglob('*_meta.json')
+    try:
+        next(json_glob)
+    except StopIteration:
+        raise SystemExit("No meta jsons were found, please check your filepaths.")
+    nav_state_provider = NavStateINSJson(json_glob)
 
     fn_glob = os.path.join(flight_dir, '*/*/*meta.json')
     count = 0
@@ -1746,27 +1758,11 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
             w.field('fate', 'C', size=255)
 
             for i in range(len(shp_shapes)):
+                image_name = shp_shapes_fnames[i]
+                reviewed, fate = get_review_fate(nav_state_provider, basename_to_time,
+                                                    sets_detector_processed, sets_with_detections,
+                                                    image_name)
                 try:
-                    image_name = shp_shapes_fnames[i]
-                    base = get_base(image_name)
-                    # Add logic for checking if image was detected / collected
-                    if base in sets_detector_processed:
-                        reviewed = "True"
-                        if base in sets_with_detections:
-                            if os.stat(image_name).st_size == 0:
-                                print("ERROR: Image with detections was discarded.")
-                                fate = "incorrectly_discarded"
-                            else:
-                                fate = "collected_via_detections"
-                        else:
-                            if os.stat(image_name).st_size == 0:
-                                fate = "discarded"
-                            else:
-                                fate = "collected_via_nth"
-                    else:
-                        reviewed = "False"
-                        fate = "collected"
-
                     w.poly([shp_shapes[i]])
                     tmp = aircraft_state[shp_shapes_fnames[i]]
                     frame_time, lat, lon, h, heading, pitch, roll = tmp
@@ -1812,29 +1808,10 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
                     w.poly([shp_shapes[i]])
 
                     image_name = shp_shapes_fnames[i]
-                    base = get_base(image_name)
-                    # Add logic for checking if image was detected / collected
-                    if base in sets_detector_processed:
-                        reviewed = "True"
-                        if base in sets_with_detections:
-                            if os.stat(image_name).st_size == 0:
-                                print("ERROR: Image with detections was discarded.")
-                                fate = "incorrectly_discarded"
-                            else:
-                                fate = "collected_via_detections"
-                        else:
-                            if os.stat(image_name).st_size == 0:
-                                fate = "discarded"
-                            else:
-                                fate = "collected_via_nth"
-                    else:
-                        reviewed = "False"
-                        fate = "collected"
-                    if os.stat(image_name).st_size == 0:
-                        fate = "discarded"
-                    else:
-                        fate = "collected"
-
+                    reviewed, fate = get_review_fate(nav_state_provider, basename_to_time,
+                                                     sets_detector_processed,
+                                                     sets_with_detections,
+                                                     image_name)
 
                     tmp = aircraft_state[shp_shapes_fnames[i]]
                     frame_time, lat, lon, h, heading, pitch, roll = tmp
@@ -2215,11 +2192,6 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
             dy = llh_to_enu(lon_lats[1, 2], lon_lats[0, 2], 0,
                             lon_lats[1, 0], lon_lats[0, 0], 0)
             dy = np.linalg.norm(dy)
-
-            if False:
-                lonlat_bbox
-                plt.plot(lon_lats[0], lon_lats[1])
-                plt.plot(lonlat_bbox[:, 0], lonlat_bbox[:, 1])
 
             # Calculate the diagonal of the bounding box in meters
             dxy = (np.diff(image_bbox, axis=0)*np.array([dx, dy])).ravel()
