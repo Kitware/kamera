@@ -1148,9 +1148,9 @@ int main(int argc, char **argv) {
         tellFeatureValue(camera_handle, "CorrectionAutoDeltaTemp");
         tellFeatureValue(camera_handle, "CorrectionAutoDeltaTime");
 
-        tellFeatureValue(camera_handle, "CorrectionAutoInProgress");
-        tryNuc(cam_node_map_ptr);
-        tellFeatureValue(camera_handle, "CorrectionAutoInProgress");
+        //tellfeaturevalue(camera_handle, "correctionautoinprogress");
+        //trynuc(cam_node_map_ptr);
+        //tellfeaturevalue(camera_handle, "correctionautoinprogress");
 
 
     } // cam pointer stuff
