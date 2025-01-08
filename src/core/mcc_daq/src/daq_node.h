@@ -8,6 +8,7 @@
 #include <std_msgs/Bool.h>
 #include <std_msgs/Float64.h>
 
+#include <roskv/envoy.h>
 #include <custom_msgs/SetTriggerRate.h>
 #include <custom_msgs/GSOF_EVT.h>
 
@@ -106,6 +107,7 @@ private:
     ros::Duration      min_period_        = ros::Duration(0.1); /// minimum time between triggers
     ros::Duration      max_period_        = ros::Duration(10.0); /// minimum time between triggers
     int                spoof_events_      = 0;
+    std::shared_ptr<RedisEnvoy> envoy_;
     int                flippy             = 0;
 
     ros::TimerCallback callback{cb_print};
@@ -115,7 +117,7 @@ public:
 
     AsyncTriggerTimer(ros::NodeHandlePtr nhp, ros::Duration period,
                       ros::Duration min_period, ros::Duration max_period,
-                      int spoof_events);
+                      int spoof_events, std::shared_ptr<RedisEnvoy> envoy);
     AsyncTriggerTimer(ros::NodeHandlePtr nhp, ros::Duration period);
     bool is_running();
 

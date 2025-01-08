@@ -42,6 +42,39 @@ std::string to_string(ros::Rate const &);
 int64_t to_nano64(ros::Duration const &);
 
 
+
+/** ===================  helper func ============================== */
+double get_redis_double(std::shared_ptr<RedisEnvoy> envoy, const std::string &key) {
+        std::string tmp = envoy->get(key);
+        json::json tmpj = json::json::parse(tmp);
+        if (!tmpj.is_primitive() || tmpj.is_null()) {
+            throw std::invalid_argument("Redis Key " + key + " must exist and be of primitive type");
+        }
+        if (tmpj.is_number_integer()) {
+            return (double) tmpj.front();
+        } else if (tmpj.is_number_float()) {
+            return (double) tmpj.front();
+        }
+        throw std::invalid_argument("Redis Key " + key + " is invalid type");
+    }
+
+int get_redis_int(std::shared_ptr<RedisEnvoy> envoy, const std::string &key) {
+        std::string tmp = envoy->get(key);
+        json::json tmpj = json::json::parse(tmp);
+        if (!tmpj.is_primitive() || tmpj.is_null()) {
+            throw std::invalid_argument("Redis Key " + key + " must exist and be of primitive type");
+        }
+        if (tmpj.is_number_integer()) {
+            return (int) tmpj.front();
+        } else if (tmpj.is_boolean()) {
+            bool b = tmpj.front();
+            return (int) b;
+        } else if (tmpj.is_number_float()) {
+            double x = tmpj.front();
+            return x != 0;
+        }
+        throw std::invalid_argument("Redis Key " + key + " is invalid type");
+}
 /// Determine if a number is a "simple fraction". A simple fraction is one that is either a whole number or a
 /// fraction with a small denominator. This ensures that pulses only edge-align if there is a clean, round modulus.
 /// This is primarily for debugging and should be reduced to 1/1 ratio in production.
@@ -248,10 +281,9 @@ boost::uuids::uuid OneShotManager::addOneShot(ros::NodeHandlePtr nhp,
 
 AsyncTriggerTimer::AsyncTriggerTimer(ros::NodeHandlePtr nhp, ros::Duration period,
                                      ros::Duration min_period, ros::Duration max_period,
-                                     int spoof_events)
-: nhp{nhp}, period_{period}, min_period_{min_period}, max_period_{max_period}, spoof_events_{spoof_events}{
-    if (spoof_events == 1)
-        spoof_evt_pub  = nhp->advertise<custom_msgs::GSOF_EVT> ("/event", 1);
+                                     int spoof_events, std::shared_ptr<RedisEnvoy> envoy)
+: nhp{nhp}, period_{period}, min_period_{min_period}, max_period_{max_period}, spoof_events_{spoof_events}, envoy_{envoy}{
+      spoof_evt_pub  = nhp->advertise<custom_msgs::GSOF_EVT> ("/event", 1);
 }
 AsyncTriggerTimer::AsyncTriggerTimer(ros::NodeHandlePtr nhp, ros::Duration period)
 : nhp{nhp}, period_{period} {}
@@ -295,6 +327,7 @@ void AsyncTriggerTimer::call() {
 void AsyncTriggerTimer::call(const ros::TimerEvent &e) {
     auto now = ros::Time::now();
     ROS_INFO("! AdjT RealDT( %lf )", (now - last_call).toSec());
+    spoof_events_ = get_redis_int(envoy_, "/debug/spoof_events");
     if (spoof_events_ == 1) {
         // We're going to spoof a GSOF_EVT, so we don't depend on the
         // INS always having a good sync to test the system
@@ -355,39 +388,6 @@ bool DaqWrapper::readPin(custom_msgs::ReadPinRequest &req,
     ROS_INFO("Starting to read on pin %d", req.pin);
     rsp.value = usbDaq.voltageRead((uint8_t) req.pin, BP_10V);
     return true;
-}
-
-/** ===================  helper func ============================== */
-double get_redis_double(std::shared_ptr<RedisEnvoy> envoy, const std::string &key) {
-        std::string tmp = envoy->get(key);
-        json::json tmpj = json::json::parse(tmp);
-        if (!tmpj.is_primitive() || tmpj.is_null()) {
-            throw std::invalid_argument("Redis Key " + key + " must exist and be of primitive type");
-        }
-        if (tmpj.is_number_integer()) {
-            return (double) tmpj.front();
-        } else if (tmpj.is_number_float()) {
-            return (double) tmpj.front();
-        }
-        throw std::invalid_argument("Redis Key " + key + " is invalid type");
-    }
-
-int get_redis_int(std::shared_ptr<RedisEnvoy> envoy, const std::string &key) {
-        std::string tmp = envoy->get(key);
-        json::json tmpj = json::json::parse(tmp);
-        if (!tmpj.is_primitive() || tmpj.is_null()) {
-            throw std::invalid_argument("Redis Key " + key + " must exist and be of primitive type");
-        }
-        if (tmpj.is_number_integer()) {
-            return (int) tmpj.front();
-        } else if (tmpj.is_boolean()) {
-            bool b = tmpj.front();
-            return (int) b;
-        } else if (tmpj.is_number_float()) {
-            double x = tmpj.front();
-            return x != 0;
-        }
-        throw std::invalid_argument("Redis Key " + key + " is invalid type");
 }
 
 /** ===================  main ============================== */
@@ -462,7 +462,8 @@ int main(int argc, char** argv) {
                                         ros::Duration(1.0),
                                         ros::Duration(min_period),
                                         ros::Duration(max_period),
-                                        spoof_events);
+                                        spoof_events,
+                                        envoy_);
     DaqWrapper daqWrapper = DaqWrapper(node, *daq);
     daq->init();
     daq->digitalPulse();

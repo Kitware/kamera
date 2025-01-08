@@ -243,6 +243,18 @@ class AvxClient(object):
                         rospy.logwarn("WARNING: Not publishing events because /debug/spoof_events is true.")
                         # let the spoofer handle it
                         continue
+                    elif isinstance(d, GsofInsDispatch):
+                        if d.msg.gnss_status == 0 and not spoof_events:
+                            # we don't have a fix and we're not spoofing, fall back to spoofing events
+                            print("We don't have a fix, turning on spoofing.")
+                            rc.set("/debug/spoof_events", 1)
+                            spoof_events = 1
+                        elif d.msg.gnss_status != 0 and spoof_events:
+                            # we do have a fix and are spoofing, stop spoofing
+                            print("We have a fix, stopping spoofing.")
+                            rc.set("/debug/spoof_events", 0)
+                            spoof_events = 0
+
                     d.publish()
 #                    dumpbuf(self.archiver.get_raw_ins_path(field=d.label), d.buf)
 

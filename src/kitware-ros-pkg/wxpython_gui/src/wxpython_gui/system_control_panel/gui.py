@@ -150,14 +150,14 @@ P1_EXPOSURE_STOPS = [
     2.0,
     2.5,
     3.125,
-    4.,
-    5.,
+    4.0,
+    5.0,
     6.25,
-    8.,
-    10.,
+    8.0,
+    10,
     12.5,
     16.7,
-    20.,
+    20,
     25,
     33.3,
     40,
@@ -1583,7 +1583,8 @@ class MainFrame(form_builder_output.MainFrame):
         :type msg: POSAVX
 
         """
-        if msg.header.stamp.to_sec() - self.last_ins_time < 0.2:
+        # Throttle to 10hz
+        if msg.header.stamp.to_sec() - self.last_ins_time < 0.1:
             return
         self.last_ins_time = msg.header.stamp.to_sec()
         wx.CallAfter(self.ins_state, msg)
@@ -1656,10 +1657,14 @@ class MainFrame(form_builder_output.MainFrame):
         if self._spoof_gps:
             self.ins_control_panel.SetBackgroundColour(WARN_AMBER)
             self.gnss_status_flag_txtctrl.SetValue("gps spoofed!")
+        self._spoof_events = int(kv.get("/debug/spoof_events", 0))
         if self._spoof_events == 1:
             self.ins_control_panel.SetBackgroundColour(WARN_AMBER)
             self.gnss_status_flag_txtctrl.SetValue("events spoofed!")
-        elif msg.gnss_status == 0:
+            return
+        else:
+            self.ins_control_panel.SetBackgroundColour(APP_GRAY)
+        if msg.gnss_status == 0:
             self.gnss_status_flag_txtctrl.SetValue("gps only")
         elif msg.gnss_status == 1:
             self.gnss_status_flag_txtctrl.SetValue("SPS Mode")
