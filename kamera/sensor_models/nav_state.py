@@ -259,6 +259,8 @@ class NavStateINSJson(NavStateINSBinary):
         self._ins_nav_times = []
         self._ins_ypr = []
         self._ins_llh = []
+        self.time_to_save_every_x_image = {}
+        self.time_to_seq = {}
         json_counter = 0
         for fname in json_paths:
             with open(fname) as json_file:
@@ -270,7 +272,8 @@ class NavStateINSJson(NavStateINSBinary):
 
                 if d['ins']['time'] in nav_pose_dict:
                     continue
-                self._ins_nav_times.append(d['ins']['time'])
+                time = d['ins']['time']
+                self._ins_nav_times.append(time)
                 self._ins_ypr.append([d['ins']['heading'],
                                       d['ins']['pitch'],
                                       d['ins']['roll']])
@@ -285,12 +288,19 @@ class NavStateINSJson(NavStateINSBinary):
                                              axes='rzyx')
                 quat = ned_quat_to_enu_quat(quat)
 
-                nav_pose_dict[d['ins']['time']] = [d['ins']['time'],
-                                                   d['ins']['latitude'],
-                                                   d['ins']['longitude'],
-                                                   d['ins']['altitude'],
-                                                   quat[0], quat[1], quat[2],
-                                                   quat[3]]
+                nav_pose_dict[time] = [d['ins']['time'],
+                                       d['ins']['latitude'],
+                                       d['ins']['longitude'],
+                                       d['ins']['altitude'],
+                                       quat[0], quat[1], quat[2],
+                                       quat[3]]
+
+                try:
+                    save_every_x_image = float(d['save_every_x_image'])
+                except KeyError:
+                    save_every_x_image = 1.0
+                self.time_to_save_every_x_image[time] = save_every_x_image                
+                self.time_to_seq[time] = int(d["evt"]["header"]["seq"])
 
                 frame_times.append(d['evt']['time'])
                 json_counter += 1
