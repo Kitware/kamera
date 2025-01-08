@@ -1374,7 +1374,7 @@ def create_all_geotiff(flight_dir, output_dir=None, quality=75,
         for thread in threads:
             if thread.is_alive():
                 any_alive = True
-            
+
 def get_review_fate(nav_state_provider: NavStateINSJson,
                     basename_to_time: dict[str, float],
                     sets_detector_processed: set[str],
@@ -1386,7 +1386,7 @@ def get_review_fate(nav_state_provider: NavStateINSJson,
     try:
         nth = nav_state_provider.save_nth_per_t[t]
     except KeyError:
-       print(f"Could not find 'save_every_x_image' for time {t}.") 
+       print(f"Could not find 'save_every_x_image' for time {t}.")
        nth = 1
 
     seq = nav_state_provider.time_to_seq[t]
@@ -1404,7 +1404,10 @@ def get_review_fate(nav_state_provider: NavStateINSJson,
                 fate = "collected_via_detections"
         else:
             if os.stat(image_name).st_size == 0:
-                fate = "discarded"
+                if seq % nth == 0:
+                    fate = "ERR_img_on_nth_discarded"
+                else:
+                    fate = "discarded"
             else:
                 fate = "collected_via_nth"
     else:
@@ -1494,7 +1497,7 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
             sets_with_detections += files
     sets_with_detections = set(sets_with_detections)
     print("Number of sets with detections: %s" % len(sets_with_detections))
-    
+
     json_glob = pathlib.Path(flight_dir).rglob('*_meta.json')
     try:
         next(json_glob)
