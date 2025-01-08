@@ -135,6 +135,9 @@ P1_GAIN_MAX_PARAM = "ISO_Max"
 P1_EXPOSURE_MAX_PARAM = "Shutter_Speed_Min"
 P1_EXPOSURE_MIN_PARAM = "Shutter_Speed_Max"
 P1_EXPOSURE_STOPS = [
+    0.0625,
+    0.125,
+    0.2,
     0.25,
     0.3125,
     0.4,
