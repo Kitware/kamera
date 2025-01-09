@@ -52,3 +52,7 @@ export COMPRESS_IMAGERY=0
 # Sets the compression used on the phase on imagery
 # Best to keep within 80-100 for optimal quality
 export JPEG_QUALITY=85
+
+# This is now overwritten by the INS, depending if it has a lock or not,
+# but leave here to initialize the state
+export SPOOF_EVENTS=0

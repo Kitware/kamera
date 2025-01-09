@@ -18,7 +18,7 @@ if SYSTEM_NAME == "taiga":
         f"{group}:cam_uv",
     ]
 else:
-    group = "cas"
+    group = "nayak"
     hosts = ["cas0", "cas1", "cas2"]
     pod = [
         "image_manager",
