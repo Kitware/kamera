@@ -130,6 +130,15 @@ class ArchiveManager(ArchiverBase):
                 filename = self.filename_from_msg(msg, mode)
                 pathdict.update({mode: filename})
                 metadata.update({mode: get_image_msg_meta(msg)})
+        # Add NUC information, if available
+        if "ir" in metadata:
+            nucing = "unknown"
+            if "nucing" in metadata["ir"]["header"]["frame_id"]:
+                nucing = (
+                    metadata["ir"]["header"]["frame_id"].split("?")[-1].split("=")[-1]
+                )
+            metadata["ir"]["is_nucing"] = nucing
+
         metadata["effort"] = self.effort
         metadata["collection_mode"] = self.collection_mode
         metadata["sys_cfg"] = self._sys_cfg

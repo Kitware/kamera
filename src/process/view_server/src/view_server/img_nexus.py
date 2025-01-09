@@ -797,8 +797,11 @@ class Nexus(object):
                     else:
                         msg = msg_dict.get(mode)
                         msg = coerce_message(msg, membridge)
+                    # hack to satisfy current file writing scheme
+                    temp_header = msg.header
                     msg.header = event.header
                     filename = self.archiver.filename_from_msg(msg, mode)
+                    msg.header = temp_header
                     setattr(outmsg, "image_" + mode, msg)
                     setattr(outmsg, "file_path_" + mode, filename)
 

@@ -723,10 +723,11 @@ public:
 class EventHandler {
 public:
     EventHandler(ros::NodeHandlePtr nhp, GEV_CAMERA_HANDLE camera_handle, CameraImageInfo cam_image_info,
-                 const boost::shared_ptr<NodeSettings> settings) :
+                 const boost::shared_ptr<NodeSettings> settings, std::shared_ptr<GenApiConnector> genapi) :
             nhp_{nhp},
             camera_handle{camera_handle}, cam_image_info{cam_image_info},
             settings{settings},
+            genapi_{genapi},
             xport{nhp, settings->output_topic_raw} {
         postprocSub = nhp->subscribe(settings->output_topic_raw, 10,
                                      &EventHandler::postProcessImage, this, ros::TransportHints().reliable());
@@ -812,6 +813,18 @@ public:
                                                                img_buff_obj_ptr->timestamp_lo);
             ROS_INFO2("Received image with ID %d (%d x %d) ", img_buff_obj_ptr->id, img_buff_obj_ptr->w, img_buff_obj_ptr->h );
 
+            // Check if we're NUCing, and flag as such
+            bool stat{false};
+            int feature_type;
+            std::string rsp;
+            try {
+                stat = genapi_->getCamAttr("CorrectionAutoInProgress", rsp, &feature_type);
+            }
+            catch (std::exception &e) {
+                rsp = "error:" + std::string(e.what());
+            }
+            ROS_INFO("<DRIVER GET> %s[%d]: %s.", "CorrectionAutoInProgress", feature_type, rsp.c_str());
+
 
             std::string msg;
             msg.resize(128);
@@ -826,6 +839,7 @@ public:
 //        cv_ptr->header.frame_id = this_frame_id.str();
                 cv_ptr->encoding = settings->rawImageCVEncoding;
                 cv_ptr->image = raw_image;
+                cv_ptr->header.frame_id = "?nucing=" + std::string(rsp.c_str());
 
                 /// IR-specific processing to remove in-band data field in the top row
                 if (cv_ptr->image.rows % 2 == 1) {
@@ -908,7 +922,7 @@ public:
         this_frame_id << settings->frame_id;
         sensor_msgs::ImagePtr img = image_map[img_key];
 
-        this_frame_id << "?lock=1&eventNum=" << gps_header.seq << "&eventTime" << gps_header.stamp.toSec() ;
+        this_frame_id << "?lock=1&eventNum=" << gps_header.seq << "&eventTime" << gps_header.stamp.toSec() << img->header.frame_id ;
         ROS_INFO_STREAM("Timestamp: " << gps_header.stamp.toSec());
         img->header = gps_header;
         img->header.frame_id = this_frame_id.str();
@@ -951,6 +965,7 @@ public:
     GEV_CAMERA_HANDLE camera_handle = NULL;  // void* type
     CameraImageInfo cam_image_info;
     ros::Subscriber event_sub;
+    std::shared_ptr<GenApiConnector> genapi_;
 
 
 private:
@@ -1277,7 +1292,7 @@ int main(int argc, char **argv) {
 //    DriverHandlerOpts dopts{node_settings->rawImageCVMatType};
         /// !!! doing the nodehandleptr thing because I don't really know how to solve it
         ros::NodeHandlePtr nhptr = ros::NodeHandlePtr(new ros::NodeHandle);
-        EventHandler handler{nhptr, camera_handle, cam_image_info, node_settings};
+        EventHandler handler{nhptr, camera_handle, cam_image_info, node_settings, genapi};
         CamParamHandler paramHandler{nhptr, camera_handle, node_settings};
 //    handler.syncUp(nh, 0.0);
         handler.event_sub = nh.subscribe(std::string("/event"), 5, &EventHandler::eventCallback, &handler);
