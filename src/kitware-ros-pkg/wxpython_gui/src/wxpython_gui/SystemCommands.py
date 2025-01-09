@@ -3,17 +3,19 @@ import xmlrpclib
 
 
 class SystemCommandsCall(object):
-    """ This contains the interface for sending supervisor calls to each system
-        and starting / stopping nodes.
+    """This contains the interface for sending supervisor calls to each system
+    and starting / stopping nodes.
     """
+
     def __init__(self, hosts):
         self.hosts = hosts
-        self.process_group = "taiga" if "nuvo0" in hosts else "cas"
-        self.supers = { host:xmlrpclib.Server('http://%s:9001/RPC2' % host)
-                        for host in self.hosts }
-        self.commands = ['up', 'down', 'restart']
-        self.cams = ['ir', 'rgb', 'uv']
-        self.devices = ['ins', 'daq']
+        self.process_group = "taiga" if "nuvo0" in hosts else "nayak"
+        self.supers = {
+            host: xmlrpclib.Server("http://%s:9001/RPC2" % host) for host in self.hosts
+        }
+        self.commands = ["up", "down", "restart"]
+        self.cams = ["ir", "rgb", "uv"]
+        self.devices = ["ins", "daq"]
         self.halt = "%s/src/run_scripts/inpath/kamera.halt" % REAL_KAM_REPO_DIR
         self.processes = ""
         self.cmd = ""
@@ -37,7 +39,9 @@ class SystemCommandsCall(object):
                             self.supers[self.host].supervisor.stopProcess(process)
                         except:
                             print("Starting process %s." % process)
-                            self.supers[self.host].supervisor.startProcess(process, False)
+                            self.supers[self.host].supervisor.startProcess(
+                                process, False
+                            )
                         print("Starting process %s." % process)
                         self.supers[self.host].supervisor.startProcess(process, False)
                 except Exception as e:
@@ -56,7 +60,9 @@ class SystemCommandsCall(object):
                             self.supers[self.host].supervisor.stopProcess(process)
                         except:
                             print("Starting process %s." % process)
-                            self.supers[self.host].supervisor.startProcess(process, False)
+                            self.supers[self.host].supervisor.startProcess(
+                                process, False
+                            )
                         print("Starting process %s." % process)
                         self.supers[self.host].supervisor.startProcess(process, False)
                 except Exception as f:
@@ -98,23 +104,25 @@ class SystemCommandsCall(object):
         self.run_bash()
 
     def command_postproc(self, host, command, postproc):
-        print('Final command: (%s %s)' % (command, postproc))
+        print("Final command: (%s %s)" % (command, postproc))
         self.host = host
         self.cmd = command
         self.processes = ["postproc:%s" % postproc]
 
     def run_bash(self):
-        bash_cmd = ' '.join(self.bash)
+        bash_cmd = " ".join(self.bash)
         if len(self.bash) > 0:
             return_code = subprocess.Popen(bash_cmd, shell=True)
+
 
 class SystemCommands(object):
     def __init__(self, hosts):
         self.scc = SystemCommandsCall(hosts)
-        self.cams = ['ir', 'rgb', 'uv']
+        self.cams = ["ir", "rgb", "uv"]
 
-    def run_command(self, target, host, command,
-                    containers=None, d=None, postproc=None):
+    def run_command(
+        self, target, host, command, containers=None, d=None, postproc=None
+    ):
         if target == "detector":
             self.scc.command_detector(host, command)
             self.scc.run()
