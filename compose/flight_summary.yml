@@ -17,5 +17,5 @@ services:
       - "/mnt:/mnt"
       - "${KAMERA_DIR}/src/run_scripts/entry:/entry"
       - "${KAMERA_DIR}:${DOCKER_KAMERA_DIR}:ro"
-        #  - "${KAMERA_DIR}/kamera:/src/kamera/kamera:ro"
+      - "${KAMERA_DIR}/kamera:/src/kamera/kamera:ro"
     entrypoint: ["/entry/postproc_summary.sh"]
