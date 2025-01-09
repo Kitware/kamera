@@ -101,7 +101,7 @@ NAS_CODE=$?
 if ! [[ $NAS_CODE == 0 ]]; then
     echo "Failed to connect to NAS! Troubleshoot!"
     sleep 5
-    exit
+#    exit
 else
     echo "NAS mounted!"
 fi

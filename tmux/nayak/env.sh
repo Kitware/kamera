@@ -51,9 +51,4 @@ export COMPRESS_IMAGERY=0
 
 # Sets the compression used on the phase on imagery
 # Best to keep within 80-100 for optimal quality
-export JPEG_QUALITY=90
-
-# If in a GPS-denied environment, this will publish events on each event
-# trigger to simulated the GPS timestamp
-# BE SURE TO SET TO 0 BEFORE FLIGHT
-export SPOOF_EVENTS=0
+export JPEG_QUALITY=85

@@ -7,5 +7,5 @@
 
 for iface in 25g_outer 25g_inner 1g pci_bot pci_top; do
 # this may do weird things to the IP connection of the camera ports
-    ./ethtoolp.py $iface --maximize-speed
+    /home/user/kw/kamera/tmux/nayak/ethtoolp.py $iface --maximize-speed
 done

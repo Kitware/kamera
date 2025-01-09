@@ -1,3 +1,4 @@
+# tmuxinator configuration file
 name: <%= ENV["SESSION"] %>
 root: <%= ENV["KAMERA_DIR"] %>
 
@@ -5,10 +6,10 @@ root: <%= ENV["KAMERA_DIR"] %>
 # socket_name: foo
 
 # Runs before everything. Use it to start daemons etc.
-on_project_start: . <%= ENV["KAMERA_DIR"] %>/tmux/cas/startup.sh
+on_project_start: . <%= ENV["KAMERA_DIR"] %>/tmux/nayak/startup.sh
 
 # Runs in each window and pane before window/pane specific commands. Useful for setting up interpreter versions.
-pre_window: source <%= ENV["KAMERA_DIR"] %>/tmux/cas/env.sh
+pre_window: source <%= ENV["KAMERA_DIR"] %>/tmux/nayak/env.sh
 
 # Pass command line options to tmux. Useful for specifying a different tmux.conf.
 # tmux_options: -f ~/.tmux.mac.conf
