@@ -1,4 +1,5 @@
 from wxpython_gui.cfg import kv, DOCK_KAM_REPO_DIR, REAL_KAM_REPO_DIR
+import time
 import xmlrpclib
 
 
@@ -60,11 +61,11 @@ class SystemCommandsCall(object):
                             self.supers[self.host].supervisor.stopProcess(process)
                         except:
                             print("Starting process %s." % process)
-                            self.supers[self.host].supervisor.startProcess(
-                                process, False
-                            )
+                            self.supers[self.host].supervisor.startProcess(process)
                         print("Starting process %s." % process)
-                        self.supers[self.host].supervisor.startProcess(process, False)
+                        print("On host %s." % self.host)
+                        time.sleep(0.1) # seems like supervisor needs a small wait
+                        self.supers[self.host].supervisor.startProcess(process)
                 except Exception as f:
                     print(f)
                     continue
