@@ -1384,12 +1384,16 @@ def get_review_fate(nav_state_provider: NavStateINSJson,
     base_name = get_base(image_name)
     t = basename_to_time[base_name]
     try:
-        nth = nav_state_provider.save_nth_per_t[t]
-    except KeyError:
-       print(f"Could not find 'save_every_x_image' for time {t}.")
-       nth = 1
+        nth = nav_state_provider.time_to_save_every_x_image[t]
+    except KeyError as e:
+        print(f"Could not find 'save_every_x_image' for time {t}.")
+        nth = 1
 
-    seq = nav_state_provider.time_to_seq[t]
+    try:
+        seq = nav_state_provider.time_to_seq[t]
+    except KeyError:
+       print(f"Could not find 'seq' for time {t}.")
+       seq = 0
 
     if base_name in sets_detector_processed:
         reviewed = "True"

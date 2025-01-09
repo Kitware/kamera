@@ -272,7 +272,7 @@ class NavStateINSJson(NavStateINSBinary):
 
                 if d['ins']['time'] in nav_pose_dict:
                     continue
-                time = d['ins']['time']
+                time = float(d['ins']['time'])
                 self._ins_nav_times.append(time)
                 self._ins_ypr.append([d['ins']['heading'],
                                       d['ins']['pitch'],
@@ -296,13 +296,14 @@ class NavStateINSJson(NavStateINSBinary):
                                        quat[3]]
 
                 try:
-                    save_every_x_image = float(d['save_every_x_image'])
+                    save_every_x_image = int(d['save_every_x_image'])
                 except KeyError:
-                    save_every_x_image = 1.0
-                self.time_to_save_every_x_image[time] = save_every_x_image                
-                self.time_to_seq[time] = int(d["evt"]["header"]["seq"])
+                    save_every_x_image = 1
+                evt_time = d['evt']['time']
+                self.time_to_save_every_x_image[evt_time] = save_every_x_image
+                self.time_to_seq[evt_time] = int(d["evt"]["header"]["seq"])
 
-                frame_times.append(d['evt']['time'])
+                frame_times.append(evt_time)
                 json_counter += 1
         print('Reconstructed navigation stream from %i meta.json files' %
               json_counter)
