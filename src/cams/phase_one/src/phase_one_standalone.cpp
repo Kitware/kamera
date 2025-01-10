@@ -232,6 +232,7 @@ namespace phase_one
         // will start before EnableImageReceiving is done
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         bool timed_out = false;
+        P1::ImageSdk::TagId ids;
         try {
             while (running_) {
                 auto tic1 = std::chrono::high_resolution_clock::now();
@@ -329,7 +330,6 @@ namespace phase_one
                     }
                 }
 
-                //P1::ImageSdk::TagId ids;
                 //P1::ImageSdk::ImageTag tag = image.GetTag(ids.DateTime);
                 //ROS_INFO_STREAM("Tag: " << tag.ToString());
                 // seems to want to take from queue, rather than straight `image`
@@ -342,7 +342,6 @@ namespace phase_one
                 try {
                     std_msgs::Header header;
                     //P1::ImageSdk::TagId ids;
-                    //P1::ImageSdk::ImageTag tag = raw_img.GetTag(ids.CaptureNumber);
                     //header.seq = tag.Value();
                     header.seq = gps_header.seq;
                     header.stamp = gps_header.stamp;
@@ -352,6 +351,42 @@ namespace phase_one
                 } catch (...) {
                     ROS_ERROR("|CAPTURE| Failed to convert preview.");
                 };
+                
+                // grab all tags for image, and shove into frame ID. faster 
+                // than adding to EXIF, can do that later
+                auto ticid = std::chrono::high_resolution_clock::now();
+                
+                P1::ImageSdk::ImageTag tag;
+                std::stringstream frame_id;
+                tag = raw_img.GetTag(ids.Make);
+                frame_id << "Make:" << tag.ToString() << ",";
+                tag = raw_img.GetTag(ids.Model);
+                frame_id << "Model:" << tag.ToString() << ",";
+                tag = raw_img.GetTag(ids.ExposureBias);
+                frame_id << "ExposureBias:" << tag.RationalValue().DoubleValue() << ",";
+                tag = raw_img.GetTag(ids.IsoSpeedRatings);
+                frame_id << "ISO:" << tag.Value() << ",";
+                tag = raw_img.GetTag(ids.ApertureValue);
+                frame_id << "ApertureValue:" << tag.RationalValue().DoubleValue() << ",";
+                tag = raw_img.GetTag(ids.ApertureMin);
+                frame_id << "ApertureMin:" << tag.DoubleValue() << ",";
+                tag = raw_img.GetTag(ids.ApertureMax);
+                frame_id << "ApertureMax:" <<tag.DoubleValue() << ",";
+                tag = raw_img.GetTag(ids.ShutterSpeedValue);
+                frame_id << "ShutterSpeedValue:" << tag.RationalValue().DoubleValue() << ",";
+                tag = raw_img.GetTag(ids.FNumber);
+                frame_id << "FNumber:" << tag.RationalValue().DoubleValue() << ",";
+                tag = raw_img.GetTag(ids.ExposureTime);
+                frame_id << "ExposureTime(s):" << tag.RationalValue().DoubleValue() << ",";
+                tag = raw_img.GetTag(ids.FocalLength);
+                frame_id << "FocalLength:" << tag.RationalValue().DoubleValue() << ",";
+                frame_id << "width:" << raw_img.Width() << ",";
+                frame_id << "height:" << raw_img.Height();
+                auto tocid = std::chrono::high_resolution_clock::now();
+                auto dtid = tocid - ticid;
+                ROS_INFO_STREAM("|CAPTURE| adding tags time: " << dtid.count() / 1e9 << "s");
+          
+                output_msg.header.frame_id = frame_id.str();
                 image_pub.publish(output_msg);
                 stat_pub_.publish(stat_msg);
                 //long int sec  = output_msg.header.stamp.sec;
@@ -447,6 +482,9 @@ namespace phase_one
                 ROS_WARN("|DEMOSAIC| Argh - we got an exception in debayering.");
                 continue;
             }
+            auto tocload = std::chrono::high_resolution_clock::now();
+            auto dtload = tocload - tic2;
+            ROS_INFO_STREAM("|DEMOSAIC| load time: " << dtload.count() / 1e9 << "s");
             P1::ImageSdk::BitmapImage bitmap;
             try {
                 // demosaic image into RGB format from IIQ

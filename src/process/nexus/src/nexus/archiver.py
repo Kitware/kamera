@@ -138,6 +138,15 @@ class ArchiveManager(ArchiverBase):
                     metadata["ir"]["header"]["frame_id"].split("?")[-1].split("=")[-1]
                 )
             metadata["ir"]["is_nucing"] = nucing
+            metadata["ir"]["header"]["frame_id"] = "ir"
+        # add phase one exif data to meta json, if available
+        if "rgb" in metadata:
+            if "Phase" in metadata["rgb"]["header"]["frame_id"]:
+                fid = metadata["rgb"]["header"]["frame_id"]
+                for kv in fid.split(","):
+                    k, v = kv.split(":")
+                    metadata["rgb"][k] = v
+                metadata["rgb"]["header"]["frame_id"] = "rgb"
 
         metadata["effort"] = self.effort
         metadata["collection_mode"] = self.collection_mode
