@@ -1660,12 +1660,12 @@ class MainFrame(form_builder_output.MainFrame):
         self._spoof_events = int(kv.get("/debug/spoof_events", 0))
         if self._spoof_events == 1:
             self.ins_control_panel.SetBackgroundColour(WARN_AMBER)
-            self.gnss_status_flag_txtctrl.SetValue("events spoofed!")
+            self.gnss_status_flag_txtctrl.SetValue("no fix! event spoof!")
             return
         else:
             self.ins_control_panel.SetBackgroundColour(APP_GRAY)
         if msg.gnss_status == 0:
-            self.gnss_status_flag_txtctrl.SetValue("gps only")
+            self.gnss_status_flag_txtctrl.SetValue("No Fix")
         elif msg.gnss_status == 1:
             self.gnss_status_flag_txtctrl.SetValue("SPS Mode")
         elif msg.gnss_status == 2:
@@ -1676,8 +1676,8 @@ class MainFrame(form_builder_output.MainFrame):
             self.gnss_status_flag_txtctrl.SetValue("Fixed RTK")
         elif msg.gnss_status == 5:
             self.gnss_status_flag_txtctrl.SetValue("Float RTK")
-        elif msg.gnss_status == 5:
-            self.gnss_status_flag_txtctrl.SetValue("DR Mode")
+        elif msg.gnss_status == 6:
+            self.gnss_status_flag_txtctrl.SetValue("Dead Reckon")
         else:
             self.gnss_status_flag_txtctrl.SetValue("")
 
