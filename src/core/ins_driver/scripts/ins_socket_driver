@@ -175,6 +175,8 @@ def gen_packets(host, port, buffer_size=4096, timeout=2.0):
             except socket.error as exc:
                 logerr(
                     "Caught exception socket.error during recv: %s" % exc)
+            # give this loop a little sleep so the core gets a rest
+            time.sleep(0.001)
 
     except socket.error as exc:
         logerr('Critical failure in initualization of host {}:{}'.format(host, port))
