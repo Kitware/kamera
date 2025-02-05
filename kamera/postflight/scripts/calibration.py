@@ -8,7 +8,7 @@ from kamera.postflight.colmap import ColmapCalibration, find_best_sparse_model
 def main():
     # REQUIREMENTS: Must already have built a reasonable 3-D model using Colmap
     # And have a flight directory populated by the kamera system
-    flight_dir = "<your_dir>"
+    flight_dir = "/home/local/KHQ/adam.romlein/noaa/data/2024_AOC_AK_Calibration/fl09"
     colmap_dir = os.path.join(flight_dir, "colmap")
     # Location to save KAMERA camera models.
     save_dir = os.path.join(flight_dir, "kamera_models")
@@ -49,10 +49,20 @@ def main():
     cc.prepare_calibration_data()
     ub.ensuredir(save_dir)
     cameras = ub.AutoDict()
+    camera_strs = list(cc.ccd.best_cameras.keys())
+    modalities = [cs.split("_")[3] for cs in camera_strs]
+    joint_calibration = False
+    # can switch to UV / IR if possible that they are better aligned
+    main_modality = "rgb"
+    if "uv" in modalities and "rgb" in modalities:
+        # both UV and RGB are in this colmap 3D model, so we're going to
+        # jointly calibrate the 2
+        joint_calibration = True
     for camera_str in cc.ccd.best_cameras.keys():
         channel, modality = camera_str.split("_")[2:]
-        # if modality != "rgb":
-        #    continue
+        # skip all modalities except the "main" ones
+        if joint_calibration and modality != main_modality:
+            continue
         print(f"Calibrating camera {camera_str}.")
         tic = time.time()
         camera_model = cc.calibrate_camera(camera_str, error_threshold=100)
@@ -66,6 +76,33 @@ def main():
             cameras[channel][modality] = camera_model
         else:
             print(f"Calibrating camera {camera_str} failed.")
+
+    if joint_calibration:
+        for camera_str in cc.ccd.best_cameras.keys():
+            channel, modality = camera_str.split("_")[2:]
+            # now calibrate all other modalities
+            if modality == main_modality:
+                continue
+            print(f"Calibrating camera {camera_str}.")
+            tic = time.time()
+            camera_model = cc.transfer_calibration(
+                camera_str,
+                cameras[channel][main_modality],
+                calibrated_modality=main_modality,
+                error_threshold=100,
+            )
+            toc = time.time()
+            if camera_model is not None:
+                out_path = os.path.join(save_dir, f"{camera_str}_v2.yaml")
+                print(f"Saving camera model to {out_path}")
+                camera_model.save_to_file(out_path)
+                print(
+                    f"Time to transfer camera calibration to {camera_str} was {(toc - tic):.3f}s"
+                )
+                print(camera_model)
+                cameras[channel][modality] = camera_model
+            else:
+                print(f"Calibrating camera {camera_str} failed.")
 
     aircraft, angle = camera_str.split("_")[0:2]
     gif_dir = os.path.join(save_dir, "registration_gifs_v2")

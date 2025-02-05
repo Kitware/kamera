@@ -18,11 +18,8 @@ from kamera.colmap_processing.camera_models import StandardCamera
 from kamera.colmap_processing.image_renderer import render_view
 from kamera.postflight.alignment import (
     VisiblePoint,
-    weighted_horn_alignment_partial,
-    analyze_rotation_estimate,
-    register_camera_horn_ransac,
-    verify_alignment,
     iterative_alignment,
+    transfer_alignment,
 )
 
 
@@ -128,6 +125,9 @@ class ColmapCalibration(object):
 
             image.cam_from_world.rotation.normalize()
             quat = image.cam_from_world.rotation.quat
+            # invert the w (rotation) component,
+            #  so we get the camera to world rotation
+            quat[3] *= -1
 
             sfm_pose = [pos, quat]
 
@@ -144,10 +144,15 @@ class ColmapCalibration(object):
                     uncertainty = self.R.points3D[pt.point3D_id].error
                     point_3d = self.R.points3D[pt.point3D_id].xyz
                     visible = True
-                    vpt = VisiblePoint(point_3d, point_2d, uncertainty, t, visible)
+                    point_3d_id = pt.point3D_id
+                    vpt = VisiblePoint(
+                        point_3d, point_3d_id, point_2d, uncertainty, t, visible
+                    )
                     points.append(vpt)
             points_per_image.append(points)
             camera_name = os.path.basename(os.path.dirname(image.name))
+            # as a way to choose the first quaternion we check, choose the one
+            # that has the most number of 3D points registered
             if camera_name in best_cameras:
                 if image.num_points3D > most_points[camera_name]:
                     best_cameras[camera_name] = image.camera
@@ -206,38 +211,44 @@ class ColmapCalibration(object):
         camera_model = iterative_alignment(
             cam_sfm_quats, cam_ins_quats, observations, cam, self.nav_state_provider
         )
-        # best_rotation = weighted_horn_alignment_partial(
-        #    observations,
-        #    cam_sfm_quats,
-        #    cam_ins_quats,
-        #    min_points_per_image=10,
-        #    ransac_iters=100,
-        #    error_threshold=error_threshold,
-        # )
-        # analyze_rotation_estimate(best_rotation)
-        # best_quat = best_rotation.quaternion
-        # K = cam.calibration_matrix()
-        # if cam.model.name == "OPENCV":
-        #    fx, fy, cx, cy, d1, d2, d3, d4 = cam.params
-        # elif cam.model.name == "SIMPLE_RADIAL":
-        #    d1 = d2 = d3 = d4 = 0
-        # elif cam.model.name == "PINHOLE":
-        #    d1 = d2 = d3 = d4 = 0
-        # else:
-        #    raise SystemError(f"Unexpected camera model found: {cam.model.name}")
-
-        # dist = np.array([d1, d2, d3, d4])
-        # camera_model = StandardCamera(
-        #    cam.width,
-        #    cam.height,
-        #    K,
-        #    dist,
-        #    [0, 0, 0],
-        #    best_quat,
-        #    platform_pose_provider=self.nav_state_provider,
-        # )
-
         return camera_model
+
+    def transfer_calibration(
+        self,
+        camera_name: str,
+        calibrated_camera_model: StandardCamera,
+        calibrated_modality: str,
+        error_threshold: float,
+    ) -> StandardCamera:
+        """
+        Use the quaternion already solved of a colocated, calibrated camera
+        to bootstrap the calibration process.
+        """
+        # Find all valid indices of current cameras
+        channel, modality = camera_name.split("_")[2:]
+        cam_idxs = [
+            1 if camera_name == os.path.basename(os.path.dirname(im)) else 0
+            for im in self.ccd.img_fnames
+        ]
+        print(f"Number of images in camera {camera_name}.")
+        print(np.sum(cam_idxs))
+        observations = [
+            pts for i, pts in enumerate(self.ccd.points_per_image) if cam_idxs[i] == 1
+        ]
+        if len(observations) < 10:
+            print(f"Only {len(observations)} seen for camera {camera_name}, skipping.")
+
+        # Now we have to find the overlapping observations on a per-frame basis between
+        # the camera to calibrate, and the colocated, calibrated, camera.
+        for i, fname in enumerate(self.ccd.img_fnames):
+            if cam_idxs[i] == 1:
+                calibrated_fname = fname.replace(modality, calibrated_modality)
+                ii = self.ccd.img_fnames.index(calibrated_fname)
+        cam = self.ccd.best_cameras[camera_name]
+        # camera_model = transfer_alignment(
+        #     cam, calibrated_cam, observations, self.nav_state_provider
+        # )
+        return None  # camera_model
 
     def create_fname_to_time_channel_modality(
         self, img_fnames, basename_to_time
