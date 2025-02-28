@@ -26,6 +26,7 @@ else:
         f"{group}:imageview",
         f"{group}:cam_rgb",
         f"{group}:cam_ir",
+        f"{group}:cam_uv",
     ]
 
 host = sys.argv[1].strip()

@@ -58,6 +58,7 @@ max_mpix: 200000 # 0.2e6
 channels:
     rgb: 0
     ir: 1
+    uv: 2
 interfaces:
   # map channels to ethernet interface names
   # this is gonna usurp the locations mapping
@@ -84,15 +85,15 @@ enabled:
   center:
     ir: true
     rgb: true
-    uv: false
+    uv: true
   left:
     ir: true
     rgb: true
-    uv: false
+    uv: true
   right:
     ir: true
     rgb: true
-    uv: false
+    uv: true
 
 # This is configuration information for each physical device
 # `ir_n0` is a DEV_ID. This is an abstract label and has no absolute correlation
