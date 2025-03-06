@@ -49,7 +49,8 @@ group2processes = {
     "nas": ["mount_nas"],
     "detector": [f"{group}:detector"],
 }
-processes = group2processes[cluster]
+# Sort so start is idempotent
+processes = sorted(group2processes[cluster])
 # sup = xmlrpclib.Server('http://%s:9001/RPC2' % host)
 sup = ServerProxy("http://%s:9001/RPC2" % host)
 

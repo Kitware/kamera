@@ -149,7 +149,11 @@ blueprintf "done\nLaunching pod nodes...\n"
 # Bring up all pod systems
 # Query list of hosts as line delim array
 declare -A PIDS
-for host in $(cq '.arch.hosts | keys | join("\n" )') ; do
+# sort, so hosts are started idempotently
+hosts=$(cq '.arch.hosts | keys | join("\n" )')
+IFS=$'\n' sorted_hosts=($(sort <<<"${hosts[*]}"))
+unset IFS
+for host in "${sorted_hosts[@]}"; do
     if [[ $(cq ".arch.hosts.${host}.enabled") == 'true' ]]; then
 	python3 ${KAM_REPO_DIR}/scripts/system.py $host "${ARGS[@]}" pod &
         PIDS[${host}]=$!
