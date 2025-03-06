@@ -1,0 +1,23 @@
+---
+## Core processes
+version: '3.7'
+services:
+  fps_monitor:
+    container_name: fps_monitor
+    image: kitware/kamera:core
+    tty: true
+    environment:
+      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      NODE_HOSTNAME: "${NODE_HOSTNAME}"
+      REDIS_HOST: "${REDIS_HOST}"
+      SYSTEM_NAME: "${SYSTEM_NAME}"
+    dns:
+      - "${KAMERA_DNS_IP}"
+    dns_search:
+      - kamera.systems
+    network_mode: host
+    volumes:
+      - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
+    command: ["/entry/fps_monitor.sh"]
+    restart: unless-stopped
+...

@@ -12,6 +12,7 @@ if SYSTEM_NAME == "taiga":
     pod = [
         "image_manager",
         "kamerad",
+        f"{group}:fps_monitor",
         f"{group}:imageview",
         f"{group}:cam_rgb",
         f"{group}:cam_ir",
@@ -23,6 +24,7 @@ else:
     pod = [
         "image_manager",
         "kamerad",
+        f"{group}:fps_monitor",
         f"{group}:imageview",
         f"{group}:cam_rgb",
         f"{group}:cam_ir",
@@ -38,7 +40,11 @@ cluster = sys.argv[3]
 group2processes = {
     "pod": pod,
     "central": [f"{group}:ins", f"{group}:daq"],
-    "monitor": [f"{group}:cam_param_monitor", f"{group}:shapefile_monitor"],
+    "monitor": [
+        f"{group}:cam_param_monitor",
+        f"{group}:shapefile_monitor",
+        f"{group}:fps_monitor",
+    ],
     "master": ["roscore"],
     "nas": ["mount_nas"],
     "detector": [f"{group}:detector"],

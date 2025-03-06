@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <node name="fps_monitor" pkg="kamcore" type="fps_monitor_node.py" respawn="true" output="screen">
+    </node>
+</launch>
