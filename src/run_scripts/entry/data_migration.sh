@@ -36,7 +36,7 @@ do
         echo "NAS still mounted!"
     fi
     # STAGE 1
-    echo "Gathering and copying files under $source_dir"
+    echo "Gathering and copying text, detection, and log files older than 10 seconds under $source_dir"
     # Find all files that are appended to and copy over incrementally.
     # This is detection files, log files, and ins dat files
     fdfind . $source_dir --exclude '*.{IIQ,iiq,json,tif,jpg}' --changed-before 10s --type f --exec echo {} | \
@@ -49,7 +49,7 @@ do
     echo "Finished copying."
 
     # STAGE 2
-    echo "Copying & removing data files older than 5 minutes in $source_dir"
+    echo "Copying & removing data files older than 10 seconds in $source_dir"
     # Find all files modified before N, excluding IIQ images, that are not append to.
     # This includes things like tif, jpg, json.
     # Give a little time, so the detector can run on images on the local drive
