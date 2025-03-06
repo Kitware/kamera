@@ -14,7 +14,7 @@ from cv_bridge import CvBridge, CvBridgeError
 
 from roskv.impl.redis_envoy import RedisEnvoy as ImplEnvoy
 import wxpython_gui
-from wxpython_gui.utils import check_default, MissedFrameStore
+from wxpython_gui.utils import check_default
 
 
 # Figure out relative positions
@@ -181,7 +181,6 @@ SYS_CFG.update(SYS_ARCH)
 
 
 # =================== DEFINE GLOBALS ===============================
-missed_frame_store = MissedFrameStore()
 # Need a vanilla one for binary insert
 ros_immediate = rospy.Duration(nsecs=1)
 # Instantiate CvBridge
@@ -312,7 +311,9 @@ def save_camera_config(curr_cfg=None):
         if not os.path.isfile(fname):
             wxpython_gui.utils.make_path(fname, from_file=True)
         with open(fname, "w") as outfile:
-            json.dump(SYS_CFG["camera_cfgs"][curr_cfg], outfile, indent=4, sort_keys=True)
+            json.dump(
+                SYS_CFG["camera_cfgs"][curr_cfg], outfile, indent=4, sort_keys=True
+            )
             print("Saved sys config: {}".format(fname))
         return dirname
     else:
@@ -376,14 +377,14 @@ def format_status(
 
 def channel_format_status(fov, chan, timeval=None, dt=0):
     driver = "%s_driver" % chan
-    for host, cfgs in SYS_CFG["arch"]["hosts"].items():
-        if cfgs["fov"] == fov:
-            final = host
+    # get current host from fov
+    host = host_from_fov(fov)
     a = "actual_geni_params"
-    param_ns = "/".join(["", "sys", a, final, chan])
-    missed_topic = "/".join(["", fov, chan, "missed"])
-    num_dropped = missed_frame_store.get(missed_topic, 0)
-    fps = missed_frame_store.get_fps(fov, chan) or 0.0
+    param_ns = "/".join(["", "sys", a, host, chan])
+    drop_ns = "/".join(["", "sys", "arch", host, chan, "dropped"])
+    num_dropped = int(kv.get(drop_ns))
+    fps_ns = "/".join(["", "sys", "arch", host, chan, "fps"])
+    fps = float(kv.get(fps_ns))
     exposure_us = None
     gain = None
     total = None
@@ -395,8 +396,8 @@ def channel_format_status(fov, chan, timeval=None, dt=0):
         gain = int(float(kv.get(param_ns + "/ISO", None)) / 50.0)
         # convert float point seconds to us
         exposure_us = float(kv.get(param_ns + "/Shutter_Speed", None)) * 1e6
-        total = int(kv.get("/sys/" + final + "/p1debayerq/total"))
-        processed = int(kv.get("/sys/" + final + "/p1debayerq/processed"))
+        total = int(kv.get("/sys/" + host + "/p1debayerq/total"))
+        processed = int(kv.get("/sys/" + host + "/p1debayerq/processed"))
     try:
         dt = float(kv.get(param_ns + "/last_msg_time", None))
     except:

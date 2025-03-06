@@ -24,7 +24,6 @@ from custom_msgs.srv import (
 from wxpython_gui.cfg import (
     SYS_CFG,
     bridge,
-    missed_frame_store,
     channel_format_status,
     format_status,
 )
@@ -86,7 +85,6 @@ class UpdateImageThread(threading.Thread):
             self.sub = True
         self._raw_image_height = SYS_CFG["models"][model]["specs"]["height"]
         self._raw_image_width = SYS_CFG["models"][model]["specs"]["width"]
-        self._missed_topic = os.path.join("/", self._node_host, self._chan, "missed")
         self._last_header = std_msgs.msg.Header()  # header of last received image
 
     @property
@@ -112,12 +110,6 @@ class UpdateImageThread(threading.Thread):
             self._sub_to_images = rospy.Subscriber(
                 sub_topic, Image, self.process_pub_image
             )
-        self._sub_missed = rospy.Subscriber(
-            self._missed_topic,
-            std_msgs.msg.Header,
-            missed_frame_store.cb_missed_fov_chan,
-            callback_args=(self._fov, self._chan),
-        )
         im_rate = 5
         rate = rospy.Rate(im_rate)
         while True:

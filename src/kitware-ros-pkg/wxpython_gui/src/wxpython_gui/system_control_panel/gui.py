@@ -96,7 +96,6 @@ from wxpython_gui.cfg import (
     get_arch_path,
     host_from_fov,
     pull_gui_state,
-    missed_frame_store,
     format_status,
     kv,
     geod,
@@ -405,11 +404,6 @@ class MainFrame(form_builder_output.MainFrame):
                 attrs={"chan": "uv", "fov": "right"},
             )
             self.remote_image_panels.append(ret)
-        # --------------------------------------------------------------------
-
-        # Subscribe to /stat topic to monitor driver FPS
-        # ImageSync subscribers
-        self.image_sync_sub = rospy.Subscriber("/stat", Stat, self.cb_image_view_stat)
 
         # ----------------------------- INS ----------------------------------
         self.lat0 = None
@@ -911,25 +905,6 @@ class MainFrame(form_builder_output.MainFrame):
             self.on_set_exposure(event)
         else:
             event.Skip()
-
-    def cb_image_view_stat(self, msg):
-        if self.image_sync_sub.get_num_connections() < 9:
-            # unsubscribe,resubscribe to /stat topic so we catch new publishers
-            self.image_sync_sub.unregister()
-            missed_frame_store.clear()
-            time.sleep(1)
-            self.image_sync_sub = rospy.Subscriber(
-                "/stat", Stat, self.cb_image_view_stat, queue_size=10
-            )
-            return
-        # type: (Stat, str) -> None
-        """triggers when a stat message comes in"""
-        # If this is a publishImage stat, count the FPS
-        if "publishImage" in msg.trace_topic.split("/"):
-            _, host, chan, _ = msg.node.split("/")
-            fov = SYS_CFG["arch"]["hosts"][host]["fov"]
-            if msg.note == "success":
-                missed_frame_store.cb_ok_img_fov_chan(None, fov, chan)
 
     def log_state(self):
         data = {
