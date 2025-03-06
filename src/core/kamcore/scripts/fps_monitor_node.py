@@ -43,8 +43,9 @@ class FPSMonitor:
 
     def ingest_event(self, msg):
         rospy.loginfo("Received event message.")
-        time = msg.gps_time.to_sec()
-        self.evt_queue.append(time)
+        if self.envoy.kv.get("/sys/arch/is_archiving") == "1":
+            time = msg.gps_time.to_sec()
+            self.evt_queue.append(time)
 
     def ingest_image(self, msg):
         frame_id = msg.header.frame_id
