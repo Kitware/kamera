@@ -121,7 +121,7 @@ class FPSMonitor:
 
 
 def main():
-    rospy.init_node("fps_monitor")
+    rospy.init_node(f"{hostname}_fps_monitor")
     mon = FPSMonitor()
     rospy.loginfo("Waiting for incoming image and event messages ...")
 
