@@ -26,11 +26,20 @@ fi
 
 while [ true ]
 do
+    ls /mnt/flight_data/.flight_data_mounted
+    NAS_CODE=$?
+    if ! [[ $NAS_CODE == 0 ]]; then
+        echo "Failed to connect to NAS! Troubleshoot!"
+        sleep 1
+        continue
+    else
+        echo "NAS still mounted!"
+    fi
     # STAGE 1
     echo "Gathering and copying files under $source_dir"
     # Find all files that are appended to and copy over incrementally.
     # This is detection files, log files, and ins dat files
-    fdfind . $source_dir --exclude '*.{IIQ,iiq,json,tif,jpg}' --type f --exec echo {} | \
+    fdfind . $source_dir --exclude '*.{IIQ,iiq,json,tif,jpg}' --changed-before 10s --type f --exec echo {} | \
         # remove far left path (/mnt/data/) dir for rsync
         cut -d'/' -f4- | \
         # cap max argument length for rsync
@@ -43,7 +52,8 @@ do
     echo "Copying & removing data files older than 5 minutes in $source_dir"
     # Find all files modified before N, excluding IIQ images, that are not append to.
     # This includes things like tif, jpg, json.
-    fdfind . $source_dir --exclude '*.{IIQ,iiq,txt,csv,dat}' --changed-before 5min --type f --exec echo {} | \
+    # Give a little time, so the detector can run on images on the local drive
+    fdfind . $source_dir --exclude '*.{IIQ,iiq,txt,csv,dat}' --changed-before 10s --type f --exec echo {} | \
         # remove far left dir for rsync
         cut -d'/' -f4- | \
         # cap max argument length for rsync
