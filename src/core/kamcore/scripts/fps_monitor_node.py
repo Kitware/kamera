@@ -26,6 +26,7 @@ class FPSMonitor:
         self.ir_queue = deque(maxlen=5)
         self.evt_queue = deque(maxlen=5)
         self.processed_times = deque(maxlen=50)
+        self.previously_archiving = False
         self.init_ros()
 
     def init_ros(self):
@@ -43,9 +44,12 @@ class FPSMonitor:
 
     def ingest_event(self, msg):
         rospy.loginfo("Received event message.")
-        if self.envoy.kv.get("/sys/arch/is_archiving") == "1":
+        is_archiving = self.envoy.kv.get("/sys/arch/is_archiving") == "1"
+        # Skip the first event, so we don't accidentally report drops
+        if is_archiving and self.previously_archiving:
             time = msg.gps_time.to_sec()
             self.evt_queue.append(time)
+        self.previously_archiving = is_archiving
 
     def ingest_image(self, msg):
         frame_id = msg.header.frame_id
@@ -70,21 +74,29 @@ class FPSMonitor:
 
         # calculate FPS
         if len(rgb_list) > 1:
-            rgb_fps = 1 / np.mean(
+            den = np.mean(
                 [rgb_list[i] - rgb_list[i - 1] for i in range(1, len(rgb_list))]
             )
+            if den != 0:
+                rgb_fps = 1 / den
+            else:
+                rgb_fps = 0
         else:
             rgb_fps = 0
         if len(ir_list) > 1:
-            ir_fps = 1 / np.mean(
-                [ir_list[i] - ir_list[i - 1] for i in range(1, len(ir_list))]
-            )
+            den = np.mean([ir_list[i] - ir_list[i - 1] for i in range(1, len(ir_list))])
+            if den != 0:
+                ir_fps = 1 / den
+            else:
+                ir_fps = 0
         else:
             ir_fps = 0
         if len(uv_list) > 1:
-            uv_fps = 1 / np.mean(
-                [uv_list[i] - uv_list[i - 1] for i in range(1, len(uv_list))]
-            )
+            den = np.mean([uv_list[i] - uv_list[i - 1] for i in range(1, len(uv_list))])
+            if den != 0:
+                uv_fps = 1 / den
+            else:
+                uv_fps = 0
         else:
             uv_fps = 0
 
