@@ -946,10 +946,12 @@ class MainFrame(form_builder_output.MainFrame):
         if not len(d_desired):
             self.detectors_gauge.SetBackgroundColour(FLAT_GRAY)
         else:
-            if all([status.is_ok() for status in d_status.values()]):
+            if any([status is EPodStatus.Pending for status in d_status.values()]):
+                self.detectors_gauge.SetBackgroundColour(WARN_AMBER)
+            elif all([status.is_ok() for status in d_status.values()]):
                 self.detectors_gauge.SetBackgroundColour(BRIGHT_GREEN)
             else:
-                self.detectors_gauge.SetBackgroundColour(WARN_AMBER)
+                self.detectors_gauge.SetBackgroundColour(ERROR_RED)
 
         is_busy = {h: 0 for h in self.hosts}
         current_task = {}
@@ -1779,6 +1781,16 @@ class MainFrame(form_builder_output.MainFrame):
     # ---------------------------- Detection Menu ----------------------------
 
     def do_start_a_detector(self, event=None, host="unset", log=True):
+        cmdpipef = SYS_CFG[host]["detector"]["pipefile"]
+        cmdpipef = SYS_CFG[host]["detector"]["pipefile"]
+        if not os.path.exists(cmdpipef):
+            msg = (
+                "Pipefile for detector %s does not exist, not starting detector." % host
+            )
+            dlg = wx.MessageDialog(self, msg, "Error", wx.OK | wx.ICON_ERROR)
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
         set_detector_state(self.system, host, EPodStatus.Running)
         if log:
             self.add_to_event_log("command sent: start detector {}".format(host))
