@@ -43,7 +43,6 @@ group2processes = {
     "monitor": [
         f"{group}:cam_param_monitor",
         f"{group}:shapefile_monitor",
-        f"{group}:fps_monitor",
     ],
     "master": ["roscore"],
     "nas": ["mount_nas"],

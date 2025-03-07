@@ -4,8 +4,6 @@
 from __future__ import division, print_function, absolute_import
 import os
 import time
-import math
-from typing import Optional, Dict
 import datetime
 
 # import threading
@@ -13,11 +11,7 @@ import cv2
 
 from cv_bridge import CvBridge
 
-# from profilehooks import timecall
-from std_msgs.msg import UInt64 as MsgUInt64
-
-from nexus.ros_numpy_lite import ImageEncodingMissingError
-from nexus.archiver_core import ArchiverBase, pathsafe_timestamp, make_path, msg_as_dict
+from nexus.archiver_core import ArchiverBase, make_path, msg_as_dict
 
 bridge = CvBridge()
 
@@ -155,7 +149,7 @@ class ArchiveManager(ArchiverBase):
         try:
             self.dump_json(metadata, time=now)
         except IOError:
-            rospy.logger("DISK READ / WRITE ERROR, CHECK MOUNT.")
+            print("DISK READ / WRITE ERROR, CHECK MOUNT.")
             self.disk_check(dirname)
         if self.verbosity >= 4:
             print(
@@ -163,21 +157,6 @@ class ArchiveManager(ArchiverBase):
             )
 
         return pathdict
-
-    def save_sys_cfg_json(self, sys_dict):
-        t = time.time()
-        now = datetime.datetime.utcfromtimestamp(rgb_time)
-        template = self.fmt_sync_path(now)
-        dirname = make_path(template, from_file=True)
-        sys_cfg_dir = os.path.dirname(dirname)
-        fname = "%s/sys_config.json" % sys_cfg_dir
-        print("Saving sys config json to %s" % fname)
-        try:
-            with open(fname, "w") as fn:
-                json.dump(sys_dict[self._sys_cfg], fn)
-        except IOError:
-            rospy.logger("DISK READ / WRITE ERROR, CHECK MOUNT.")
-            self.disk_check(dirname)
 
 
 class SimpleFileDump(object):
