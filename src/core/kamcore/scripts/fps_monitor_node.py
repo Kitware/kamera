@@ -43,27 +43,37 @@ class FPSMonitor:
             )
 
     def ingest_event(self, msg):
-        rospy.loginfo("Received event message.")
+        time = msg.gps_time.to_sec()
+        rospy.loginfo("Received event message, time %0.5f." % time)
         is_archiving = self.envoy.kv.get("/sys/arch/is_archiving") == "1"
         # Skip the first event, so we don't accidentally report drops
         if is_archiving and self.previously_archiving:
-            time = msg.gps_time.to_sec()
             self.evt_queue.append(time)
+
+        # on falling edge, clear events
+        if not is_archiving and self.previously_archiving:
+            self.evt_queue.clear()
+
         self.previously_archiving = is_archiving
 
     def ingest_image(self, msg):
         frame_id = msg.header.frame_id
-        rospy.loginfo("Received message, frame id: %s." % frame_id)
         time = msg.header.stamp.to_sec()
 
+        modality = ""
         if "uv" in frame_id:
+            modality = "uv"
             self.uv_queue.append(time)
         elif "Phase One" in frame_id or "rgb" in frame_id:
+            modality = "rgb"
             self.rgb_queue.append(time)
         elif "ir" in frame_id:
+            modality = "ir"
             self.ir_queue.append(time)
         else:
             rospy.logwarn("No valid modality found in image message!")
+
+        rospy.loginfo("Received %s message, time: %0.5f." % (modality, time))
 
     def update(self):
         # copy over data structures and sort
@@ -110,19 +120,18 @@ class FPSMonitor:
         # we missed it. Process everything except the most recent event,
         # since that's assumed to be received before the images
         # Only count frame drops when archiving
-        if self.envoy.kv.get("/sys/arch/is_archiving") == "1":
-            for time in times[:-1]:
-                if time in self.processed_times:
-                    continue
-                # give 1 second before registering as a drop
-                if len(rgb_list) == 0 or time not in rgb_list:
-                    self.rgb_drops += 1
-                if len(ir_list) == 0 or time not in ir_list:
-                    self.ir_drops += 1
-                if len(uv_list) == 0 or time not in uv_list:
-                    self.uv_drops += 1
+        for time in times[:-1]:
+            if time in self.processed_times:
+                continue
+            print("checking event time %0.5f" % time)
+            if len(rgb_list) == 0 or time not in rgb_list:
+                self.rgb_drops += 1
+            if len(ir_list) == 0 or time not in ir_list:
+                self.ir_drops += 1
+            if len(uv_list) == 0 or time not in uv_list:
+                self.uv_drops += 1
 
-                self.processed_times.append(time)
+            self.processed_times.append(time)
 
         self.envoy.kv.set(f"/sys/arch/{hostname}/rgb/fps", rgb_fps)
         self.envoy.kv.set(f"/sys/arch/{hostname}/ir/fps", ir_fps)
