@@ -2,6 +2,7 @@ import os
 import time
 import ubelt as ub
 
+from kamera.colmap_processing.camera_models import load_from_file
 from kamera.postflight.colmap import ColmapCalibration, find_best_sparse_model
 
 
@@ -14,6 +15,15 @@ def main():
     save_dir = os.path.join(flight_dir, "kamera_models")
     # Location to find / build aligned model
     align_dir = os.path.join(colmap_dir, "aligned")
+    # This assumes that 2 modalities of cameras are within the 3-D model
+    joint_calibration = True
+    # Can switch to UV / IR if possible that they are better aligned
+    main_modality = "rgb"
+    # If camera models are already present, if true this will overwrite
+    force_calibrate = False
+    # Whether to calibrate IR models or not. A "colmap_ir" must be built
+    # in the same folder
+    calibrate_ir = True
 
     # Step 1: Make sure the model is aligned to the INS readings, if not,
     # find the best model and align it.
@@ -51,32 +61,40 @@ def main():
     cameras = ub.AutoDict()
     camera_strs = list(cc.ccd.best_cameras.keys())
     modalities = [cs.split("_")[3] for cs in camera_strs]
-    joint_calibration = False
-    # can switch to UV / IR if possible that they are better aligned
-    main_modality = "rgb"
-    if "uv" in modalities and "rgb" in modalities:
-        # both UV and RGB are in this colmap 3D model, so we're going to
-        # jointly calibrate the 2
-        joint_calibration = True
+    if len(modalities) < 1:
+        print(
+            "Warning: only 1 modality found in this 3D model, not joinly calibrating."
+        )
+        joint_calibration = False
     for camera_str in cc.ccd.best_cameras.keys():
         channel, modality = camera_str.split("_")[2:]
         # skip all modalities except the "main" ones
         if joint_calibration and modality != main_modality:
             continue
-        print(f"Calibrating camera {camera_str}.")
-        tic = time.time()
-        camera_model = cc.calibrate_camera(camera_str, error_threshold=100)
-        toc = time.time()
-        if camera_model is not None:
-            out_path = os.path.join(save_dir, f"{camera_str}_v2.yaml")
-            print(f"Saving camera model to {out_path}")
-            camera_model.save_to_file(out_path)
-            print(f"Time to calibrate camera {camera_str} was {(toc - tic):.3f}s")
-            print(camera_model)
+        out_path = os.path.join(save_dir, f"{camera_str}_v2.yaml")
+        # skip compute if we don't have to recompute
+        if os.path.exists(out_path) and not force_calibrate:
+            print(
+                f"Camera model path {out_path} exists and force_calibrate is turned off, loading model."
+            )
+            camera_model = load_from_file(out_path)
             cameras[channel][modality] = camera_model
         else:
-            print(f"Calibrating camera {camera_str} failed.")
+            print(f"Calibrating camera {camera_str}.")
+            tic = time.time()
+            camera_model = cc.calibrate_camera(camera_str, error_threshold=100)
+            toc = time.time()
+            if camera_model is not None:
+                print(f"Saving camera model to {out_path}")
+                camera_model.save_to_file(out_path)
+                print(f"Time to calibrate camera {camera_str} was {(toc - tic):.3f}s")
+                print(camera_model)
+                cameras[channel][modality] = camera_model
+            else:
+                print(f"Calibrating camera {camera_str} failed.")
 
+    # If we have multiple cameras within one model, we can utilize the fact that these cameras
+    # are colocated to use 3D points obtained from one to project into the other
     if joint_calibration:
         for camera_str in cc.ccd.best_cameras.keys():
             channel, modality = camera_str.split("_")[2:]
@@ -84,14 +102,14 @@ def main():
             if modality == main_modality:
                 continue
             print(f"Calibrating camera {camera_str}.")
-            tic = time.time()
+            tic = time.perf_counter()
             camera_model = cc.transfer_calibration(
                 camera_str,
                 cameras[channel][main_modality],
                 calibrated_modality=main_modality,
                 error_threshold=100,
             )
-            toc = time.time()
+            toc = time.perf_counter()
             if camera_model is not None:
                 out_path = os.path.join(save_dir, f"{camera_str}_v2.yaml")
                 print(f"Saving camera model to {out_path}")
@@ -102,7 +120,12 @@ def main():
                 print(camera_model)
                 cameras[channel][modality] = camera_model
             else:
-                print(f"Calibrating camera {camera_str} failed.")
+                print(f"Transferring calibration to camera {camera_str} failed.")
+
+    # IR calibration generally happens in a separate model, since SIFT has a hard
+    # time matching between EO and long-wave IR
+    if calibrate_ir:
+        colmap_dir = os.path.join(flight_dir, "colmap")
 
     aircraft, angle = camera_str.split("_")[0:2]
     gif_dir = os.path.join(save_dir, "registration_gifs_v2")
