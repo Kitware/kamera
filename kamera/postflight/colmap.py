@@ -80,6 +80,20 @@ class ColmapCalibration(object):
         channel = base.split("_")[3]
         return channel
 
+    def get_view(self, fname: str | os.PathLike) -> str:
+        """Extract view (e.g. left_view, right_view, center_view) from
+        a given kamera filename"""
+        base = osp.basename(fname)
+        channel = base.split("_")[3]
+        view = "null"
+        if channel == "C":
+            view = "center_view"
+        elif channel == "L":
+            view = "left_view"
+        elif channel == "R":
+            view = "right_view"
+        return view
+
     def get_basename_to_time(self, flight_dir: str | os.PathLike) -> dict:
         # Establish correspondence between real-world exposure times base of file
         # names.
@@ -282,71 +296,98 @@ class ColmapCalibration(object):
     def write_gifs(
         self,
         gif_dir: str | os.PathLike,
-        colmap_dir: str | os.PathLike,
-        rgb_str: str,
-        camera_str: str,
-        cm_rgb: StandardCamera,
-        cm_uv: StandardCamera,
+        camera_name: str,
+        colocated_modality: str,
+        camera_model: StandardCamera,
+        colocated_camera_model: StandardCamera,
     ) -> None:
-        print(f"Writing a registration gif for cameras {rgb_str} " f"and {camera_str}.")
-        # Pick an image pair and register.
+        channel, modality = camera_name.split("_")[2:]
+        colocated_camera_name = camera_name.replace(modality, colocated_modality)
+        print(
+            f"Writing registration gifs for cameras {camera_name} "
+            f"and {colocated_camera_name}."
+        )
         ub.ensuredir(gif_dir)
 
         img_fnames = self.ccd.img_fnames
-        for k in range(10):
+        # write 5 image pairs for each
+        for k in range(5):
             inds = list(range(len(img_fnames)))
             np.random.shuffle(inds)
             for i in range(len(img_fnames)):
-                uv_img = rgb_img = None
-                fname1 = img_fnames[inds[i]]
-                if osp.basename(osp.dirname(fname1)) != rgb_str:
+                colocated_img = img = None
+                fname = img_fnames[inds[i]]
+                if osp.basename(osp.dirname(fname)) != camera_name:
                     continue
-                t1 = self.ccd.basename_to_time[self.get_base_name(fname1)]
-                channel = self.get_channel(fname1)  # L/C/R
+                view = self.get_view(fname)
                 try:
-                    rgb_fname = self.ccd.fname_to_time_channel_modality[t1][channel][
-                        "rgb"
-                    ]
-                    abs_rgb_fname = os.path.join(colmap_dir, "images0", rgb_fname)
-                    rgb_img = cv2.imread(abs_rgb_fname, cv2.IMREAD_COLOR)[:, :, ::-1]
+                    bname = osp.basename(fname)
+                    abs_fname = osp.join(self.flight_dir, view, bname)
+                    img = cv2.imread(abs_fname, cv2.IMREAD_COLOR)[:, :, ::-1]
                 except Exception as e:
-                    print(f"No rgb image found at time {t1}")
+                    print(f"No {modality} image found at path {abs_fname}")
                     continue
                 try:
-                    uv_fname = self.ccd.fname_to_time_channel_modality[t1][channel][
-                        "uv"
+                    # get colocated image from the same time
+                    abs_colocated_bname = pathlib.Path(
+                        abs_fname.replace(modality, colocated_modality)
+                    )
+                    abs_colocated_fname = None
+                    if not abs_colocated_bname.is_file():
+                        # can't find file, check other extensions
+                        for ext in [".jpg", ".jpeg", ".png", ".tiff"]:
+                            if abs_colocated_bname.with_suffix(ext).is_file():
+                                abs_colocated_fname = str(
+                                    abs_colocated_bname.with_suffix(ext)
+                                )
+                                break
+                    else:
+                        abs_colocated_fname = str(abs_colocated_bname)
+                    colocated_bname = osp.basename(abs_colocated_fname)
+                    colocated_img = cv2.imread(abs_colocated_fname, cv2.IMREAD_COLOR)[
+                        :, :, ::-1
                     ]
-                    abs_uv_fname = os.path.join(colmap_dir, "images0", uv_fname)
-                    uv_img = cv2.imread(abs_uv_fname, cv2.IMREAD_COLOR)[:, :, ::-1]
+                    # Once we find a matching pair, break
                     break
                 except Exception as e:
-                    print(f"No uv image found at time {t1}")
+                    print(
+                        f"No {colocated_modality} image found at filepath {abs_colocated_fname}"
+                    )
                     continue
 
-            if uv_img is None or rgb_img is None:
+            if img is None or colocated_img is None:
                 print("Failed to find matching image pair, skipping.")
                 continue
-            print(f"Writing {rgb_fname} and {uv_fname} to gif.")
+            print(f"Writing {bname} and {colocated_bname} to gif.")
 
-            # Warps the color image img1 into the uv camera model cm_uv
-            warped_rgb_img, mask = render_view(
-                cm_rgb, rgb_img, 0, cm_uv, 0, block_size=10
-            )
-
-            ds_warped_rgb_img = PIL.Image.fromarray(
-                cv2.pyrDown(cv2.pyrDown(cv2.pyrDown(warped_rgb_img)))
-            )
-            ds_uv_img = PIL.Image.fromarray(
-                cv2.pyrDown(cv2.pyrDown(cv2.pyrDown(uv_img)))
+            # warps the given colocated image into the view of the original camera model
+            warped_colocated_img, mask = render_view(
+                colocated_camera_model, colocated_img, 0, camera_model, 0, block_size=10
             )
             fname_out = osp.join(
-                gif_dir, f"{rgb_str}_to_{camera_str}_registration_{k}.gif"
+                gif_dir,
+                f"{camera_name}_to_{colocated_camera_name}_registration_{k}.gif",
             )
             print(f"Writing gif to {fname_out}.")
-            ds_uv_img.save(
+            # ds_warped_rgb_img = PIL.Image.fromarray(
+            #    cv2.pyrDown(cv2.pyrDown(cv2.pyrDown(warped_rgb_img)))
+            # )
+            # ds_uv_img = PIL.Image.fromarray(
+            #    cv2.pyrDown(cv2.pyrDown(cv2.pyrDown(colocated_img)))
+            # )
+            # Make sure gifs are reasonable size
+            w, h, _ = img.shape
+            ratio = w / h
+            new_w = 1280
+            new_h = int(new_w * ratio)
+            pil_img = PIL.Image.fromarray(img).resize((new_w, new_h))
+            pil_colocated_img = PIL.Image.fromarray(warped_colocated_img).resize(
+                (new_w, new_h)
+            )
+            pil_img.save(
                 fname_out,
                 save_all=True,
-                append_images=[ds_warped_rgb_img],
+                append_images=[pil_colocated_img],
                 duration=350,
                 loop=0,
             )
