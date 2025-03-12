@@ -1,4 +1,5 @@
 import random
+import cv2
 import numpy as np
 from dataclasses import dataclass
 from typing import List, NamedTuple, Optional, Tuple
@@ -6,7 +7,7 @@ from scipy.optimize import minimize, fminbound
 from scipy.spatial.transform import Rotation
 import pycolmap
 from kamera.colmap_processing.camera_models import StandardCamera
-from kamera.sensor_models.nav_state import NavStateINSJson
+from kamera.sensor_models.nav_state import NavStateINSJson, NavStateFixed
 
 
 @dataclass
@@ -534,9 +535,6 @@ def iterative_alignment(
         # Update uncertainty based on errors
         # check quaternion alignment over all frames
         for xys, xyzs, t in organized_points_per_frame:
-            xys = []
-            xyzs = []
-                    
             xys = np.array(xys)
             xyzs = np.array(xyzs)
             # Error in meters.
@@ -626,120 +624,95 @@ def iterative_alignment(
 
 def transfer_alignment(
     colmap_camera: pycolmap._core.Camera,
-    calibrated_camera: pycolmap._core.Camera,
-    nav_state_provider: NavStateINSJson,
-    points_per_image: List[List[VisiblePoint]],
     calibrated_camera_model: StandardCamera,
+    points_per_image: List[List[VisiblePoint]],
+    colocated_points_per_image: List[List[VisiblePoint]],
 ) -> StandardCamera:
-    # Both quaternions are of the form (x, y, z, w) and represent a coordinate
-    # system rotation.
+    im_pts = []
+    colocated_im_pts = []
     skipped = 0
     total = 0
-    im_pts_uv = []
-    im_pts_rgb = []
 
-    organized_points_per_frame = []
-    for pts in points_per_image:
-        max_uncertainty = 1
-        xy = []
-        xyz = []
-        xyz_ids = []
-        for pt in pts:
-            if pt.uncertainty < max_uncertainty:
-                xy.append(pt.point_2d)
-                xyz.append(pt.point_3d)
-                xyz_ids.append(pt.point_3d_id)
-        # time is the same for all points, since it's a single frame
-        xy = np.array(xy)
-        xyz = np.array(xyz)
-        organized_points_per_frame.append((xy, xyz, xyz_ids, pts[0].time))
-    return
+    for i, pts in enumerate(points_per_image):
+        pts = np.asarray(pts)
+        pt_3d_ids = np.asarray([pt.point_3d_id for pt in pts])
+        colocated_pts = np.asarray(colocated_points_per_image[i])
+        colocated_pt_3d_ids = np.asarray([pt.point_3d_id for pt in colocated_pts])
 
-    # Build up pairs of image coordinates between the two cameras from image
-    # pairs acquired from the same time.
-    # for pts in zip(points_per_image):
-    #    xys1, xyzs1, xyz1_ids, t1 = pts
+        # Need to make a unique here, since there are some non-unique 3d IDs for a
+        # multiple 2D points. This gets complicated, since we need to retain the original
+        # indices, so we return the index obtained via np.unique
+        uniq_pt_3d_ids, uniq_idx = np.unique(pt_3d_ids, return_index=True)
+        uniq_colocated_pt_3d_ids, colocated_uniq_idx = np.unique(
+            colocated_pt_3d_ids, return_index=True
+        )
 
-    #    for _id in xyz1_ids:
-    #        if calibrated_camera.has_point3D(_id):
+        # Get correspondences from uncalibrated -> colocated camera
+        match_idx = np.isin(
+            uniq_pt_3d_ids, uniq_colocated_pt_3d_ids, assume_unique=True
+        )
+        if len(match_idx) < 1:
+            print("No matching 3D points found!")
+            continue
+        temp_pts = [pt.point_2d for pt in pts[uniq_idx][match_idx]]
 
-    #    xys2, xyzs2, t2 = colocated_pts
-    #    base_name = get_base_name(image_uv.name)
+        # Since they're both unique, commutative, so repeat the process but in opposite
+        # to find colocated -> uncalibrated correspondences
+        colocated_match_idx = np.isin(
+            uniq_colocated_pt_3d_ids, uniq_pt_3d_ids, assume_unique=True
+        )
+        temp_colocated_pts = [
+            pt.point_2d for pt in colocated_pts[colocated_uniq_idx][colocated_match_idx]
+        ]
 
-    #    try:
-    #        t1 = basename_to_time[base_name]
-    #    except KeyError:
-    #        print(f"No time found for {base_name}.")
-    #        continue
+        im_pts += temp_pts
+        colocated_im_pts += temp_colocated_pts
 
-    #    try:
-    #        image_rgb = time_to_modality[t1]["rgb"]
-    #    except KeyError:
-    #        print(f"No rgb image found at {t1}.")
-    #        continue
+        # Since both are equal, can take the total of either
+        total += np.sum(colocated_match_idx)
+    print(
+        f"Matched {i-skipped}/{i} image pairs, resulting in "
+        f"{total} matching 2D points."
+    )
 
-    #    # Both 'uv_image' and 'image_rgb' are from the same time.
-    #    pt_ids1 = image_uv.point3D_ids
-    #    ind = pt_ids1 != -1
-    #    xys1 = dict(zip(pt_ids1[ind], image_uv.xys[ind]))
+    im_pts = np.array(im_pts)
+    colocated_im_pts = np.array(colocated_im_pts)
 
-    #    pt_ids2 = image_rgb.point3D_ids
-    #    ind = pt_ids2 != -1
-    #    xys2 = dict(zip(pt_ids2[ind], image_rgb.xys[ind]))
+    # Arbitrary cut off
+    minimum_pts_required = 10
+    if (
+        len(im_pts) < minimum_pts_required
+        or len(colocated_im_pts) < minimum_pts_required
+    ):
+        print("[ERROR] Not enough matching 2D image points were found for camera.")
+        return
 
-    #    match_ids = set(xys1.keys()).intersection(set(xys2.keys()))
-    #    total += 1
-    #    if len(match_ids) < 1:
-    #        # print("No match IDs found.")
-    #        skipped += 1
-    #        continue
+    # Treat as co-located cameras (they are) and unproject out of RGB and into
+    # the other camera.
+    ray_pos, ray_dir = calibrated_camera_model.unproject(colocated_im_pts.T)
+    wrld_pts = ray_dir.T * 1e4
+    assert np.all(np.isfinite(wrld_pts)), "World points contain non-finite values."
 
-    #    for match_id in match_ids:
-    #        im_pts_uv.append(xys1[match_id])
-    #        im_pts_rgb.append(xys2[match_id])
+    if colmap_camera.model == "OPENCV":
+        fx, fy, cx, cy, d1, d2, d3, d4 = colmap_camera.params
+    elif colmap_camera.model == "PINHOLE":
+        fx, fy, cx, cy = colmap_camera.params
+        d1 = d2 = d3 = d4 = 0
 
-    # print(
-    #    f"Matched {total-skipped}/{total} image pairs, resulting in "
-    #    f"{len(im_pts_uv)} matching UV and RGB points."
-    # )
+    K = colmap_camera.calibration_matrix()
+    if colmap_camera.model.name == "OPENCV":
+        fx, fy, cx, cy, d1, d2, d3, d4 = colmap_camera.params
+    elif colmap_camera.model.name == "SIMPLE_RADIAL":
+        d1 = d2 = d3 = d4 = 0
+    elif colmap_camera.model.name == "PINHOLE":
+        d1 = d2 = d3 = d4 = 0
+    else:
+        raise SystemError(f"Unexpected camera model found: {colmap_camera.model.name}")
+    dist = np.array([d1, d2, d3, d4])
 
-    # im_pts_uv = np.array(im_pts_uv)
-    # im_pts_rgb = np.array(im_pts_rgb)
-    ## Arbitrary cut off
-    # minimum_pts_required = 10
-    # if len(im_pts_rgb) < minimum_pts_required or len(im_pts_uv) < minimum_pts_required:
-    #    print(
-    #        "[ERROR] Not enough matching RGB/UV image points were found "
-    #        f"for camera {uv_str}."
-    #    )
-    #    continue
-
-    # if False:
-    #    plt.subplot(121)
-    #    plt.plot(im_pts_uv[:, 0], im_pts_uv[:, 1], "ro")
-    #    plt.subplot(122)
-    #    plt.plot(im_pts_rgb[:, 0], im_pts_rgb[:, 1], "bo")
-
-    ## Treat as co-located cameras (they are) and unproject out of RGB and into
-    ## the other camera.
-    # ray_pos, ray_dir = cm_rgb.unproject(im_pts_rgb.T)
-    # wrld_pts = ray_dir.T * 1e4
-    # assert np.all(np.isfinite(wrld_pts)), "World points contain non-finite values."
-
-    # colmap_camera = camera_from_camera_str[uv_str]
-
-    # if colmap_camera.model == "OPENCV":
-    #    fx, fy, cx, cy, d1, d2, d3, d4 = colmap_camera.params
-    # elif colmap_camera.model == "PINHOLE":
-    #    fx, fy, cx, cy = colmap_camera.params
-    #    d1 = d2 = d3 = d4 = 0
-
-    # K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
-    # dist = np.array([d1, d2, d3, d4], dtype=np.float32)
-
-    # flags = cv2.CALIB_ZERO_TANGENT_DIST
-    # flags = flags | cv2.CALIB_USE_INTRINSIC_GUESS
-    # flags = flags | cv2.CALIB_FIX_PRINCIPAL_POINT
+    flags = cv2.CALIB_ZERO_TANGENT_DIST
+    flags = flags | cv2.CALIB_USE_INTRINSIC_GUESS
+    flags = flags | cv2.CALIB_FIX_PRINCIPAL_POINT
     # flags = flags | cv2.CALIB_FIX_K1
     # flags = flags | cv2.CALIB_FIX_K2
     # flags = flags | cv2.CALIB_FIX_K3
@@ -747,187 +720,175 @@ def transfer_alignment(
     # flags = flags | cv2.CALIB_FIX_K5
     # flags = flags | cv2.CALIB_FIX_K6
 
-    # criteria = (
-    #    cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
-    #    30000,
-    #    0.0000001,
-    # )
+    criteria = (
+        cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
+        30000,
+        0.0000001,
+    )
 
-    # ret = cv2.calibrateCamera(
-    #    [wrld_pts.astype(np.float32)],
-    #    [im_pts_uv.astype(np.float32)],
-    #    (colmap_camera.width, colmap_camera.height),
-    #    cameraMatrix=K.copy(),
-    #    distCoeffs=dist.copy(),
-    #    flags=flags,
-    #    criteria=criteria,
-    # )
+    print(len(wrld_pts))
+    print(len(im_pts))
 
-    # err, _, _, rvecs, tvecs = ret
+    ret = cv2.calibrateCamera(
+        [wrld_pts.astype(np.float32)],
+        [im_pts.astype(np.float32)],
+        (colmap_camera.width, colmap_camera.height),
+        cameraMatrix=K.copy(),
+        distCoeffs=dist.copy(),
+        flags=flags,
+        criteria=criteria,
+    )
+
+    err, _, _, rvecs, tvecs = ret
 
     # R = np.identity(4)
-    # R[:3, :3] = cv2.Rodrigues(rvecs[0])[0]
+    R = cv2.Rodrigues(rvecs[0])[0]
+    cam_quat = Rotation.from_matrix(R.T).as_quat()
     # cam_quat = quaternion_from_matrix(R.T)
 
     ## Only optimize 3/4 components of the quaternion.
-    # static_quat_ind = np.argmax(np.abs(cam_quat))
-    # dynamic_quat_ind = [i for i in range(4) if i != static_quat_ind]
-    ## static_quat_ind = 3            # Fixing the 'w' component
-    ## dynamic_quat_ind = [0, 1, 2]   # Optimizing 'x', 'y', 'z' components
-    # dynamic_quat_ind = np.array(dynamic_quat_ind)
-    # cam_quat = np.asarray(cam_quat)
-    # cam_quat /= np.linalg.norm(cam_quat)
-    # x0 = cam_quat[dynamic_quat_ind].copy()  # [x, y, z]
+    # static_quat_ind = 3  # Fixing the 'w' component
+    dynamic_quat_ind = [0, 1, 2]  # Optimizing 'x', 'y', 'z' components
+    dynamic_quat_ind = np.array(dynamic_quat_ind)
+    cam_quat = np.asarray(cam_quat)
+    cam_quat /= np.linalg.norm(cam_quat)
+    x0 = cam_quat[dynamic_quat_ind].copy()  # [x, y, z]
 
-    # def get_cm(x):
-    #    """
-    #    Create a camera model with updated quaternion and intrinsic parameters.
+    nav_state_fixed = NavStateFixed(np.zeros(3), [0, 0, 0, 1])
 
-    #    Parameters:
-    #    - x: array-like, shape (N,)
-    #        Optimization variables where the first 3 elements correspond to
-    #        the dynamic quaternion components ('x', 'y', 'z'), optionally
-    #        followed by intrinsic parameters ('fx', 'fy', etc.).
+    def get_cm(x):
+        """
+        Create a camera model with updated quaternion and intrinsic parameters.
 
-    #    Returns:
-    #    - cm: StandardCamera instance
-    #        Updated camera model with new parameters.
-    #    """
-    #    # Ensure 'x' has at least 3 elements for quaternion
-    #    assert (
-    #        len(x) > 2
-    #    ), "Optimization variable 'x' must have at least 3 elements for quaternion."
+        Parameters:
+        - x: array-like, shape (N,)
+            Optimization variables where the first 3 elements correspond to
+            the dynamic quaternion components ('x', 'y', 'z'), optionally
+            followed by intrinsic parameters ('fx', 'fy', etc.).
 
-    #    # Validate 'x[:3]' are finite numbers
-    #    assert np.all(
-    #        np.isfinite(x[:3])
-    #    ), "Quaternion components contain non-finite values."
+        Returns:
+        - cm: StandardCamera instance
+            Updated camera model with new parameters.
+        """
+        # Ensure 'x' has at least 3 elements for quaternion
+        assert (
+            len(x) > 2
+        ), "Optimization variable 'x' must have at least 3 elements for quaternion."
 
-    #    # Initialize quaternion with fixed 'w' component
-    #    cam_quat_new = np.ones(4)
+        # Validate 'x[:3]' are finite numbers
+        assert np.all(
+            np.isfinite(x[:3])
+        ), "Quaternion components contain non-finite values."
 
-    #    # Assign dynamic components from optimization variables
-    #    cam_quat_new[dynamic_quat_ind] = x[:3]
+        # Initialize quaternion with fixed 'w' component
+        cam_quat_new = np.ones(4)
 
-    #    # Normalize to ensure it's a unit quaternion
-    #    norm = np.linalg.norm(cam_quat_new)
-    #    assert norm > 1e-6, "Quaternion has zero or near-zero magnitude."
-    #    cam_quat_new /= norm
+        # Assign dynamic components from optimization variables
+        cam_quat_new[dynamic_quat_ind] = x[:3]
 
-    #    # Extract intrinsic parameters
-    #    if len(x) > 3:
-    #        fx_ = x[3]
-    #        fy_ = x[4]
-    #    else:
-    #        fx_ = fx
-    #        fy_ = fy
+        # Normalize to ensure it's a unit quaternion
+        norm = np.linalg.norm(cam_quat_new)
+        assert norm > 1e-6, "Quaternion has zero or near-zero magnitude."
+        cam_quat_new /= norm
 
-    #    if len(x) > 5:
-    #        dist_ = x[5:]
-    #    else:
-    #        dist_ = dist
+        # Extract intrinsic parameters
+        if len(x) > 3:
+            fx_ = x[3]
+            fy_ = x[4]
+        else:
+            fx_ = fx
+            fy_ = fy
 
-    #    # Construct the intrinsic matrix
-    #    K = np.array([[fx_, 0, cx], [0, fy_, cy], [0, 0, 1]])
+        if len(x) > 5:
+            dist_ = x[5:]
+        else:
+            dist_ = dist
 
-    #    # Create the camera model
-    #    cm = StandardCamera(
-    #        colmap_camera.width,
-    #        colmap_camera.height,
-    #        K,
-    #        dist_,
-    #        [0, 0, 0],
-    #        cam_quat_new,
-    #        platform_pose_provider=nav_state_fixed,
-    #    )
-    #    return cm
+        # Construct the intrinsic matrix
+        K = np.array([[fx_, 0, cx], [0, fy_, cy], [0, 0, 1]])
 
-    # def error(x):
-    #    try:
-    #        cm = get_cm(x)
-    #        projected_uv = cm.project(wrld_pts.T).T  # Shape: (N, 2)
+        # Create the camera model
+        cm = StandardCamera(
+            colmap_camera.width,
+            colmap_camera.height,
+            K,
+            dist_,
+            [0, 0, 0],
+            cam_quat_new,
+            platform_pose_provider=nav_state_fixed,
+        )
+        return cm
 
-    #        # Compute Euclidean distances
-    #        err = np.sqrt(np.sum((im_pts_uv - projected_uv) ** 2, axis=1))
+    def error(x):
+        try:
+            cm = get_cm(x)
+            projected = cm.project(wrld_pts.T).T  # Shape: (N, 2)
 
-    #        # Apply Huber loss
-    #        delta = 20
-    #        ind = err < delta
-    #        err[ind] = err[ind] ** 2
-    #        err[~ind] = 2 * (err[~ind] - delta / 2) * delta
+            # Compute Euclidean distances
+            err = np.sqrt(np.sum((im_pts - projected) ** 2, axis=1))
 
-    #        # Sort and trim the error
-    #        err = sorted(err)[: len(err) - len(err) // 5]
+            # Apply Huber loss
+            delta = 20
+            ind = err < delta
+            err[ind] = err[ind] ** 2
+            err[~ind] = 2 * (err[~ind] - delta / 2) * delta
 
-    #        # Compute mean error
-    #        mean_err = np.sqrt(np.mean(err))
+            # Sort and trim the error
+            err = sorted(err)[: len(err) - len(err) // 5]
 
-    #        # Add regularization term (e.g., L2 penalty)
-    #        reg_strength = 1e-3  # Adjust as needed
-    #        reg_term = reg_strength * np.linalg.norm(x[:3]) ** 2
+            # Compute mean error
+            mean_err = np.sqrt(np.mean(err))
 
-    #        total_error = mean_err + reg_term
-    #        return total_error
-    #    except Exception as e:
-    #        print(f"Error in error function: {e}")
-    #        return np.inf  # Assign a high error if computation fails
+            # Add regularization term (e.g., L2 penalty)
+            reg_strength = 1e-3  # Adjust as needed
+            reg_term = reg_strength * np.linalg.norm(x[:3]) ** 2
 
-    ## Optional: Define a callback function to monitor optimization
-    # def callback(xk):
-    #    try:
-    #        cm = get_cm(xk)
-    #        projected_uv = cm.project(wrld_pts.T).T
-    #        err = np.sqrt(np.sum((im_pts_uv - projected_uv) ** 2, axis=1))
-    #        mean_err = np.mean(err)
-    #        print(f"Current x: {xk}, Mean Error: {mean_err}")
-    #    except Exception as e:
-    #        print(f"Error in callback: {e}")
+            total_error = mean_err + reg_term
+            return total_error
+        except Exception as e:
+            print(f"Error in error function: {e}")
+            return np.inf  # Assign a high error if computation fails
 
-    # def plot_results1(x):
-    #    cm = get_cm(x)
-    #    err = np.sqrt(np.sum((im_pts_uv - cm.project(wrld_pts.T).T) ** 2, 1))
-    #    err = sorted(err)
-    #    plt.plot(np.linspace(0, 100, len(err)), err)
+    print("Optimizing error for transfer models.")
+    x = x0.copy()
+    # Example bounds for [x, y, z] components
+    bounds = [
+        (-1.0, 1.0),  # x
+        (-1.0, 1.0),  # y
+        (-1.0, 1.0),  # z
+    ]
+    print("First pass")
+    # Perform optimization on [x, y, z]
+    ret = minimize(
+        error,
+        x,
+        method="L-BFGS-B",
+        bounds=bounds,
+        callback=None,  # Optional: Monitor progress
+        options={"disp": False, "maxiter": 30000, "ftol": 1e-7},
+    )
+    assert ret.success, "Minimization of transfer calibration error failed."
+    x = np.hstack([ret.x, fx, fy])
+    print("Second pass")
+    assert np.all(np.isfinite(x)), "Input quaternion with locked fx, fy, is not finite."
+    ret = minimize(error, x, method="Powell")
+    x = ret.x
+    print("Third pass")
+    assert np.all(np.isfinite(x)), "Input quaternion for BFGS is not finite."
+    ret = minimize(error, x, method="BFGS")
 
-    # print("Optimizing error for UV models.")
-    # x = x0.copy()
-    ## Example bounds for [x, y, z] components
-    # bounds = [
-    #    (-1.0, 1.0),  # x
-    #    (-1.0, 1.0),  # y
-    #    (-1.0, 1.0),
-    # ]  # z
-    # print("First pass")
-    ## Perform optimization on [x, y, z]
-    # ret = minimize(
-    #    error,
-    #    x,
-    #    method="L-BFGS-B",
-    #    bounds=bounds,
-    #    callback=None,  # Optional: Monitor progress
-    #    options={"disp": False, "maxiter": 30000, "ftol": 1e-7},
-    # )
-    # assert ret.success, "Minimization of UV error failed."
-    # x = np.hstack([ret.x, fx, fy])
-    # print("Second pass")
-    # assert np.all(np.isfinite(x)), "Input quaternion with locked fx, fy, is not finite."
-    # ret = minimize(error, x, method="Powell")
-    # x = ret.x
-    # print("Third pass")
-    # assert np.all(np.isfinite(x)), "Input quaternion for BFGS is not finite."
-    # ret = minimize(error, x, method="BFGS")
+    print("Fourth pass")
+    x = np.hstack([ret.x, dist])
+    ret = minimize(error, x, method="Powell")
+    x = ret.x
 
-    # print("Final pass")
-    # if True:
-    #    x = np.hstack([ret.x, dist])
-    #    ret = minimize(error, x, method="Powell")
-    #    x = ret.x
-    #    ret = minimize(error, x, method="BFGS")
-    #    x = ret.x
+    print("Final pass")
+    ret = minimize(error, x, method="BFGS")
+    x = ret.x
 
-    # assert np.all(np.isfinite(x)), "Input quaternion for final model is not finite."
-    # cm_uv = get_cm(x)
-    # cm_uv.save_to_file("%s/%s.yaml" % (save_dir, uv_str))
+    assert np.all(np.isfinite(x)), "Input quaternion for final model is not finite."
+    cm = get_cm(x)
+    return cm
 
 
 if __name__ == "__main__":

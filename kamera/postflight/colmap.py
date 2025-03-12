@@ -235,20 +235,31 @@ class ColmapCalibration(object):
         observations = [
             pts for i, pts in enumerate(self.ccd.points_per_image) if cam_idxs[i] == 1
         ]
-        if len(observations) < 10:
-            print(f"Only {len(observations)} seen for camera {camera_name}, skipping.")
 
         # Now we have to find the overlapping observations on a per-frame basis between
         # the camera to calibrate, and the colocated, calibrated, camera.
+        colocated_observations = []
+        observations = []
         for i, fname in enumerate(self.ccd.img_fnames):
             if cam_idxs[i] == 1:
+                # Replace with the modality of the already calibrated modality
                 calibrated_fname = fname.replace(modality, calibrated_modality)
                 ii = self.ccd.img_fnames.index(calibrated_fname)
+                colocated_observations.append(self.ccd.points_per_image[ii])
+                observations.append(self.ccd.points_per_image[i])
+        if len(observations) < 10 or len(colocated_observations) < 10:
+            print(
+                f"Only {len(observations)} seen for camera {camera_name}, and "
+                f" only {len(colocated_observations)} found for the calibrated camera, "
+                " skipping."
+            )
+            return
+
         cam = self.ccd.best_cameras[camera_name]
-        # camera_model = transfer_alignment(
-        #     cam, calibrated_cam, observations, self.nav_state_provider
-        # )
-        return None  # camera_model
+        camera_model = transfer_alignment(
+            cam, calibrated_camera_model, observations, colocated_observations
+        )
+        return camera_model
 
     def create_fname_to_time_channel_modality(
         self, img_fnames, basename_to_time
