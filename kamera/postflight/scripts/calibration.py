@@ -1,6 +1,9 @@
 import os
 import time
+import json
+import pathlib
 import ubelt as ub
+from rich import print
 
 from kamera.colmap_processing.camera_models import load_from_file
 from kamera.postflight.colmap import ColmapCalibration, find_best_sparse_model
@@ -58,9 +61,12 @@ def main():
     # Whether to calibrate IR models or not. A "colmap_ir" must be built
     # in the same folder
     calibrate_ir = True
+    # open the point clicking UI to refine IR calibration?
+    refine_ir = True
 
     # Step 1: Make sure the model is aligned to the INS readings, if not,
     # find the best model and align it.
+    print("[blue] Loading 3D RGB/UV Model.[/blue]")
     cc = align_model(flight_dir, colmap_dir, align_dir)
 
     # We now have an aligned 3-D model, so we can calibrate the cameras
@@ -68,8 +74,11 @@ def main():
     cc.prepare_calibration_data()
     ub.ensuredir(save_dir)
     cameras = ub.AutoDict()
+    errors = ub.AutoDict()
     camera_strs = list(cc.ccd.best_cameras.keys())
     modalities = [cs.split("_")[3] for cs in camera_strs]
+    num_cameras_loaded = 0
+    num_cameras_calibrated = 0
     if len(modalities) < 1:
         print(
             "Warning: only 1 modality found in this 3D model, not joinly calibrating."
@@ -88,10 +97,11 @@ def main():
             )
             camera_model = load_from_file(out_path)
             cameras[channel][modality] = camera_model
+            num_cameras_loaded += 1
         else:
             print(f"Calibrating camera {camera_str}.")
             tic = time.time()
-            camera_model = cc.calibrate_camera(camera_str, error_threshold=100)
+            camera_model, error = cc.calibrate_camera(camera_str)
             toc = time.time()
             if camera_model is not None:
                 print(f"Saving camera model to {out_path}")
@@ -99,8 +109,10 @@ def main():
                 print(f"Time to calibrate camera {camera_str} was {(toc - tic):.3f}s")
                 print(camera_model)
                 cameras[channel][modality] = camera_model
+                errors[channel][modality] = error
             else:
                 print(f"Calibrating camera {camera_str} failed.")
+            num_cameras_calibrated += 1
 
     # If we have multiple cameras within one model, we can utilize the fact that these cameras
     # are colocated to use 3D points obtained from one to project into the other
@@ -117,14 +129,14 @@ def main():
                 )
                 camera_model = load_from_file(out_path)
                 cameras[channel][modality] = camera_model
+                num_cameras_loaded += 1
             else:
                 print(f"Calibrating camera {camera_str}.")
                 tic = time.perf_counter()
-                camera_model = cc.transfer_calibration(
+                camera_model, error = cc.transfer_calibration(
                     camera_str,
                     cameras[channel][main_modality],
                     calibrated_modality=main_modality,
-                    error_threshold=100,
                 )
                 toc = time.perf_counter()
                 if camera_model is not None:
@@ -135,6 +147,8 @@ def main():
                     )
                     print(camera_model)
                     cameras[channel][modality] = camera_model
+                    errors[channel][modality] = error
+                    num_cameras_calibrated += 1
                 else:
                     print(f"Transferring calibration to camera {camera_str} failed.")
 
@@ -143,6 +157,7 @@ def main():
     if calibrate_ir:
         ir_colmap_dir = os.path.join(flight_dir, "colmap_ir")
         ir_align_dir = os.path.join(ir_colmap_dir, "aligned")
+        print("[blue] Loading 3D IR Model.[/blue]")
         ir_cc = align_model(flight_dir, ir_colmap_dir, ir_align_dir)
         print("Preparing IR calibration data...")
         ir_cc.prepare_calibration_data()
@@ -156,10 +171,13 @@ def main():
                 )
                 camera_model = load_from_file(out_path)
                 cameras[channel][modality] = camera_model
+                num_cameras_loaded += 1
             else:
                 print(f"Calibrating camera {camera_str}.")
                 tic = time.perf_counter()
-                camera_model = ir_cc.calibrate_camera(camera_str, error_threshold=100)
+                camera_model, error = ir_cc.calibrate_camera(
+                    camera_str, error_threshold=100
+                )
                 toc = time.perf_counter()
                 if camera_model is not None:
                     print(f"Saving camera model to {out_path}")
@@ -169,8 +187,49 @@ def main():
                     )
                     print(camera_model)
                     cameras[channel][modality] = camera_model
+                    errors[channel][modality] = error
+                    num_cameras_calibrated += 1
                 else:
                     print(f"Calibrating camera {camera_str} failed.")
+
+            ir_cameras_refined = 0
+            if refine_ir:
+                # need to define a points per modality/view pair
+                ir_points_json = pathlib.Path(
+                    os.path.join(
+                        flight_dir,
+                        "manual_keypoints",
+                        f"{channel}_ir_to_rgb_points.json",
+                    )
+                )
+                if not ir_points_json.is_file():
+                    # check to see if there are numpy points saved
+                    ir_points_txt = ir_points_json.with_suffix(".txt")
+                    if ir_points_txt.is_file():
+                        with ir_points_txt.open() as f:
+                            fpoints = f.readlines()
+                        points = {"rightPoints": [], "leftPoints": []}
+                        for line in fpoints:
+                            vals = list(map(float, line.split(" ")))
+                            points["rightPoints"].append(vals[:2])
+                            points["leftPoints"].append(vals[2:4])
+                    else:
+                        print(
+                            "[yellow]"
+                            f"No matching points file was found! Please place your points file"
+                            f" in [bold]{ir_points_txt}[/bold] if in text format, or [bold]{ir_points_json}[/bold] if in json format."
+                            "[yellow]"
+                        )
+                        continue
+                else:
+                    with open(ir_points_json, "r") as f:
+                        points = json.load(f)
+                refined_camera_model, error = ir_cc.manual_calibration(
+                    camera_model, cameras[channel][main_modality], points
+                )
+                cameras[channel][modality] = refined_camera_model
+                errors[channel][modality] = error
+                ir_cameras_refined += 1
 
     aircraft, angle = camera_str.split("_")[0:2]
     gif_dir = os.path.join(save_dir, "registration_gifs_v2")
@@ -187,6 +246,7 @@ def main():
             colocated_modality="rgb",
             camera_model=uv_model,
             colocated_camera_model=rgb_model,
+            num_gifs=5,
         )
 
     # Write IR GIFs
@@ -201,7 +261,16 @@ def main():
                 colocated_modality="rgb",
                 camera_model=ir_model,
                 colocated_camera_model=rgb_model,
+                num_gifs=5,
             )
+
+    print("=" * 80)
+    print("[bold] Quick Summary: ")
+    print(f"Number of cameras calibrated: {num_cameras_calibrated}.")
+    print(f"Number of cameras loaded from disk: {num_cameras_loaded}.")
+    print(f"Number of IR cameras refined {ir_cameras_refined}.")
+    print("Errors: ")
+    print(errors)
 
 
 if __name__ == "__main__":

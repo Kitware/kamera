@@ -8,6 +8,7 @@ import os.path as osp
 import ubelt as ub
 from posixpath import basename
 from re import I
+from rich import print
 
 from shapely import points
 import pycolmap as pc
@@ -19,6 +20,7 @@ from kamera.colmap_processing.image_renderer import render_view
 from kamera.postflight.alignment import (
     VisiblePoint,
     iterative_alignment,
+    manual_alignment,
     transfer_alignment,
 )
 
@@ -202,9 +204,7 @@ class ColmapCalibration(object):
         self.ccd = ccd
         return ccd
 
-    def calibrate_camera(
-        self, camera_name: str, error_threshold: float
-    ) -> StandardCamera:
+    def calibrate_camera(self, camera_name: str) -> tuple[StandardCamera, float]:
         sfm_quats = np.array([pose[1] for pose in self.ccd.sfm_poses])
         ins_quats = np.array([pose[1] for pose in self.ccd.ins_poses])
         # Find all valid indices of current camera
@@ -222,18 +222,17 @@ class ColmapCalibration(object):
         if len(observations) < 10:
             print(f"Only {len(observations)} seen for camera {camera_name}, skipping.")
         cam = self.ccd.best_cameras[camera_name]
-        camera_model = iterative_alignment(
+        camera_model, error = iterative_alignment(
             cam_sfm_quats, cam_ins_quats, observations, cam, self.nav_state_provider
         )
-        return camera_model
+        return camera_model, error
 
     def transfer_calibration(
         self,
         camera_name: str,
         calibrated_camera_model: StandardCamera,
         calibrated_modality: str,
-        error_threshold: float,
-    ) -> StandardCamera:
+    ) -> tuple[StandardCamera, float]:
         """
         Use the quaternion already solved of a colocated, calibrated camera
         to bootstrap the calibration process.
@@ -270,10 +269,22 @@ class ColmapCalibration(object):
             return
 
         cam = self.ccd.best_cameras[camera_name]
-        camera_model = transfer_alignment(
+        camera_model, error = transfer_alignment(
             cam, calibrated_camera_model, observations, colocated_observations
         )
-        return camera_model
+        return camera_model, error
+
+    def manual_calibration(
+        self,
+        camera_model: StandardCamera,
+        reference_camera_model: StandardCamera,
+        point_pairs: dict,
+    ) -> tuple[StandardCamera, float]:
+        print("Refining camera model using manually defined point pairs.")
+        refined_model, error = manual_alignment(
+            camera_model, reference_camera_model, point_pairs
+        )
+        return refined_model, error
 
     def create_fname_to_time_channel_modality(
         self, img_fnames, basename_to_time
@@ -300,6 +311,7 @@ class ColmapCalibration(object):
         colocated_modality: str,
         camera_model: StandardCamera,
         colocated_camera_model: StandardCamera,
+        num_gifs: int = 5,
     ) -> None:
         channel, modality = camera_name.split("_")[2:]
         colocated_camera_name = camera_name.replace(modality, colocated_modality)
@@ -310,8 +322,7 @@ class ColmapCalibration(object):
         ub.ensuredir(gif_dir)
 
         img_fnames = self.ccd.img_fnames
-        # write 5 image pairs for each
-        for k in range(5):
+        for k in range(num_gifs):
             inds = list(range(len(img_fnames)))
             np.random.shuffle(inds)
             for i in range(len(img_fnames)):
@@ -460,9 +471,6 @@ class ColmapCalibration(object):
                 name = img_fnames[i]
                 pos = ins_poses[i][0]
                 fo.write("%s %0.8f %0.8f %0.8f\n" % (name, pos[0], pos[1], pos[2]))
-
-    def calibrate_ir(self):
-        pass
 
 
 def find_best_sparse_model(sparse_dir: str | os.PathLike):

@@ -1,5 +1,6 @@
 import random
 import cv2
+import copy
 import numpy as np
 from dataclasses import dataclass
 from typing import List, NamedTuple, Optional, Tuple
@@ -8,6 +9,7 @@ from scipy.spatial.transform import Rotation
 import pycolmap
 from kamera.colmap_processing.camera_models import StandardCamera
 from kamera.sensor_models.nav_state import NavStateINSJson, NavStateFixed
+from rich import print
 
 
 @dataclass
@@ -479,7 +481,7 @@ def iterative_alignment(
     points_per_image: List[List[VisiblePoint]],
     colmap_camera: pycolmap._core.Camera,
     nav_state_provider: NavStateINSJson,
-) -> StandardCamera:
+) -> tuple[StandardCamera, float]:
     # Both quaternions are of the form (x, y, z, w) and represent a coordinate
     # system rotation.
     cam_quats = [
@@ -619,7 +621,9 @@ def iterative_alignment(
         platform_pose_provider=nav_state_provider,
     )
 
-    return camera_model
+    final_error = cam_quat_error(best_quat)
+
+    return camera_model, final_error
 
 
 def transfer_alignment(
@@ -627,7 +631,27 @@ def transfer_alignment(
     calibrated_camera_model: StandardCamera,
     points_per_image: List[List[VisiblePoint]],
     colocated_points_per_image: List[List[VisiblePoint]],
-) -> StandardCamera:
+) -> tuple[StandardCamera, float]:
+    """If you have a 3D colmap sparse model that was generated using multiple,
+    colocated modalities, you can generate the camera model for the higher-resolution
+    camera first, then bootstrap the calibration process for the lower-resolution
+    modalities by transferring initial the transformation to the INS that was
+    already found by unprojecting the matching 3D features.
+
+    Args:
+        colmap_camera (pycolmap._core.Camera): The camera to calibrate.
+        calibrated_camera_model (StandardCamera): The colocated, already calibrated camera.
+        points_per_image (List[List[VisiblePoint]]): The 2D and 3D correspondences found
+            in each image in the camera to calibrate.
+        colocated_points_per_image (List[List[VisiblePoint]]): The 2D and 3D correspondences
+            found in each image in the colocated, calibrated camera.
+
+    Raises:
+        SystemError: An unsupported camera model was found in the colmap model.
+
+    Returns:
+        StandardCamera: The refined camera model.
+    """
     im_pts = []
     colocated_im_pts = []
     skipped = 0
@@ -713,6 +737,7 @@ def transfer_alignment(
     flags = cv2.CALIB_ZERO_TANGENT_DIST
     flags = flags | cv2.CALIB_USE_INTRINSIC_GUESS
     flags = flags | cv2.CALIB_FIX_PRINCIPAL_POINT
+    # Optionally, fix the K intrinsics
     # flags = flags | cv2.CALIB_FIX_K1
     # flags = flags | cv2.CALIB_FIX_K2
     # flags = flags | cv2.CALIB_FIX_K3
@@ -888,7 +913,69 @@ def transfer_alignment(
 
     assert np.all(np.isfinite(x)), "Input quaternion for final model is not finite."
     cm = get_cm(x)
-    return cm
+    final_error = error(x)
+    return cm, final_error
+
+
+def manual_alignment(
+    camera_model: StandardCamera,
+    reference_camera_model: StandardCamera,
+    image_point_pairs: dict,
+) -> tuple[StandardCamera, float]:
+    pts = np.array(image_point_pairs["rightPoints"]).astype(np.float32)
+    reference_pts = np.array(image_point_pairs["leftPoints"]).astype(np.float32)
+
+    def get_new_cm(x):
+        tmp_cm = copy.deepcopy(camera_model)
+        cam_quat = x[:4]
+        cam_quat /= np.linalg.norm(cam_quat)
+        tmp_cm.update_intrinsics(cam_quat=cam_quat)
+
+        if len(x) > 4:
+            tmp_cm.fx = x[4]
+
+        if len(x) > 5:
+            tmp_cm.fy = x[5]
+
+        return tmp_cm
+
+    def proj_err(x):
+        tmp_cm = get_new_cm(x)
+
+        wrld_pts = reference_camera_model.unproject(reference_pts.T)[1]
+        im_pts = tmp_cm.project(wrld_pts)
+
+        err = np.sqrt(np.sum(np.sum((pts.T - im_pts) ** 2, 1)))
+        err /= len(wrld_pts)
+        return err
+
+    min_err = np.inf
+    best_x = None
+    iterations = 10000
+    for _ in range(iterations):
+        x = np.random.rand(4) * 2 - 1
+        x /= np.linalg.norm(x)
+        err = proj_err(x)
+        if err < min_err:
+            min_err = err
+            best_x = x
+
+    x = np.hstack([best_x, camera_model.fx, camera_model.fy])
+
+    x = minimize(proj_err, x).x
+    x = minimize(proj_err, x, method="Powell").x
+    x = minimize(proj_err, x, method="BFGS").x
+    x = minimize(proj_err, x).x
+
+    tmp_cm = get_new_cm(x)
+
+    final_err = proj_err(x)
+    print(
+        "[bold green] Mean error after manual alignment[/bold green]:",
+        final_err,
+        "pixels",
+    )
+    return tmp_cm, final_err
 
 
 if __name__ == "__main__":
