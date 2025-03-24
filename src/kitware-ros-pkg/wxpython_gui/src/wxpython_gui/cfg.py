@@ -356,8 +356,7 @@ def format_status(
     )
     gain_str = "Gain:?" if gain is None else "Gain:{}".format(gain)
     if total is not None and processed is not None:
-        drop_str += " | DB: {}/{}".format(processed, total)
-    total_str = "" if total is None else "{}".format(total)
+        drop_str += " | DB: {}/{}".format(processed, (total-1))
     processed_str = "" if processed is None else "{}".format(processed)
     expo_str = (
         "Exp: ? ms"
