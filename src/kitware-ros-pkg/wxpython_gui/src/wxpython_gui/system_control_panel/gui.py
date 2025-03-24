@@ -943,10 +943,14 @@ class MainFrame(form_builder_output.MainFrame):
             else:
                 text_attr.SetForegroundColour(ERROR_RED)
 
+        print(d_status.values())
+
         if not len(d_desired):
             self.detectors_gauge.SetBackgroundColour(FLAT_GRAY)
         else:
-            if any([status is EPodStatus.Pending for status in d_status.values()]):
+            if any([status is EPodStatus.Failed for status in d_status.values()]):
+                self.detectors_gauge.SetBackgroundColour(ERROR_RED)
+            elif any([status is EPodStatus.Pending for status in d_status.values()]):
                 self.detectors_gauge.SetBackgroundColour(WARN_AMBER)
             elif all([status.is_ok() for status in d_status.values()]):
                 self.detectors_gauge.SetBackgroundColour(BRIGHT_GREEN)

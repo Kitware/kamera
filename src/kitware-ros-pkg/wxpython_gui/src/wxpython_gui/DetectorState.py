@@ -21,11 +21,12 @@ class EPodStatus(Enum):
         return self.value in ['pending', 'succeeded']
 
 class DetectorState(object):
-    def __init__(self, kv, hosts, short_thresh=2.0, long_thresh=10.0):
+    def __init__(self, kv, hosts, short_thresh=2.0, med_thresh=10.0, long_thresh=120.0):
         # type: (ImplEnvoy, List[str], float, float) -> None
         self.kv = kv
         self.hosts = hosts
         self.short_thresh = short_thresh
+        self.med_thresh = med_thresh
         self.long_thresh = long_thresh
         self.desired = {h: None for h in hosts}  # type: Dict[str, Optional[EPodStatus]]
         self.actual = {h: None for h in hosts}  # type: Dict[str, Optional[EPodStatus]]
@@ -55,8 +56,9 @@ class DetectorState(object):
         # type: (str, EPodStatus) -> EPodStatus
         status = self.set_det_attr_state(host, 'desired', state)
         self.desired[host] = status
-        SYS_CFG[host]["detector"]["last_change_desired"] = time.time()
-        self.last_change_desired = SYS_CFG[host]["detector"]["last_change_desired"]
+        now = time.time()
+        SYS_CFG[host]["detector"]["last_change_desired"] = now
+        self.last_change_desired = now
         return status
 
     def bump(self, host):
@@ -68,12 +70,16 @@ class DetectorState(object):
         """Decide whether to call the detector running or not, based on available information.
         """
         now = time.time()
-        if not self.pipe_matches(host):
-            return EPodStatus.Pending
         if now < (self.last_frame_bump[host] + self.short_thresh):
-            return EPodStatus.Running
-        elif now < (self.last_frame_bump[host] + self.long_thresh):
+            if not self.pipe_matches(host):
+                # the pipefiles don't match, so report as bad
+                return EPodStatus.Failed
+            else:
+                return EPodStatus.Running
+        elif now < (self.last_frame_bump[host] + self.med_thresh):
             return EPodStatus.Stalled
+        elif now < (self.last_change_desired + self.long_thresh):
+            return EPodStatus.Pending
         else:
             return EPodStatus.Failed
 
