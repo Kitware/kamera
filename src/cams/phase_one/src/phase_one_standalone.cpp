@@ -452,7 +452,7 @@ namespace phase_one
             // Add in (at least) a 1 image delay so that detection can keep up
             // This does always leave the last image not debayered, but that's
             // generally of the tarmac, so not a serious concern.
-            int delay = 1;
+            int delay = 2;
             if ( filename_to_seq_map_.size() > delay ) {
                 // grab most-recent filename (could make a LIFO queue?)
                 filename = filename_to_seq_map_.begin()->first;
