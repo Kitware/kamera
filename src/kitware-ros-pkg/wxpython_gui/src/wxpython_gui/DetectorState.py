@@ -21,7 +21,7 @@ class EPodStatus(Enum):
         return self.value in ['pending', 'succeeded']
 
 class DetectorState(object):
-    def __init__(self, kv, hosts, short_thresh=2.0, med_thresh=10.0, long_thresh=120.0):
+    def __init__(self, kv, hosts, short_thresh=2.0, med_thresh=10.0, long_thresh=360.0):
         # type: (ImplEnvoy, List[str], float, float) -> None
         self.kv = kv
         self.hosts = hosts

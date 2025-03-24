@@ -356,7 +356,9 @@ def format_status(
     )
     gain_str = "Gain:?" if gain is None else "Gain:{}".format(gain)
     # display N/N, even if internally it's N-1/N
-    total = total - 1 if total > 0 else total
+    # make sure processed isn't above total
+    if processed < total:
+        total = total - 1 if total > 0 else total
     if total is not None and processed is not None:
         drop_str += " | DB: {}/{}".format(processed, total)
     processed_str = "" if processed is None else "{}".format(processed)
