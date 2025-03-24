@@ -355,8 +355,10 @@ def format_status(
         else "{:.0e} dropped".format(num_dropped)
     )
     gain_str = "Gain:?" if gain is None else "Gain:{}".format(gain)
+    # display N/N, even if internally it's N-1/N
+    total = total - 1 if total > 0 else total
     if total is not None and processed is not None:
-        drop_str += " | DB: {}/{}".format(processed, (total-1))
+        drop_str += " | DB: {}/{}".format(processed, total)
     processed_str = "" if processed is None else "{}".format(processed)
     expo_str = (
         "Exp: ? ms"
