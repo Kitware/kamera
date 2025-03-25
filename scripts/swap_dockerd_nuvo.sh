@@ -1,2 +1,2 @@
 sudo service docker stop
-sudo dockerd --insecure-registry cas0:5000
+sudo dockerd --insecure-registry nuvo0:5000
