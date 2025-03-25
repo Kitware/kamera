@@ -1035,7 +1035,14 @@ namespace phase_one
                 lock.unlock();
                 // "touch" jpeg file, so timestamp still exists
                 std::ofstream output(fname);
-
+                // Throw results into redis for access
+                std::string base = "/sys/" + hostname + "/p1debayerq/";
+                std::string total = base + "total";
+                std::string num_processed = base + "processed";
+                std::string processed_str = std::to_string(processed_counter);
+                std::string total_str = std::to_string(total_counter);
+                envoy_->put(total, total_str);
+                envoy_->put(num_processed, processed_str);
             }
         } // else image has detections, so save regardless
     };
