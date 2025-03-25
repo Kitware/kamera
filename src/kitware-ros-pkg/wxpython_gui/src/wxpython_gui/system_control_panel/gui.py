@@ -627,7 +627,8 @@ class MainFrame(form_builder_output.MainFrame):
                 )
 
         if len(nas_unmounts) > 0:
-            self.nas_disk_space.SetLabel("NAS Disk Space: Err")
+            err_host_str = "NAS Err: " + "".join(nas_unmounts)
+            self.nas_disk_space.SetLabel(err_host_str)
             self.nas_disk_space.SetForegroundColour(ERROR_RED)
             errmsg = "ERROR: One or more hosts has an NAS mount issue: {}\n".format(
                 nas_unmounts
@@ -934,9 +935,12 @@ class MainFrame(form_builder_output.MainFrame):
             status = detector_state.decide_status(host, desired)
             d_desired[host] = desired
             d_status[host] = status
+            print(status)
             if status is EPodStatus.Unknown:
                 text_attr.SetForegroundColour(WTF_PURPLE)
             elif status is EPodStatus.Pending:
+                text_attr.SetForegroundColour(WARN_AMBER)
+            elif status is EPodStatus.Stalled:
                 text_attr.SetForegroundColour(WARN_AMBER)
             elif status.is_ok():
                 text_attr.SetForegroundColour(VERDANT_GREEN)
@@ -951,6 +955,8 @@ class MainFrame(form_builder_output.MainFrame):
             if any([status is EPodStatus.Failed for status in d_status.values()]):
                 self.detectors_gauge.SetBackgroundColour(ERROR_RED)
             elif any([status is EPodStatus.Pending for status in d_status.values()]):
+                self.detectors_gauge.SetBackgroundColour(WARN_AMBER)
+            elif any([status is EPodStatus.Stalled for status in d_status.values()]):
                 self.detectors_gauge.SetBackgroundColour(WARN_AMBER)
             elif all([status.is_ok() for status in d_status.values()]):
                 self.detectors_gauge.SetBackgroundColour(BRIGHT_GREEN)
