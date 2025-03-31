@@ -1,17 +1,21 @@
+import argparse
+import bottle
 import json
 import os
-import argparse
+import pathlib
 from bottle import route, template, run, static_file, request, BaseRequest
 
 BaseRequest.MEMFILE_MAX = 6 * 2048 * 2048
 
 image_dir = ""
-left_img_file = "./kamera_calibration_fl09_C_20240612_204041.621432_rgb.jpg"
-right_img_file = "./kamera_calibration_fl09_C_20240612_204041.621432_ir.png"
+left_img_file = "./original.png"
+right_img_file = "./reference.png"
 
 
 @route("/")
 def index():
+    dir = os.path.dirname(__file__)
+    bottle.TEMPLATE_PATH.insert(0, dir)
     return template("keypoint.tpl")
 
 
@@ -42,14 +46,16 @@ def set_left_img_file():
 
 @route("/image/left")
 def left_image():
-    resp = static_file(left_img_file, root=image_dir)
+    left_img = pathlib.Path(left_img_file)
+    resp = static_file(left_img.name, root=left_img.parent)
     resp.set_header("Cache-Control", "no-store")
     return resp
 
 
 @route("/image/right")
 def right_image():
-    resp = static_file(right_img_file, root=image_dir)
+    right_img = pathlib.Path(right_img_file)
+    resp = static_file(right_img.name, root=right_img.parent)
     resp.set_header("Cache-Control", "no-store")
     return resp
 
