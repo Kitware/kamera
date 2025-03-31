@@ -8,3 +8,4 @@ devel
 provision/ansible/.password
 .catkin_tools
 .venv
+kamera.egg-info
