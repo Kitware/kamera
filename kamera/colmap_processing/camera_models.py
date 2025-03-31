@@ -5,6 +5,7 @@ import cv2
 import time
 import yaml
 from scipy.interpolate import RectBivariateSpline
+from scipy.spatial.transform import Rotation
 import PIL
 from math import sqrt
 
@@ -278,6 +279,7 @@ class Camera(object):
             self._platform_pose_provider = platform_pose_provider
 
         self._depth_map = None
+        self.model_type = "standard"
 
     @property
     def width(self):
@@ -613,11 +615,11 @@ class Camera(object):
         cx = self.width / 2
         cy = self.height / 2
         ray1 = self.unproject([cx, cy], t)[1]
-        ray1 /= np.sqrt(np.sum(ray1 ** 2, 0))
+        ray1 /= np.sqrt(np.sum(ray1**2, 0))
         ray2 = self.unproject([cx, cy + 1], t)[1]
-        ray2 /= np.sqrt(np.sum(ray2 ** 2, 0))
+        ray2 /= np.sqrt(np.sum(ray2**2, 0))
         ray3 = self.unproject([cx + 1, cy], t)[1]
-        ray3 /= np.sqrt(np.sum(ray3 ** 2, 0))
+        ray3 /= np.sqrt(np.sum(ray3**2, 0))
 
         ifovx = np.arccos(np.dot(ray1.ravel(), ray3.ravel()))
         ifovy = np.arccos(np.dot(ray1.ravel(), ray2.ravel()))
@@ -643,21 +645,21 @@ class Camera(object):
         cy = self.height / 2
 
         ray1 = self.unproject([cx, 0], t)[1]
-        ray1 /= np.sqrt(np.sum(ray1 ** 2, 0))
+        ray1 /= np.sqrt(np.sum(ray1**2, 0))
         ray2 = self.unproject([cx, self.height], t)[1]
-        ray2 /= np.sqrt(np.sum(ray2 ** 2, 0))
+        ray2 /= np.sqrt(np.sum(ray2**2, 0))
         fov_v = np.arccos(np.dot(ray1.ravel(), ray2.ravel())) * 180 / np.pi
 
         ray1 = self.unproject([0, cy], t)[1]
-        ray1 /= np.sqrt(np.sum(ray1 ** 2, 0))
+        ray1 /= np.sqrt(np.sum(ray1**2, 0))
         ray2 = self.unproject([self.width, cy], t)[1]
-        ray2 /= np.sqrt(np.sum(ray2 ** 2, 0))
+        ray2 /= np.sqrt(np.sum(ray2**2, 0))
         fov_h = np.arccos(np.dot(ray1.ravel(), ray2.ravel())) * 180 / np.pi
 
         ray1 = self.unproject([0, 0], t)[1]
-        ray1 /= np.sqrt(np.sum(ray1 ** 2, 0))
+        ray1 /= np.sqrt(np.sum(ray1**2, 0))
         ray2 = self.unproject([self.width, self.height], t)[1]
-        ray2 /= np.sqrt(np.sum(ray2 ** 2, 0))
+        ray2 /= np.sqrt(np.sum(ray2**2, 0))
         fov_d = np.arccos(np.dot(ray1.ravel(), ray2.ravel())) * 180 / np.pi
 
         return fov_h, fov_v, fov_d
@@ -727,9 +729,10 @@ class StandardCamera(Camera):
         self._cam_quat = np.array(cam_quat, dtype=np.float64)
         self._cam_quat /= np.linalg.norm(self._cam_quat)
         self._min_ray_cos = None
+        self.model_type = "standard"
 
     def __str__(self):
-        string = ["model_type: standard\n"]
+        string = [f"model_type: {self.model_type}\n"]
         string.append(super(StandardCamera, self).__str__())
         string.append("\n")
         string.append("".join(["fx: ", repr(self._K[0, 0]), "\n"]))
@@ -815,7 +818,7 @@ class StandardCamera(Camera):
                 "".join(
                     [
                         "# The type of camera model.\n",
-                        "model_type: standard\n\n",
+                        f"model_type: {self.model_type}\n\n",
                         "# Image dimensions\n",
                     ]
                 )
@@ -874,6 +877,29 @@ class StandardCamera(Camera):
                     ]
                 )
             )
+
+    def save_to_krtd(self, filename):
+        """Write a single camera in ASCII KRTD format to the file object.
+
+        Args:
+            camera (list[np.ndarray]): A length-4 of type (K, R, t, d)
+            fout (str | os.PathLike): _description_
+        """
+        K = self.K
+        R = Rotation.from_quat(self.cam_quat).as_matrix()
+        t = self.cam_pos
+        d = self.dist
+        t = np.reshape(np.array(t), 3)
+        with open(filename, "w") as fout:
+            fout.write("%.12g %.12g %.12g\n" % tuple(K.tolist()[0]))
+            fout.write("%.12g %.12g %.12g\n" % tuple(K.tolist()[1]))
+            fout.write("%.12g %.12g %.12g\n\n" % tuple(K.tolist()[2]))
+            fout.write("%.12g %.12g %.12g\n" % tuple(R.tolist()[0]))
+            fout.write("%.12g %.12g %.12g\n" % tuple(R.tolist()[1]))
+            fout.write("%.12g %.12g %.12g\n\n" % tuple(R.tolist()[2]))
+            fout.write("%.12g %.12g %.12g\n\n" % tuple(t.tolist()))
+            for v in d:
+                fout.write("%.12g " % v)
 
     @property
     def K(self):
@@ -965,6 +991,10 @@ class StandardCamera(Camera):
     @property
     def cam_pos(self):
         return self._cam_pos
+
+    @cam_pos.setter
+    def cam_pos(self, value):
+        self._cam_pos = value
 
     @property
     def cam_quat(self):
@@ -1081,8 +1111,6 @@ class StandardCamera(Camera):
             t = time.time()
 
         ins_pos, ins_quat = self.platform_pose_provider.pose(t)
-        # print('ins_pos', ins_pos)
-        # print('ins_quat', ins_quat)
 
         # Unproject rays into the camera coordinate system.
         ray_dir = np.ones((3, points.shape[1]), dtype=points.dtype)
@@ -1091,8 +1119,9 @@ class StandardCamera(Camera):
         )
         ray_dir[:2] = np.squeeze(ray_dir0, 1).T
 
+        R_cam_to_world = Rotation.from_quat(self._cam_quat).as_matrix()
         # Rotate rays into the navigation coordinate system.
-        ray_dir = np.dot(quaternion_matrix(self._cam_quat)[:3, :3], ray_dir)
+        ray_dir = np.dot(R_cam_to_world, ray_dir)
 
         # Translate ray positions into their navigation coordinate system
         # definition.
@@ -1102,7 +1131,7 @@ class StandardCamera(Camera):
         ray_pos[2] = self._cam_pos[2]
 
         # Rotate and translate rays into the world coordinate system.
-        R_ins_to_world = quaternion_matrix(ins_quat)[:3, :3]
+        R_ins_to_world = Rotation.from_quat(ins_quat).as_matrix()
         ray_dir = np.dot(R_ins_to_world, ray_dir)
         ray_pos = np.dot(R_ins_to_world, ray_pos) + np.atleast_2d(ins_pos).T
 
@@ -1413,6 +1442,7 @@ class DepthCamera(StandardCamera):
             platform_pose_provider=platform_pose_provider,
         )
         self._depth_map = depth_map
+        self.model_type = "depth"
 
     @classmethod
     def load_from_file(cls, filename, platform_pose_provider=None):
@@ -1439,7 +1469,15 @@ class DepthCamera(StandardCamera):
         cam_quat = calib["camera_quaternion"]
         cam_pos = calib["camera_position"]
 
-        return cls(width, height, K, dist, cam_pos, cam_quat, platform_pose_provider)
+        depth_map_fname = "%s_depth_map.tif" % os.path.splitext(filename)[0]
+        try:
+            depth_map = np.asarray(PIL.Image.open(depth_map_fname))
+        except OSError:
+            depth_map = None
+
+        return cls(
+            width, height, K, dist, cam_pos, cam_quat, depth_map, platform_pose_provider
+        )
 
     def save_to_file(self, filename, save_depth_viz=True):
         """See base class Camera documentation."""
@@ -1517,7 +1555,7 @@ class DepthCamera(StandardCamera):
 
             if save_depth_viz:
                 depth_viz_fname = (
-                    "%s/depth_vizualization.png" % os.path.split(filename)[0]
+                    "%s/depth_vizualization.png" % os.path.splitext(filename)[0]
                 )
                 self.save_depth_viz(depth_viz_fname)
 
