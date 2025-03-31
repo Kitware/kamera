@@ -6,3 +6,4 @@ build
 devel
 provision/ansible/.password
 .catkin_tools
+kamera.egg-info
