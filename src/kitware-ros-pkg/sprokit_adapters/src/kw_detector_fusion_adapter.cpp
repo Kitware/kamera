@@ -203,19 +203,7 @@ public:
       cv::Mat cv_image2;
       std::string file_name = msg->file_path_ir;
       if ( msg->image_ir.height > 0 || msg->image_ir.width > 0 ) {
-          // data exists
-          cv_image2 = cv_bridge::toCvCopy( msg->image_ir, "mono16" )->image;
-          // find if NUCing or not
-          std::string frame_id = msg->image_ir.header.frame_id;
-          std::string delimiter = "nucing=";
-          int ind = frame_id.find(delimiter);
-          std::string token = frame_id.substr(ind+7, ind+8);
-          int is_nucing = std::stoi(token);
-          if (is_nucing == 1) {
-              // overload filename
-              file_name = "nucing";
-              // return;
-          }
+        cv_image2 = cv_bridge::toCvCopy( msg->image_ir, "mono16" )->image;
       } else if ( msg->image_ir.data.empty() ) {
           if ( file_exists(file_name) ) {
 	          cv_image2 = cv::imread(file_name, cv::IMREAD_ANYDEPTH);
@@ -233,6 +221,7 @@ public:
            ROS_ERROR("IR image is null-ish ");
            return ;
       }
+      ROS_INFO_STREAM("ir image elemSize: " << cv_image2.elemSize() );
 
       // Put OCV image into vital container
       ROS_INFO_STREAM( "Pushing IR image into pipeline" );
@@ -534,38 +523,12 @@ main( int argc, char** argv )
       ROS_ERROR( "Required \"file_name\" datum not present in output set" );
       continue;
     }
-    
-    auto ir = ods->find( "file_name2" );
-    if ( ir == ods->end() )
-    {
-      ROS_WARN( "Optional \"file_name2\" datum not present in output set" );
-    }
 
     // File name associated with the image in which the detection bounding boxes
     // are defined.
     auto src_img_fname = iy->second->get_datum< std::string > ();
-    auto ir_img_fname = ir->second->get_datum< std::string > ();
 
     ROS_INFO( "Received 'file_name' %s from pipeline", src_img_fname.c_str() );
-
-    if (ir_img_fname == "nucing") {
-      ROS_WARN_STREAM("IR camera is NUCing, skipping detection.");
-      double time = ros::Time::now().toSec();
-      auto int_dets = 0;
-      // Convert things to string for json
-      std::string str_dets = std::to_string(int_dets);
-      std::string str_time = std::to_string(time);
-      health["num_dets"] = str_dets;
-      health["time"] = str_time;
-      health["src_img_fname"] = src_img_fname;
-      health["frame"] = std::to_string( frame );
-      health["pipefile"] = pipe_file;
-      // Add health check publishing here
-      envoy->put_dict(health_param, health);
-      frame++;
-      // skip publishing detections
-      continue;
-    }
 
     custom_msgs::ImageSpaceDetectionList det_list;
 
