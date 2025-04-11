@@ -375,18 +375,28 @@ class ImageViewServer(object):
         # rospy.logwarn(inspect.currentframe().f_lineno)
         flags = get_interpolation(req.interpolation)
         dsize = (req.output_width, req.output_height)
+        if modality == "ir_msg":
+            if req.apply_clahe:
+                bright_px = 5
+                h, w = image.shape
+                pxs = h * w
+                top_percentile = ((pxs - bright_px) / pxs) * 100
+                stretch_percentiles = [1, top_percentile]
+                img = image.astype("float32")
+                mi = np.percentile( img, stretch_percentiles[0] )
+                ma = np.percentile( img, stretch_percentiles[1] )
+                normalized = ( img - mi ) / ( ma - mi)
+                normalized = np.clip(normalized, 0, 1)
+                normalized = normalized * 255
+                image = np.round(normalized).astype("uint8")
 
         homography = np.reshape(req.homography, (3,3)).astype(np.float32)
         raw_image = cv2.warpPerspective(image, homography, dsize=dsize,
                                      flags=flags)
 
         if modality == "ir_msg":
-            if req.apply_clahe:
-                clahe = cv2.createCLAHE(clipLimit=req.contrast_strength,
-                                        tileGridSize=(8,8))
-                raw_image = clahe.apply(raw_image)
             # Don't need mono16 for display
-            raw_image = np.round(raw_image/256).astype('uint8')
+            # raw_image = np.round(raw_image/256).astype('uint8')
             image2 = cv2.cvtColor(raw_image, cv2.COLOR_GRAY2RGB)
             if req.show_saturated_pixels:
                 maxval = 255
