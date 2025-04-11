@@ -1387,13 +1387,13 @@ def get_review_fate(nav_state_provider: NavStateINSJson,
         nth = nav_state_provider.time_to_save_every_x_image[t]
     except KeyError as e:
         print(f"Could not find 'save_every_x_image' for time {t}.")
-        nth = 1
+        nth = None
 
     try:
         seq = nav_state_provider.time_to_seq[t]
     except KeyError:
        print(f"Could not find 'seq' for time {t}.")
-       seq = 0
+       seq = None
 
     if base_name in sets_detector_processed:
         reviewed = "True"
@@ -1401,6 +1401,10 @@ def get_review_fate(nav_state_provider: NavStateINSJson,
             if os.stat(image_name).st_size == 0:
                 print("ERROR: Image with detections was discarded.")
                 fate = "ERR_img_with_detections_discarded"
+            elif seq is None:
+                fate = "ERR_no_seq_found"
+            elif nth is None:
+                fate = "ERR_no_nth_found"
             elif seq % nth == 0:
                 # Make sure we assign it via nth first, even if it has detections
                 fate = "collected_via_nth"
