@@ -36,10 +36,10 @@ do
         echo "NAS still mounted!"
     fi
     # STAGE 1
-    echo "Gathering and copying text, detection, and log files older than 10 seconds under $source_dir"
+    echo "Gathering and copying text, detection, and log files under $source_dir"
     # Find all files that are appended to and copy over incrementally.
     # This is detection files, log files, and ins dat files
-    fdfind . $source_dir --exclude '*.{IIQ,iiq,json,tif,jpg,flight_data_mounted}' --changed-before 10s --type f --exec echo {} | \
+    fdfind . $source_dir --exclude '*.{IIQ,iiq,json,tif,jpg,flight_data_mounted}' --type f --exec echo {} | \
         # remove far left path (/mnt/data/) dir for rsync
         cut -d'/' -f4- | \
         # cap max argument length for rsync
