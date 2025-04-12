@@ -1412,7 +1412,11 @@ def get_review_fate(nav_state_provider: NavStateINSJson,
                 fate = "collected_via_detections"
         else:
             if os.stat(image_name).st_size == 0:
-                if seq % nth == 0:
+                if seq is None:
+                    fate = "ERR_no_seq_found"
+                elif nth is None:
+                    fate = "ERR_no_nth_found"
+                elif seq % nth == 0:
                     fate = "ERR_img_on_nth_discarded"
                 else:
                     fate = "discarded"
