@@ -150,6 +150,9 @@ def set_detector_state(system, host, desired):
     assert host in SYS_CFG["arch"]["hosts"]
     detector_state.set_desired(host, desired)
     if desired is EPodStatus.Running:
+        # kickstart frame bump so it's orange
+        now = time.time()
+        detector_state.last_frame_bump[host] = (now - 16)
         verb = "up"
     elif desired is EPodStatus.Off:
         verb = "down"
