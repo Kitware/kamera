@@ -27,15 +27,16 @@ import shapefile
 
 # Custom package imports.
 import sys
-sys.path.insert(0,'C:/Users/path_to/postflight_scripts/sensor_models/src')
+
+sys.path.insert(0, "C:/Users/path_to/postflight_scripts/sensor_models/src")
 from kamera.sensor_models import (
-        quaternion_multiply,
-        quaternion_from_matrix,
-        quaternion_from_euler,
-        quaternion_slerp,
-        quaternion_inverse,
-        quaternion_matrix
-        )
+    quaternion_multiply,
+    quaternion_from_matrix,
+    quaternion_from_euler,
+    quaternion_slerp,
+    quaternion_inverse,
+    quaternion_matrix,
+)
 from kamera.colmap_processing.camera_models import load_from_file
 from kamera.sensor_models.nav_conversions import enu_to_llh, llh_to_enu
 from kamera.sensor_models.nav_state import NavStateINSJson
@@ -47,23 +48,28 @@ if not os.path.isfile(GEOD_FNAME):
     raise FileNotFoundError(GEOD_FNAME)
 geod = pygeodesy.geoids.GeoidPGM(GEOD_FNAME)
 
-SUFFIX_RGB = 'rgb.jpg'
-SUFFIX_IR = 'ir.tif'
-SUFFIX_UV = 'uv.jpg'
-SUFFIX_META = 'meta.json'
+SUFFIX_RGB = "rgb.jpg"
+SUFFIX_IR = "ir.tif"
+SUFFIX_UV = "uv.jpg"
+SUFFIX_META = "meta.json"
 
-SUFFIX_DICT = {'rgb': SUFFIX_RGB, 'ir': SUFFIX_IR, 'uv': SUFFIX_UV}
+SUFFIX_DICT = {"rgb": SUFFIX_RGB, "ir": SUFFIX_IR, "uv": SUFFIX_UV}
 
 # === === === === === === === one-off functions === === === === === === ===
 
+
 class FileNotFoundError(IOError):
-    def __init__(self, path, kind='file'):
+    def __init__(self, path, kind="file"):
 
         # Call the base class constructor with the parameters it needs
-        super(FileNotFoundError, self).__init__("{} does not exist: '{}'".format(kind, path))
+        super(FileNotFoundError, self).__init__(
+            "{} does not exist: '{}'".format(kind, path)
+        )
+
 
 def get_subdirs(path):
     return next(os.walk(path))[1]
+
 
 def make_path(path, from_file=False, verbose=False):
     """
@@ -75,7 +81,7 @@ def make_path(path, from_file=False, verbose=False):
     :return:
     """
     path = str(path)  # coerce pathlib.Path
-    if path == '':
+    if path == "":
         raise ValueError("Path is empty string, cannot make dir.")
 
     if from_file:
@@ -83,37 +89,40 @@ def make_path(path, from_file=False, verbose=False):
     try:
         os.makedirs(path)
         if verbose:
-            print('Created path: {}'.format(path))
+            print("Created path: {}".format(path))
     except OSError as exception:
         if exception.errno != EEXIST:
             raise
         if verbose:
-            print('Tried to create path, but exists: {}'.format(path))
+            print("Tried to create path, but exists: {}".format(path))
 
-FOV_CENTER = 'center'
-FOV_LEFT = 'left'
-FOV_RIGHT = 'right'
+
+FOV_CENTER = "center"
+FOV_LEFT = "left"
+FOV_RIGHT = "right"
 
 fov_map = {
-    'center': FOV_CENTER,
-    'left': FOV_LEFT,
-    'right': FOV_RIGHT,
-    'cent': FOV_CENTER,
-    'rght': FOV_RIGHT
- }
+    "center": FOV_CENTER,
+    "left": FOV_LEFT,
+    "right": FOV_RIGHT,
+    "cent": FOV_CENTER,
+    "rght": FOV_RIGHT,
+}
 
 fov_map.update({k.upper(): v for k, v in fov_map.items()})
 
+
 def first_wordlike(name):
-    return name.replace('-', '_').split('_')[0]
+    return name.replace("-", "_").split("_")[0]
+
 
 def get_base(fname):
-    """ Take an absolute path to a file, and return its stripped
+    """Take an absolute path to a file, and return its stripped
     base name, e.g. "ice_seals_2024_fl03_R_<time>", so it could
     correspond to any modality.
     """
     bname = os.path.basename(fname)
-    base = '_'.join(bname.split('_')[:-1])
+    base = "_".join(bname.split("_")[:-1])
     return base
 
 
@@ -129,41 +138,50 @@ def reduce_fov(name, noisy=True):
 def get_dir_type(dpath):
     dpath = os.path.abspath(dpath)
     if os.path.isfile(dpath):
-        return 'file'
+        return "file"
     if not os.path.isdir(dpath):
-        return 'special'
+        return "special"
     subfiles = os.listdir(dpath)
-    if 'sys_config.json' in subfiles:
-        return 'sys_config'
-    fn_logs = [el for el in subfiles if '_log.txt' in el]
+    if "sys_config.json" in subfiles:
+        return "sys_config"
+    fn_logs = [el for el in subfiles if "_log.txt" in el]
     for fn_log in fn_logs:
         if os.path.basename(dpath) in os.path.basename(fn_log):
-            return 'flight'
-    return 'unknown'
+            return "flight"
+    return "unknown"
 
 
 def get_fov_dirs(flight_dir):
     """Return the actual FOV direcotry
     This actually expects a sys_cfg dir
     """
-    #subdirs = get_subdirs(flight_dir)
-    #actual_dirs = [name for name in subdirs if reduce_fov(name, noisy=False)]
+    # subdirs = get_subdirs(flight_dir)
+    # actual_dirs = [name for name in subdirs if reduce_fov(name, noisy=False)]
 
     # These are the acceptable options for camera directories that we want to
     # consider.
     if not os.path.isdir(flight_dir):
         raise OSError("Called get_fov_dirs on a non-directory: {}".format(flight_dir))
     dtype = get_dir_type(flight_dir)
-    if dtype != 'sys_config':
-        raise RuntimeError("Called get_fov_dirs on {} directory: {}".format(dtype, flight_dir))
+    if dtype != "sys_config":
+        raise RuntimeError(
+            "Called get_fov_dirs on {} directory: {}".format(dtype, flight_dir)
+        )
 
-    acceptable_names = ['cent','center', 'left', 'right', 'center_view',
-                        'left_view', 'right_view']
+    acceptable_names = [
+        "cent",
+        "center",
+        "left",
+        "right",
+        "center_view",
+        "left_view",
+        "right_view",
+    ]
 
     actual_dirs = []
 
     for subdir in os.listdir(flight_dir):
-        full_path = '%s/%s' % (flight_dir, subdir)
+        full_path = "%s/%s" % (flight_dir, subdir)
 
         if not os.path.isdir(full_path):
             continue
@@ -179,28 +197,26 @@ def get_active_fovs(flight_dir):
     return [first_wordlike(n) for n in fov_dirs]
 
 
-def dir_assert(dirname, kind='dir'):
+def dir_assert(dirname, kind="dir"):
     if not os.path.isdir(dirname):
         raise FileNotFoundError(dirname, kind=kind)
 
 
-def file_assert(filename, kind='file'):
+def file_assert(filename, kind="file"):
     if not os.path.isfile(filename):
         raise FileNotFoundError(filename, kind=kind)
-
-
 
 
 # === === === === === === === one-off functions === === === === === === ===
 
 
-def update_progress(num, total, flight_dir, skip_n=10, msg=None, name='progress.jsonl'):
+def update_progress(num, total, flight_dir, skip_n=10, msg=None, name="progress.jsonl"):
     if num % skip_n:
         return
     key = os.path.join(flight_dir, name)
     data = {"time": time.time(), "num": num, "total": total, "msg": msg}
-    js = json.dumps(data) + '\n'
-    with open(key, 'w') as fp:
+    js = json.dumps(data) + "\n"
+    with open(key, "w") as fp:
         fp.write(js)
 
 
@@ -211,43 +227,66 @@ wgs84_wkt = wgs84_cs.ExportToWkt()
 
 # Bayer pattern dictionary.
 bayer_patterns = {}
-bayer_patterns['bayer_rggb8'] = cv2.COLOR_BayerBG2RGB
-bayer_patterns['bayer_grbg8'] = cv2.COLOR_BayerGB2RGB
-bayer_patterns['bayer_bggr8'] = cv2.COLOR_BayerRG2RGB
-bayer_patterns['bayer_gbrg8'] = cv2.COLOR_BayerGR2RGB
-bayer_patterns['bayer_rggb16'] = cv2.COLOR_BayerBG2RGB
-bayer_patterns['bayer_grbg16'] = cv2.COLOR_BayerGB2RGB
-bayer_patterns['bayer_bggr16'] = cv2.COLOR_BayerRG2RGB
-bayer_patterns['bayer_gbrg16'] = cv2.COLOR_BayerGR2RGB
+bayer_patterns["bayer_rggb8"] = cv2.COLOR_BayerBG2RGB
+bayer_patterns["bayer_grbg8"] = cv2.COLOR_BayerGB2RGB
+bayer_patterns["bayer_bggr8"] = cv2.COLOR_BayerRG2RGB
+bayer_patterns["bayer_gbrg8"] = cv2.COLOR_BayerGR2RGB
+bayer_patterns["bayer_rggb16"] = cv2.COLOR_BayerBG2RGB
+bayer_patterns["bayer_grbg16"] = cv2.COLOR_BayerGB2RGB
+bayer_patterns["bayer_bggr16"] = cv2.COLOR_BayerRG2RGB
+bayer_patterns["bayer_gbrg16"] = cv2.COLOR_BayerGR2RGB
 
 
-kml_color_map = {'left_rgb': simplekml.Color.green,
-                 'center_rgb': simplekml.Color.green,
-                 'right_rgb': simplekml.Color.green,
-                 'left_ir': simplekml.Color.red,
-                 'center_ir': simplekml.Color.red,
-                 'right_ir': simplekml.Color.red,
-                 'left_uv': simplekml.Color.yellow,
-                 'center_uv': simplekml.Color.yellow,
-                 'right_uv': simplekml.Color.yellow}
+kml_color_map = {
+    "left_rgb": simplekml.Color.green,
+    "center_rgb": simplekml.Color.green,
+    "right_rgb": simplekml.Color.green,
+    "left_ir": simplekml.Color.red,
+    "center_ir": simplekml.Color.red,
+    "right_ir": simplekml.Color.red,
+    "left_uv": simplekml.Color.yellow,
+    "center_uv": simplekml.Color.yellow,
+    "right_uv": simplekml.Color.yellow,
+}
 
 
 def print2(*args):
-    """Print and then flush stdout so that multi-threaded logging works.
-
-    """
+    """Print and then flush stdout so that multi-threaded logging works."""
     print(*args)
     sys.stdout.flush()
 
 
 class Detection(object):
-    __slots__ = ['uid', 'image_fname', 'frame_id', 'image_bbox', 'lonlat_bbox',
-                 'confidence', 'length', 'confidence_pairs', 'gsd',
-                 'height_meters', 'width_meters', 'suppressed']
+    __slots__ = [
+        "uid",
+        "image_fname",
+        "frame_id",
+        "image_bbox",
+        "lonlat_bbox",
+        "confidence",
+        "length",
+        "confidence_pairs",
+        "gsd",
+        "height_meters",
+        "width_meters",
+        "suppressed",
+    ]
 
-    def __init__(self, uid, image_fname, frame_id, image_bbox, lonlat_bbox,
-                 confidence, length, confidence_pairs, gsd, height_meters,
-                 width_meters, suppressed):
+    def __init__(
+        self,
+        uid,
+        image_fname,
+        frame_id,
+        image_bbox,
+        lonlat_bbox,
+        confidence,
+        length,
+        confidence_pairs,
+        gsd,
+        height_meters,
+        width_meters,
+        suppressed,
+    ):
         self.uid = uid
         self.image_fname = image_fname
         self.frame_id = frame_id
@@ -263,7 +302,7 @@ class Detection(object):
 
 
 def decompose_affine(A):
-    '''Decompose homogenous affine transformation matrix `A` into parts.
+    """Decompose homogenous affine transformation matrix `A` into parts.
 
     The transforms3d package, including all examples, code snippets and
     attached documentation is covered by the 2-clause BSD license.
@@ -358,15 +397,15 @@ def decompose_affine(A):
     means that the Cholesky decomposition of ``np.dot(RZS.T, RZS)`` will give
     us our ``ZS`` matrix, from which we take the zooms from the diagonal, and
     the shear values from the off-diagonal elements.
-    '''
+    """
     A = np.asarray(A)
-    T = A[:-1,-1]
-    RZS = A[:-1,:-1]
-    ZS = np.linalg.cholesky(np.dot(RZS.T,RZS)).T
+    T = A[:-1, -1]
+    RZS = A[:-1, :-1]
+    ZS = np.linalg.cholesky(np.dot(RZS.T, RZS)).T
     Z = np.diag(ZS).copy()
-    shears = ZS / Z[:,np.newaxis]
+    shears = ZS / Z[:, np.newaxis]
     n = len(Z)
-    S = shears[np.triu(np.ones((n,n)), 1).astype(bool)]
+    S = shears[np.triu(np.ones((n, n)), 1).astype(bool)]
     R = np.dot(RZS, np.linalg.inv(ZS))
     if np.linalg.det(R) < 0:
         Z[0] *= -1
@@ -400,27 +439,27 @@ def points_along_image_border(width, height, num_points=4):
     :rtype: numpy.ndarry with shape (3,n)
 
     """
-    perimeter = 2*(height + width)
-    ds = num_points/float(perimeter)
-    xn = np.max([2, int(ds*width)])
-    yn = np.max([2, int(ds*height)])
+    perimeter = 2 * (height + width)
+    ds = num_points / float(perimeter)
+    xn = np.max([2, int(ds * width)])
+    yn = np.max([2, int(ds * height)])
     x = np.linspace(0, width, xn)
     y = np.linspace(0, height, yn)[1:-1]
-    pts = np.vstack([np.hstack([x,
-                                np.full(len(y), width,
-                                        dtype=np.float64),
-                                x[::-1],
-                                np.zeros(len(y))]),
-                     np.hstack([np.zeros(xn),
-                                y,
-                                np.full(xn, height,
-                                        dtype=np.float64),
-                                y[::-1]])])
+    pts = np.vstack(
+        [
+            np.hstack(
+                [x, np.full(len(y), width, dtype=np.float64), x[::-1], np.zeros(len(y))]
+            ),
+            np.hstack(
+                [np.zeros(xn), y, np.full(xn, height, dtype=np.float64), y[::-1]]
+            ),
+        ]
+    )
     return pts
 
 
 def meters_per_lon_lat(lon, lat):
-    dtheta = 1e-5   # degrees
+    dtheta = 1e-5  # degrees
     meters_per_lat_deg = llh_to_enu(lat + dtheta, lon, 0, lat, lon, 0)[1]
     meters_per_lat_deg /= dtheta
 
@@ -431,27 +470,27 @@ def meters_per_lon_lat(lon, lat):
 
 
 def match_image_to_json(img_fname):
-    if img_fname[-7:] == 'rgb.tif':
+    if img_fname[-7:] == "rgb.tif":
         # Older RGB imagery was .tif.
-        return img_fname.replace('rgb.tif', SUFFIX_META)
+        return img_fname.replace("rgb.tif", SUFFIX_META)
 
-    json_fname = img_fname.replace(SUFFIX_RGB, SUFFIX_META) \
-        .replace(SUFFIX_IR, SUFFIX_META)\
+    json_fname = (
+        img_fname.replace(SUFFIX_RGB, SUFFIX_META)
+        .replace(SUFFIX_IR, SUFFIX_META)
         .replace(SUFFIX_UV, SUFFIX_META)
+    )
 
     if not os.path.isfile(json_fname):
-        print('Could not find {} for {}'.format(SUFFIX_META, img_fname))
-        return ''
+        print("Could not find {} for {}".format(SUFFIX_META, img_fname))
+        return ""
     return json_fname
 
 
 def parse_image_directory(image_dir, modality=None):
     # type: (str, str) -> Tuple[Dict, Dict, NavStateINSJson]
-    """Parse imagery and metadata for subsystem image directory.
-
-    """
+    """Parse imagery and metadata for subsystem image directory."""
     # Read in the nav binary.
-    json_glob = pathlib.Path(image_dir).rglob('*_meta.json')
+    json_glob = pathlib.Path(image_dir).rglob("*_meta.json")
     platform_pose_provider = NavStateINSJson(json_glob)
 
     img_fname_to_time = {}
@@ -460,7 +499,7 @@ def parse_image_directory(image_dir, modality=None):
     effort_type = {}
     trigger_type = {}
 
-    print('parse_image_directory({},\n  {})'.format(image_dir, modality))
+    print("parse_image_directory({},\n  {})".format(image_dir, modality))
 
     if modality is not None:
         suffixes = [SUFFIX_DICT[modality]]
@@ -468,13 +507,13 @@ def parse_image_directory(image_dir, modality=None):
         suffixes = [SUFFIX_RGB, SUFFIX_IR, SUFFIX_UV]
 
     for suffix in suffixes:
-        globs = glob.glob('{}/*{}'.format(image_dir, suffix))
+        globs = glob.glob("{}/*{}".format(image_dir, suffix))
 
-        if len(globs) == 0 and suffix == 'rgb.jpg':
+        if len(globs) == 0 and suffix == "rgb.jpg":
             # Older RGB data was saved as tiff.
-            globs = glob.glob('{}/*{}'.format(image_dir, 'rgb.tif'))
+            globs = glob.glob("{}/*{}".format(image_dir, "rgb.tif"))
 
-        print2('Found {} images of {}'.format(len(globs), suffix))
+        print2("Found {} images of {}".format(len(globs), suffix))
         image_files += globs
 
     for img_fname in image_files:
@@ -489,25 +528,30 @@ def parse_image_directory(image_dir, modality=None):
                     continue
 
                 # Time that the image was taken.
-                img_time_to_fname[d['evt']['time']] = img_fname
-                img_fname_to_time[img_fname] = d['evt']['time']
+                img_time_to_fname[d["evt"]["time"]] = img_fname
+                img_fname_to_time[img_fname] = d["evt"]["time"]
 
                 # Pull the effort type if available.
                 try:
-                    effort_type[img_fname] = str(d['effort'])
+                    effort_type[img_fname] = str(d["effort"])
                 except KeyError:
                     pass
 
                 # Pull the trigger type if available.
                 try:
-                    trigger_type[img_fname] = str(d['collection_mode'])
+                    trigger_type[img_fname] = str(d["collection_mode"])
                 except KeyError:
                     pass
         except (OSError, IOError):
             pass
 
-    return [img_fname_to_time, img_time_to_fname, platform_pose_provider,
-            effort_type, trigger_type]
+    return [
+        img_fname_to_time,
+        img_time_to_fname,
+        platform_pose_provider,
+        effort_type,
+        trigger_type,
+    ]
 
 
 def get_image_boundary(camera_model, frame_time, geod_filename=GEOD_FNAME):
@@ -518,9 +562,14 @@ def get_image_boundary(camera_model, frame_time, geod_filename=GEOD_FNAME):
     """
     global geod
 
-    im_pts = np.array([[0, 0], [camera_model.width, 0],
-                       [camera_model.width, camera_model.height],
-                       [0, camera_model.height]])
+    im_pts = np.array(
+        [
+            [0, 0],
+            [camera_model.width, 0],
+            [camera_model.width, camera_model.height],
+            [0, camera_model.height],
+        ]
+    )
 
     # platform_pose_provider currently uses an assumption that we don't move too
     # far away from the origin, which is obviously violated here. Currently,
@@ -538,24 +587,28 @@ def get_image_boundary(camera_model, frame_time, geod_filename=GEOD_FNAME):
     ray_pos, ray_dir = camera_model.unproject(im_pts.T, frame_time)
     ray_pos[:2] = 0
     ray_pos[2] = h
-    corner_enu = (ray_pos + ray_dir*(-alt_msl/ray_dir[2])).T
+    corner_enu = (ray_pos + ray_dir * (-alt_msl / ray_dir[2])).T
 
     im_pts = im_pts.astype(np.float64)
 
     corner_ll = []
     for i in range(len(corner_enu)):
-        corner_ll.append(enu_to_llh(*corner_enu[i], lat0=lat, lon0=lon,
-                                    h0=0)[:2])
+        corner_ll.append(enu_to_llh(*corner_enu[i], lat0=lat, lon0=lon, h0=0)[:2])
 
     corner_ll = np.array(corner_ll, dtype=np.float64)
 
     return im_pts, corner_ll
 
 
-def measure_image_to_image_homographies(img_fnames, homog_out_dir,
-                                        ins_homog_dir=None, num_features=10000,
-                                        min_matches=40, reproj_thresh=5,
-                                        save_viz_gif=False):
+def measure_image_to_image_homographies(
+    img_fnames,
+    homog_out_dir,
+    ins_homog_dir=None,
+    num_features=10000,
+    min_matches=40,
+    reproj_thresh=5,
+    save_viz_gif=False,
+):
     print("measure_image_to_image_homographies: {} img_fnames".format(len(img_fnames)))
     if len(img_fnames) == 0:
         return
@@ -564,15 +617,17 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
     lon_lat_homog = {}
 
     if ins_homog_dir is not None:
-        for fname in glob.glob('%s/*.txt' % ins_homog_dir):
+        for fname in glob.glob("%s/*.txt" % ins_homog_dir):
             try:
                 h = np.loadtxt(fname)
                 img_fname = os.path.splitext(os.path.split(fname)[1])[0]
-                lon_lat_homog[img_fname] = np.reshape(h, (3, 3), order='C')
+                lon_lat_homog[img_fname] = np.reshape(h, (3, 3), order="C")
             except Exception as exc:
                 exc_type, exc_obj, exc_tb = sys.exc_info()
                 fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                msg = "{}:{}\n{}: {}".format(fname, exc_tb.tb_lineno, exc_type.__name__, exc)
+                msg = "{}:{}\n{}: {}".format(
+                    fname, exc_tb.tb_lineno, exc_type.__name__, exc
+                )
                 print(msg)
 
     for _fn in img_fnames:
@@ -583,20 +638,27 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
             break
 
     # Find the keypoints and descriptors and match them.
-    orb = cv2.ORB_create(nfeatures=num_features, edgeThreshold=21,
-                         patchSize=31, nlevels=16,
-                         scoreType=cv2.ORB_FAST_SCORE, fastThreshold=10)
+    orb = cv2.ORB_create(
+        nfeatures=num_features,
+        edgeThreshold=21,
+        patchSize=31,
+        nlevels=16,
+        scoreType=cv2.ORB_FAST_SCORE,
+        fastThreshold=10,
+    )
 
     fname0 = img_fnames[0]
     homog_ij = {}
     for i in range(len(img_fnames)):
         fname1 = os.path.splitext(os.path.split(img_fnames[i])[1])[0]
 
-        fname_base = '%s_to_%s' % (fname0, fname1)
-        fname_out = '%s/%s.txt' % (homog_out_dir, fname_base)
+        fname_base = "%s_to_%s" % (fname0, fname1)
+        fname_out = "%s/%s.txt" % (homog_out_dir, fname_base)
 
-        print2('Image %i/%i: extracting features from image \'%s\'' %
-               (i + 1, len(img_fnames), fname1))
+        print2(
+            "Image %i/%i: extracting features from image '%s'"
+            % (i + 1, len(img_fnames), fname1)
+        )
 
         h1 = lon_lat_homog.get(fname1, None)
         img1 = cv2.imread(img_fnames[i], -1)
@@ -612,7 +674,7 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
             img1 = img1.astype(np.float64)
             img1 -= np.percentile(img1.ravel(), 1)
             img1[img1 < 0] = 0
-            img1 /= np.percentile(img1.ravel(), 99)/255
+            img1 /= np.percentile(img1.ravel(), 99) / 255
             img1[img1 > 225] = 255
             img1 = np.round(img1).astype(np.uint8)
 
@@ -631,8 +693,10 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
         matches = bf.match(des0, des1)
 
         if len(matches) < min_matches:
-            print2('Only found %d feature matches, could not match images %i '
-                   'to %i.' % (len(matches), i, i + 1))
+            print2(
+                "Only found %d feature matches, could not match images %i "
+                "to %i." % (len(matches), i, i + 1)
+            )
             fname0, img0, kp0, des0 = fname1, img1, kp1, des1
             continue
 
@@ -644,13 +708,12 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
         # that the displacement fits a translation within 1/20 the image's
         # larger dimension.
         if False:
-            thresh = max([image_height, image_width])/20
+            thresh = max([image_height, image_width]) / 20
             dxy = pts0 - pts1
 
             num_inliers = np.zeros(len(dxy))
             for k in range(len(dxy)):
-                num_inliers[k] = sum(np.all(np.abs(dxy[i] - dxy) < thresh,
-                                            axis=1))
+                num_inliers[k] = sum(np.all(np.abs(dxy[i] - dxy) < thresh, axis=1))
 
             ind = np.all(dxy[np.argmax(num_inliers)] - dxy < thresh, axis=1)
 
@@ -658,8 +721,10 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
             pts1 = pts1[ind]
 
             if len(pts0) < min_matches:
-                print2('Only found %d matches, could not match images %i to '
-                       '%i.' % (len(pts0), i, i + 1))
+                print2(
+                    "Only found %d matches, could not match images %i to "
+                    "%i." % (len(pts0), i, i + 1)
+                )
                 fname0, img0, kp0, des0 = fname1, img1, kp1, des1
                 continue
 
@@ -669,36 +734,36 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
             h = np.dot(np.linalg.inv(h1), h0)
 
             pts0_to_1 = np.dot(h, np.hstack([pts0, np.ones((len(pts0), 1))]).T)
-            pts0_to_1 = (pts0_to_1[:2]/pts0_to_1[2]).T
+            pts0_to_1 = (pts0_to_1[:2] / pts0_to_1[2]).T
 
-            err = np.sqrt(np.sum((pts0_to_1 - pts1)**2, axis=1))
+            err = np.sqrt(np.sum((pts0_to_1 - pts1) ** 2, axis=1))
 
             # Calculate GSD
-            xc = image_width/2
-            yc = image_height/2
-            lon_lats = np.dot(h0, np.array([[xc, xc + 1, xc],
-                                            [yc, yc, yc + 1],
-                                            [1, 1, 1]]))
-            lon_lats = lon_lats[:2]/lon_lats[2]
-            dx = llh_to_enu(lon_lats[1, 1], lon_lats[0, 1], 0,
-                            lon_lats[1, 0], lon_lats[0, 0], 0)
+            xc = image_width / 2
+            yc = image_height / 2
+            lon_lats = np.dot(
+                h0, np.array([[xc, xc + 1, xc], [yc, yc, yc + 1], [1, 1, 1]])
+            )
+            lon_lats = lon_lats[:2] / lon_lats[2]
+            dx = llh_to_enu(
+                lon_lats[1, 1], lon_lats[0, 1], 0, lon_lats[1, 0], lon_lats[0, 0], 0
+            )
             dx = np.linalg.norm(dx)
-            dy = llh_to_enu(lon_lats[1, 2], lon_lats[0, 2], 0,
-                            lon_lats[1, 0], lon_lats[0, 0], 0)
+            dy = llh_to_enu(
+                lon_lats[1, 2], lon_lats[0, 2], 0, lon_lats[1, 0], lon_lats[0, 0], 0
+            )
             dy = np.linalg.norm(dy)
             gsd = np.mean([dx, dy])
 
             # Assume 100 meters of geo-accuracy.
-            thresh = 100/gsd
+            thresh = 100 / gsd
 
             ind = err < thresh
             pts0 = pts0[ind]
             pts1 = pts1[ind]
 
         def affine_not_valid(h):
-            """Is this affine matrix valid for our flight motion.
-
-            """
+            """Is this affine matrix valid for our flight motion."""
             if h is None:
                 return True
 
@@ -710,12 +775,12 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
             except:
                 return True
 
-            #translation = h[:2, 2]
-            #scale = np.sqrt(np.sum(h[:, :2]**2, axis=0))
-            #angle = (np.arccos(h[0, 0] / scale[0]))*180/np.pi
-            angle = np.arctan2(R[1, 0], R[0, 0])*180/np.pi
+            # translation = h[:2, 2]
+            # scale = np.sqrt(np.sum(h[:, :2]**2, axis=0))
+            # angle = (np.arccos(h[0, 0] / scale[0]))*180/np.pi
+            angle = np.arctan2(R[1, 0], R[0, 0]) * 180 / np.pi
 
-            shear_angle = float(np.arctan(S)*180/np.pi)
+            shear_angle = float(np.arctan(S) * 180 / np.pi)
 
             if min(scale) < 0.8 or max(scale) > 1.3:
                 return True
@@ -740,7 +805,7 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
         if h_valid:
             pts = np.dot(h, pts0h)
             pts = pts[:2]
-            mask = np.sum((pts - pts1.T)**2, 0) < (2*reproj_thresh)**2
+            mask = np.sum((pts - pts1.T) ** 2, 0) < (2 * reproj_thresh) ** 2
             h_valid = sum(mask) >= min_matches
 
         if not h_valid:
@@ -766,7 +831,7 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
                     continue
 
                 h_ = cv2.getAffineTransform(pts0[inds], pts1[inds])
-                #h_ = cv2.getPerspectiveTransform(pts0[inds], pts1[inds])
+                # h_ = cv2.getPerspectiveTransform(pts0[inds], pts1[inds])
 
                 # Determine if this is an acceptable homography.
                 if affine_not_valid(h_):
@@ -774,7 +839,7 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
 
                 pts = np.dot(h_, pts0h)
                 pts = pts[:2]
-                ind_ = np.sum((pts - pts1.T)**2, 0) < (2*reproj_thresh)**2
+                ind_ = np.sum((pts - pts1.T) ** 2, 0) < (2 * reproj_thresh) ** 2
                 num_inliers_ = sum(ind_)
                 if num_inliers_ > num_inliers:
                     num_inliers = num_inliers_
@@ -785,23 +850,29 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
         pts1 = pts1[mask]
 
         if len(pts0) < min_matches:
-            print2("Only found %d matches, could not match images %i to %i." %
-                   (len(pts0), i, i + 1))
+            print2(
+                "Only found %d matches, could not match images %i to %i."
+                % (len(pts0), i, i + 1)
+            )
             fname0, img0, kp0, des0 = fname1, img1, kp1, des1
             continue
 
         if True:
             # Refine with full homography.
             mask = np.zeros(len(pts0))
-            h, mask = cv2.findHomography(pts0.reshape(-1, 1, 2),
-                                         pts1.reshape(-1, 1, 2),
-                                         method=cv2.RANSAC,
-                                         ransacReprojThreshold=reproj_thresh,
-                                         mask=mask)
+            h, mask = cv2.findHomography(
+                pts0.reshape(-1, 1, 2),
+                pts1.reshape(-1, 1, 2),
+                method=cv2.RANSAC,
+                ransacReprojThreshold=reproj_thresh,
+                mask=mask,
+            )
 
             if h is None:
-                print2("Only found %d matches, could not match images %i to %i." %
-                       (len(pts0), i, i + 1))
+                print2(
+                    "Only found %d matches, could not match images %i to %i."
+                    % (len(pts0), i, i + 1)
+                )
                 fname0, img0, kp0, des0 = fname1, img1, kp1, des1
                 continue
 
@@ -819,14 +890,17 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
             h = np.vstack([h, [0, 0, 1]])
 
         if save_viz_gif:
-            dir_out = ('%s/refined_registration_viz' %
-                       '/'.join(fname_out.split('/')[:-3]))
-            viz_fname_out = '%s/%s_to_%s.gif' % (dir_out, fname0, fname1)
+            dir_out = "%s/refined_registration_viz" % "/".join(
+                fname_out.split("/")[:-3]
+            )
+            viz_fname_out = "%s/%s_to_%s.gif" % (dir_out, fname0, fname1)
             save_registration_gif(img0, img1, h, viz_fname_out)
 
         if len(pts0) < min_matches:
-            print2("Only found %d matches, could not match images %i to %i." %
-                   (len(pts0), i, i + 1))
+            print2(
+                "Only found %d matches, could not match images %i to %i."
+                % (len(pts0), i, i + 1)
+            )
             fname0, img0, kp0, des0 = fname1, img1, kp1, des1
             continue
 
@@ -835,10 +909,9 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
         except (OSError, IOError):
             pass
 
-        print2('Found %i consistent feature matches between images' %
-               len(pts0))
+        print2("Found %i consistent feature matches between images" % len(pts0))
 
-        np.savetxt(fname_out, h.ravel(order='C'))
+        np.savetxt(fname_out, h.ravel(order="C"))
 
         # This current homography warps from the previous image to the current
         # one.
@@ -871,11 +944,12 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
             h_desired = np.dot(last_h, intermediate_h)
 
             # Check to see if there is actually any overlap.
-            im_pts = points_along_image_border(image_width, image_height,
-                                               num_points=100)
+            im_pts = points_along_image_border(
+                image_width, image_height, num_points=100
+            )
             im_pts = np.vstack([im_pts, np.ones(im_pts.shape[1])])
             im_pts = np.dot(h_desired, im_pts)
-            im_pts = im_pts[:2]/im_pts[2]
+            im_pts = im_pts[:2] / im_pts[2]
             ind = np.logical_and(im_pts[0] > 0, im_pts[0] < image_width)
             ind = np.logical_and(ind, im_pts[1] > 0)
             ind = np.logical_and(ind, im_pts[1] < image_height)
@@ -889,9 +963,9 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
             i1, i2 = key_desired
             fname_from = os.path.splitext(os.path.split(img_fnames[i1])[1])[0]
             fname_to = os.path.splitext(os.path.split(img_fnames[i2])[1])[0]
-            fname_base = '%s_to_%s' % (fname_from, fname_to)
-            fname_out = '%s/%s.txt' % (homog_out_dir, fname_base)
-            np.savetxt(fname_out, h.ravel(order='C'))
+            fname_base = "%s_to_%s" % (fname_from, fname_to)
+            fname_out = "%s/%s.txt" % (homog_out_dir, fname_base)
+            np.savetxt(fname_out, h.ravel(order="C"))
 
             last_h = h_desired
             last_key = key_desired
@@ -899,9 +973,9 @@ def measure_image_to_image_homographies(img_fnames, homog_out_dir,
         fname0, img0, kp0, des0 = fname1, img1, kp1, des1
 
 
-def measure_image_to_image_homographies_flight_dir(flight_dir,
-                                                   multi_threaded=True,
-                                                   save_viz_gif=False):
+def measure_image_to_image_homographies_flight_dir(
+    flight_dir, multi_threaded=True, save_viz_gif=False
+):
     """Process all image_to_image homographies in the flight directory.
 
     Triggered by "Fine Tune Tracking" menu item
@@ -918,53 +992,73 @@ def measure_image_to_image_homographies_flight_dir(flight_dir,
     <flight_dir>/<sys_config>/center_view
 
     """
-    print('measure_image_to_image_homographies_flight_dir: {}'.format(flight_dir))
+    print("measure_image_to_image_homographies_flight_dir: {}".format(flight_dir))
     dtype = get_dir_type(flight_dir)
-    if dtype != 'flight':
-        raise RuntimeError("Called measure_image_to_image_homographies_flight_dir on `{}` directory: {}".format(dtype, flight_dir))
+    if dtype != "flight":
+        raise RuntimeError(
+            "Called measure_image_to_image_homographies_flight_dir on `{}` directory: {}".format(
+                dtype, flight_dir
+            )
+        )
 
     threads = []
     for sys_config in os.listdir(flight_dir):
-        sys_config_dir = '%s/%s' % (flight_dir, sys_config)
+        sys_config_dir = "%s/%s" % (flight_dir, sys_config)
         if not os.path.isdir(sys_config_dir):
-            print("skipping because it's not a real sys_config_dir: {}".format(sys_config_dir))
+            print(
+                "skipping because it's not a real sys_config_dir: {}".format(
+                    sys_config_dir
+                )
+            )
             continue
 
         sys_config_dtype = get_dir_type(sys_config_dir)
-        if sys_config_dtype != 'sys_config':
-            print("skipping because it's not a real sys_config_dir: {}".format(sys_config_dir))
+        if sys_config_dtype != "sys_config":
+            print(
+                "skipping because it's not a real sys_config_dir: {}".format(
+                    sys_config_dir
+                )
+            )
             continue
 
-        print('measure_image_to_image_homographies_flight_dir: sys_config_dir: {}'.format(sys_config_dir))
-        homog_dir0 = '%s/processed_results/homographies_img_to_img' % (flight_dir)
+        print(
+            "measure_image_to_image_homographies_flight_dir: sys_config_dir: {}".format(
+                sys_config_dir
+            )
+        )
+        homog_dir0 = "%s/processed_results/homographies_img_to_img" % (flight_dir)
 
-        for modality in ['rgb', 'ir', 'uv']:
+        for modality in ["rgb", "ir", "uv"]:
             for sys_str in get_fov_dirs(sys_config_dir):
-                image_dir = '%s/%s' % (sys_config_dir, sys_str)
-                print('Image directory:', image_dir)
+                image_dir = "%s/%s" % (sys_config_dir, sys_str)
+                print("Image directory:", image_dir)
 
-                image_glob = '%s/*%s.*' % (image_dir, modality)
+                image_glob = "%s/*%s.*" % (image_dir, modality)
                 img_fnames = glob.glob(image_glob)
                 img_fnames = sorted(img_fnames)
 
-                homog_dir = '%s/%s_%s' % (homog_dir0, sys_str.lower(), modality)
+                homog_dir = "%s/%s_%s" % (homog_dir0, sys_str.lower(), modality)
 
-                print2('Creating homographies for', image_glob)
+                print2("Creating homographies for", image_glob)
 
                 if multi_threaded:
-                    thread = threading.Thread(target=measure_image_to_image_homographies,
-                                              args=(img_fnames, homog_dir, None,
-                                                    20000, 40, 5, save_viz_gif))
+                    thread = threading.Thread(
+                        target=measure_image_to_image_homographies,
+                        args=(img_fnames, homog_dir, None, 20000, 40, 5, save_viz_gif),
+                    )
                     thread.daemon = True
                     thread.start()
                     threads.append(thread)
                 else:
-                    measure_image_to_image_homographies(img_fnames, homog_dir,
-                                                        ins_homog_dir=None,
-                                                        num_features=20000,
-                                                        min_matches=40,
-                                                        reproj_thresh=5,
-                                                        save_viz_gif=save_viz_gif)
+                    measure_image_to_image_homographies(
+                        img_fnames,
+                        homog_dir,
+                        ins_homog_dir=None,
+                        num_features=20000,
+                        min_matches=40,
+                        reproj_thresh=5,
+                        save_viz_gif=save_viz_gif,
+                    )
 
     if multi_threaded:
         # Block until all threads finished (if any).
@@ -990,8 +1084,9 @@ def debayer_image(image, bayer_pattern):
     """
     if image.ndim == 2:
         return cv2.cvtColor(image, bayer_patterns[bayer_pattern])
-    if (np.all(image[:, :, 0] == image[:, :, 1]) and
-        np.all(image[:, :, 0] == image[:, :, 2])):
+    if np.all(image[:, :, 0] == image[:, :, 1]) and np.all(
+        image[:, :, 0] == image[:, :, 2]
+    ):
         # Bayered image encoded as three seperate identical channels.
         return cv2.cvtColor(image[:, :, 0], bayer_patterns[bayer_pattern])
     else:
@@ -1015,20 +1110,18 @@ def debayer_image_list(img_fnames, img_fnames_out):
         with open(img_fname) as f:
             tags = exifread.process_file(f)
             try:
-                if tags['Image SamplesPerPixel'].field_type == 3:
+                if tags["Image SamplesPerPixel"].field_type == 3:
                     if img_fname_out != img_fname:
-                        print2('Copying \'%s\' to \'%s\'' % (img_fname,
-                                                             img_fname_out))
+                        print2("Copying '%s' to '%s'" % (img_fname, img_fname_out))
                         copyfile(img_fname, img_fname_out)
                     else:
-                        print2('Image \'%s\' already debayered' %
-                               img_fname_out)
+                        print2("Image '%s' already debayered" % img_fname_out)
 
                 continue
             except KeyError:
                 pass
 
-        print2('Reading:', img_fname)
+        print2("Reading:", img_fname)
         img = cv2.imread(img_fname)
 
         if img is None:
@@ -1039,20 +1132,19 @@ def debayer_image_list(img_fnames, img_fnames_out):
         except OSError:
             pass
 
-        img2 = debayer_image(img, 'bayer_gbrg8')
+        img2 = debayer_image(img, "bayer_gbrg8")
 
         if img2 is not img:
-            print2('Saving:', img_fname_out)
+            print2("Saving:", img_fname_out)
             cv2.imwrite(img_fname_out, img2)
         else:
             if img_fname_out != img_fname:
-                print2('Copying \'%s\' to \'%s\'' % (img_fname,
-                                                     img_fname_out))
+                print2("Copying '%s' to '%s'" % (img_fname, img_fname_out))
                 copyfile(img_fname, img_fname_out)
             else:
-                print2('Image \'%s\' already debayered' % img_fname_out)
+                print2("Image '%s' already debayered" % img_fname_out)
 
-    print2('Thread Finished')
+    print2("Thread Finished")
 
 
 def debayer_dir_tree(src_dir, dst_dir=None, num_threads=1):
@@ -1072,18 +1164,18 @@ def debayer_dir_tree(src_dir, dst_dir=None, num_threads=1):
 
     img_fnames = []
     img_fnames_out = []
-    for img_fname in glob.glob('%s/*rgb.tif' % src_dir):
+    for img_fname in glob.glob("%s/*rgb.tif" % src_dir):
         img_fnames.append(img_fname)
         img_fnames_out.append(img_fname.replace(src_dir, dst_dir))
 
     for root, dirnames, filenames in os.walk(src_dir):
         for dirname in dirnames:
-            curr_dir = '%s/%s/*rgb.tif' % (root, dirname)
+            curr_dir = "%s/%s/*rgb.tif" % (root, dirname)
             for img_fname in glob.glob(curr_dir):
                 img_fnames.append(img_fname)
                 img_fnames_out.append(img_fname.replace(src_dir, dst_dir))
 
-    print2('Found %i RGB images to consider' % len(img_fnames))
+    print2("Found %i RGB images to consider" % len(img_fnames))
 
     num_threads = min([num_threads, len(img_fnames)])
 
@@ -1094,9 +1186,13 @@ def debayer_dir_tree(src_dir, dst_dir=None, num_threads=1):
         ind = ind.astype(np.int)
         threads = []
         for i in range(len(ind) - 1):
-            thread = threading.Thread(target=debayer_image_list,
-                                      args=(img_fnames[ind[i]:ind[i+1]],
-                                            img_fnames_out[ind[i]:ind[i+1]]))
+            thread = threading.Thread(
+                target=debayer_image_list,
+                args=(
+                    img_fnames[ind[i] : ind[i + 1]],
+                    img_fnames_out[ind[i] : ind[i + 1]],
+                ),
+            )
             thread.daemon = True
             thread.start()
             threads.append(thread)
@@ -1114,7 +1210,7 @@ def stretch_constrast(img):
     img = img.astype(np.float32)
     img -= np.percentile(img.ravel(), 0.1)
     img[img < 0] = 0
-    img /= np.percentile(img.ravel(), 99.9)/255
+    img /= np.percentile(img.ravel(), 99.9) / 255
     img[img > 225] = 255
     img = np.round(img).astype(np.uint8)
 
@@ -1129,27 +1225,34 @@ def stretch_constrast(img):
     return img
 
 
-def save_geotiff(img, camera_model, frame_time, geotiff_fname,
-                 compression_setting=None, verbosity=0):
-    gdal_drv = gdal.GetDriverByName('GTiff')
+def save_geotiff(
+    img, camera_model, frame_time, geotiff_fname, compression_setting=None, verbosity=0
+):
+    gdal_drv = gdal.GetDriverByName("GTiff")
 
     if compression_setting is not None:
         # Compress the RGB and UV.
-        gdal_settings = ['COMPRESS=JPEG',
-                         'JPEG_QUALITY=%i' % compression_setting]
+        gdal_settings = ["COMPRESS=JPEG", "JPEG_QUALITY=%i" % compression_setting]
     else:
         gdal_settings = []
 
-    ds = gdal_drv.Create(geotiff_fname, img.shape[1], img.shape[0], img.ndim,
-                         gdal.GDT_Byte, gdal_settings)
+    ds = gdal_drv.Create(
+        geotiff_fname,
+        img.shape[1],
+        img.shape[0],
+        img.ndim,
+        gdal.GDT_Byte,
+        gdal_settings,
+    )
     ds.SetProjection(wgs84_cs.ExportToWkt())
 
     im_pts, corner_ll = get_image_boundary(camera_model, frame_time)
     corner_ll = corner_ll[:, ::-1]
 
     # Affine transform warping image coordinates to latitude/longitude.
-    A, inliers = cv2.estimateAffine2D(np.reshape(im_pts, (1, -1, 2)),
-                                   np.reshape(corner_ll, (1, -1, 2)), True)
+    A, inliers = cv2.estimateAffine2D(
+        np.reshape(im_pts, (1, -1, 2)), np.reshape(corner_ll, (1, -1, 2)), True
+    )
 
     if A is None:
         # Failure can happen when the aircraft is just above the ground.
@@ -1158,9 +1261,9 @@ def save_geotiff(img, camera_model, frame_time, geotiff_fname,
         scale = np.max(np.abs(corners))
         corners /= scale
 
-        A, inliers = cv2.estimateAffine2D(np.reshape(im_pts, (1, -1, 2)),
-                                       np.reshape(corners, (1, -1, 2)),
-                                       True)
+        A, inliers = cv2.estimateAffine2D(
+            np.reshape(im_pts, (1, -1, 2)), np.reshape(corners, (1, -1, 2)), True
+        )
         A = np.vstack([A, [0, 0, 1]])
         S = np.identity(3)
         S[0, 0] = S[1, 1] = scale
@@ -1179,17 +1282,23 @@ def save_geotiff(img, camera_model, frame_time, geotiff_fname,
         ds.GetRasterBand(1).WriteArray(img[:, :], 0, 0)
     else:
         for i in range(ds.RasterCount):
-            ds.GetRasterBand(i+1).WriteArray(img[:, :, i], 0, 0)
+            ds.GetRasterBand(i + 1).WriteArray(img[:, :, i], 0, 0)
 
     ds.FlushCache()  # Write to disk.
     ds = None
     if verbosity >= 3:
-        print2('Saved \'%s\'' % geotiff_fname)
+        print2("Saved '%s'" % geotiff_fname)
 
 
-def create_geotiffs_glob(image_dir, modality, output_dir, camera_model_fname,
-                         compression_quality=75, stretch_constrast=None,
-                         verbosity=0):
+def create_geotiffs_glob(
+    image_dir,
+    modality,
+    output_dir,
+    camera_model_fname,
+    compression_quality=75,
+    stretch_constrast=None,
+    verbosity=0,
+):
     # type: (str, str, str, str, int, Callable, int) -> None
     """Create geotiffs for images from one camera.
 
@@ -1208,9 +1317,9 @@ def create_geotiffs_glob(image_dir, modality, output_dir, camera_model_fname,
     :type compression_quality: int [0,100]
 
     """
-    file_assert(camera_model_fname, 'Cannot load camera model. File')
+    file_assert(camera_model_fname, "Cannot load camera model. File")
 
-    dir_assert(image_dir, 'Image dir')
+    dir_assert(image_dir, "Image dir")
 
     # This will do some duplication of NavState parsing but I do not have time to fix
     ret = parse_image_directory(image_dir, modality=modality)
@@ -1225,15 +1334,16 @@ def create_geotiffs_glob(image_dir, modality, output_dir, camera_model_fname,
     frame_times = sorted(list(set(img_time_to_fname.keys())))
 
     if False:
-        frame_times = [_ for _ in frame_times
-                       if _ >= 1557373173.6 and _ <= 1557373193.2]
+        frame_times = [
+            _ for _ in frame_times if _ >= 1557373173.6 and _ <= 1557373193.2
+        ]
 
     if verbosity >= 1:
-        print2('create_greotiffs_glob: {}'.format(modality))
+        print2("create_greotiffs_glob: {}".format(modality))
     for frame_time in frame_times:
         src_img_fname = img_time_to_fname[frame_time]
         if verbosity >= 2:
-            print2('Processing \'%s\'' % src_img_fname)
+            print2("Processing '%s'" % src_img_fname)
         img = cv2.imread(src_img_fname)
 
         if img is None:
@@ -1241,37 +1351,47 @@ def create_geotiffs_glob(image_dir, modality, output_dir, camera_model_fname,
 
         if img.ndim == 3:
             img = img[:, :, ::-1]
-        elif 'rgb.tif' in src_img_fname:
+        elif "rgb.tif" in src_img_fname:
             # Wasn't debayered yet.
-            img = debayer_image(img, 'bayer_gbrg8')
+            img = debayer_image(img, "bayer_gbrg8")
 
         if stretch_constrast is not None:
             img = stretch_constrast(img)
 
         base_fname = os.path.splitext(os.path.split(src_img_fname)[1])[0]
-        fname = '%s/%s.tif' % (output_dir, base_fname)
+        fname = "%s/%s.tif" % (output_dir, base_fname)
 
-        if img.shape[1]*img.shape[0] > 1500*1500:
+        if img.shape[1] * img.shape[0] > 1500 * 1500:
             # Compress the RGB and UV.
-            save_geotiff(img, camera_model, frame_time, fname,
-                         compression_quality)
+            save_geotiff(img, camera_model, frame_time, fname, compression_quality)
         else:
             # Don't compress the IR.
             save_geotiff(img, camera_model, frame_time, fname, None)
 
-def fac_geotiff_thunk(image_dir, modality, output_dir, camera_model_fname,
-                         compression_quality=75, stretch_constrast=None,
-                         verbosity=0):
+
+def fac_geotiff_thunk(
+    image_dir,
+    modality,
+    output_dir,
+    camera_model_fname,
+    compression_quality=75,
+    stretch_constrast=None,
+    verbosity=0,
+):
     # type: (str, str, str, str, int, Callable, int) -> Callable
     """Create a callback to be passed to thread"""
 
     def thread_thunk():
-        #try:
-        create_geotiffs_glob(image_dir=image_dir, modality=modality,
-                             output_dir=output_dir,
-                             camera_model_fname=camera_model_fname,
-                             compression_quality=compression_quality,
-                             verbosity=verbosity)
+        # try:
+        create_geotiffs_glob(
+            image_dir=image_dir,
+            modality=modality,
+            output_dir=output_dir,
+            camera_model_fname=camera_model_fname,
+            compression_quality=compression_quality,
+            verbosity=verbosity,
+        )
+
     #    except FileNotFoundError as exc:
     #        print2(repr(exc))
 
@@ -1282,8 +1402,9 @@ def fac_geotiff_thunk(image_dir, modality, output_dir, camera_model_fname,
     return thread_thunk
 
 
-def create_all_geotiff(flight_dir, output_dir=None, quality=75,
-                       multi_threaded=False, verbosity=0):
+def create_all_geotiff(
+    flight_dir, output_dir=None, quality=75, multi_threaded=False, verbosity=0
+):
     """Create geotiffs for all images in the flight directory.
 
     A flight directory contains a folder structure where different
@@ -1300,26 +1421,28 @@ def create_all_geotiff(flight_dir, output_dir=None, quality=75,
 
     """
     if output_dir is None:
-        output_dir = '%s/processed_results/geotiffs' % flight_dir
+        output_dir = "%s/processed_results/geotiffs" % flight_dir
 
     make_path(output_dir)
 
     jobs = []
     for sys_config in os.listdir(flight_dir):
-        sys_config_dir = '%s/%s' % (flight_dir, sys_config)
+        sys_config_dir = "%s/%s" % (flight_dir, sys_config)
         if not os.path.isdir(sys_config_dir):
             pass
 
         try:
-            sys_config_fname = '%s/sys_config.json' % sys_config_dir
+            sys_config_fname = "%s/sys_config.json" % sys_config_dir
             with open(sys_config_fname, "r") as input_file:
                 camera_model_paths = json.load(input_file)
         except (OSError, IOError):
-            print('Could not read \'%s\', skipping summary for system '
-                  'configuration \'%s\'' % (sys_config_fname, sys_config_dir))
+            print(
+                "Could not read '%s', skipping summary for system "
+                "configuration '%s'" % (sys_config_fname, sys_config_dir)
+            )
             continue
 
-        for modality in ['ir', 'uv','rgb']:
+        for modality in ["ir", "uv", "rgb"]:
             for fov_dirname in get_fov_dirs(sys_config_dir):
                 sys_str = first_wordlike(fov_dirname)
                 image_dir = os.path.join(sys_config_dir, fov_dirname)
@@ -1327,32 +1450,37 @@ def create_all_geotiff(flight_dir, output_dir=None, quality=75,
                 sys_str = sys_str.lower()
 
                 try:
-                    key = '%s_%s_yaml_path' % (sys_str, modality)
+                    key = "%s_%s_yaml_path" % (sys_str, modality)
                     camera_model_fname = camera_model_paths[key]
                 except KeyError:
-                    print('Camera model path specification file \'%s\' does'
-                          'not include a specification for \'%s\', skipping '
-                          % (sys_config_fname, key))
+                    print(
+                        "Camera model path specification file '%s' does"
+                        "not include a specification for '%s', skipping "
+                        % (sys_config_fname, key)
+                    )
                     continue
 
                 try:
                     load_from_file(camera_model_fname)
                 except IOError:
-                    print('Could not load the camera model '
-                                  'yaml specified to be located: %s. '
-                                  'Skipping' % camera_model_fname)
+                    print(
+                        "Could not load the camera model "
+                        "yaml specified to be located: %s. "
+                        "Skipping" % camera_model_fname
+                    )
                     continue
 
-                image_glob = '%s/*%s.tif' % (image_dir, modality)
-                print2('Creating GeoTIFFs for', image_glob)
+                image_glob = "%s/*%s.tif" % (image_dir, modality)
+                print2("Creating GeoTIFFs for", image_glob)
 
                 thunk = fac_geotiff_thunk(
-                            image_dir=image_dir,
-                            modality=modality,
-                            output_dir=output_dir,
-                            camera_model_fname=camera_model_fname,
-                            compression_quality=quality,
-                            verbosity=verbosity)
+                    image_dir=image_dir,
+                    modality=modality,
+                    output_dir=output_dir,
+                    camera_model_fname=camera_model_fname,
+                    compression_quality=quality,
+                    verbosity=verbosity,
+                )
 
                 jobs.append(thunk)
 
@@ -1362,7 +1490,7 @@ def create_all_geotiff(flight_dir, output_dir=None, quality=75,
         return
 
     threads = [threading.Thread(target=thunk) for thunk in jobs]
-    print('Threads: {}'.format(len(threads)))
+    print("Threads: {}".format(len(threads)))
     for thread in threads:
         thread.daemon = True
         thread.start()
@@ -1375,12 +1503,14 @@ def create_all_geotiff(flight_dir, output_dir=None, quality=75,
             if thread.is_alive():
                 any_alive = True
 
-def get_review_fate(nav_state_provider: NavStateINSJson,
-                    basename_to_time: dict[str, float],
-                    sets_detector_processed: set[str],
-                    sets_with_detections: set[str],
-                    image_name: str | os.PathLike,
-                    ) -> tuple[str, str]:
+
+def get_review_fate(
+    nav_state_provider: NavStateINSJson,
+    basename_to_time: dict[str, float],
+    sets_detector_processed: set[str],
+    sets_with_detections: set[str],
+    image_name: str | os.PathLike,
+) -> tuple[str, str]:
     base_name = get_base(image_name)
     t = basename_to_time[base_name]
     try:
@@ -1392,8 +1522,8 @@ def get_review_fate(nav_state_provider: NavStateINSJson,
     try:
         seq = nav_state_provider.time_to_seq[t]
     except KeyError:
-       print(f"Could not find 'seq' for time {t}.")
-       seq = None
+        print(f"Could not find 'seq' for time {t}.")
+        seq = None
 
     if base_name in sets_detector_processed:
         reviewed = "True"
@@ -1435,13 +1565,13 @@ def get_basename_to_time(flight_dir) -> dict:
     # Establish correspondence between real-world exposure times base of file
     # names.
     basename_to_time = {}
-    for json_fname in pathlib.Path(flight_dir).rglob('*_meta.json'):
+    for json_fname in pathlib.Path(flight_dir).rglob("*_meta.json"):
         try:
             with open(json_fname) as json_file:
                 d = json.load(json_file)
                 # Time that the image was taken.
                 basename = get_base(json_fname)
-                basename_to_time[basename] = float(d['evt']['time'])
+                basename_to_time[basename] = float(d["evt"]["time"])
         except (OSError, IOError):
             pass
     return basename_to_time
@@ -1468,14 +1598,14 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
     project_id = os.path.basename(os.path.dirname(flight_dir))
     print("FLIGHT_ID: %s" % flight_id)
     print("PROJECT_ID: %s" % project_id)
-    process_summary = {'fovs': {}, 'models': [], 'shapefile_count': 0, 'fails': {}}
+    process_summary = {"fovs": {}, "models": [], "shapefile_count": 0, "fails": {}}
 
     camera_models = {}
     img_fname_to_time = {}
     img_time_to_fname = {}
     fnames_by_system = {}
-    effort_type = defaultdict(lambda: '')
-    trigger_type = defaultdict(lambda: '')
+    effort_type = defaultdict(lambda: "")
+    trigger_type = defaultdict(lambda: "")
 
     # ------------------------------------------------------------------------
     # We loop over <sys_config> within the flight directory to find the camera
@@ -1486,66 +1616,68 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
     # <flight_dir>/<sys_config>/right_view
     # <flight_dir>/<sys_config>/center_view
 
-        # Read in detector information
+    # Read in detector information
     print(flight_dir)
-    det_txts = glob.glob(os.path.join(flight_dir, 'detections', '*.txt'))
+    det_txts = glob.glob(os.path.join(flight_dir, "detections", "*.txt"))
     sets_detector_processed = []
     for f in det_txts:
         print(f)
-        with open(f, 'r') as of:
-            sets_detector_processed += [ get_base(l) for l in of.readlines() ]
+        with open(f, "r") as of:
+            sets_detector_processed += [get_base(l) for l in of.readlines()]
     sets_detector_processed = set(sets_detector_processed)
     print("Number of sets of images detected on: %s" % len(sets_detector_processed))
 
     basename_to_time = get_basename_to_time(flight_dir=flight_dir)
 
-    det_csvs = glob.glob(os.path.join(flight_dir, 'detections', '*.csv'))
+    det_csvs = glob.glob(os.path.join(flight_dir, "detections", "*.csv"))
     sets_with_detections = []
     for f in det_csvs:
-        with open(f, 'r') as of:
+        with open(f, "r") as of:
             lines = of.readlines()
-            lines = [ l for l in lines if l[0] != "#" ]
-            files = [get_base(l.split(',')[1]) for l in lines]
+            lines = [l for l in lines if l[0] != "#"]
+            files = [get_base(l.split(",")[1]) for l in lines]
             sets_with_detections += files
     sets_with_detections = set(sets_with_detections)
     print("Number of sets with detections: %s" % len(sets_with_detections))
 
-    json_glob = pathlib.Path(flight_dir).rglob('*_meta.json')
+    json_glob = pathlib.Path(flight_dir).rglob("*_meta.json")
     try:
         next(json_glob)
     except StopIteration:
         raise SystemExit("No meta jsons were found, please check your filepaths.")
     nav_state_provider = NavStateINSJson(json_glob)
 
-    fn_glob = os.path.join(flight_dir, '*/*/*meta.json')
+    fn_glob = os.path.join(flight_dir, "*/*/*meta.json")
     count = 0
     est_metas = glob.glob(fn_glob)
     total = len(est_metas) * 3
 
     for sys_config in os.listdir(flight_dir):
-        sys_config_dir = '%s/%s' % (flight_dir, sys_config)
+        sys_config_dir = "%s/%s" % (flight_dir, sys_config)
         if not os.path.isdir(sys_config_dir):
             pass
 
         try:
-            sys_config_fname = '%s/sys_config.json' % sys_config_dir
+            sys_config_fname = "%s/sys_config.json" % sys_config_dir
             with open(sys_config_fname, "r") as input_file:
                 camera_model_paths = json.load(input_file)
         except (OSError, IOError):
-            print('Could not read \'%s\', skipping summary for system '
-                  'configuration \'%s\'' % (sys_config_fname, sys_config_dir))
+            print(
+                "Could not read '%s', skipping summary for system "
+                "configuration '%s'" % (sys_config_fname, sys_config_dir)
+            )
             continue
 
         # Extract camera models.
         for sys_str in get_fov_dirs(sys_config_dir):
-            image_dir = '%s/%s' % (sys_config_dir, sys_str)
+            image_dir = "%s/%s" % (sys_config_dir, sys_str)
 
             ret = parse_image_directory(image_dir)
             try:
                 ret = parse_image_directory(image_dir)
             except Exception as e:
                 print(e)
-                print('Not considering: \'%s\'' % image_dir)
+                print("Not considering: '%s'" % image_dir)
                 continue
 
             img_fname_to_time.update(ret[0])
@@ -1557,20 +1689,22 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
 
             sys_str = reduce_fov(sys_str)
 
-            for cam_str in ['rgb', 'ir', 'uv']:
-                img_fnames = glob.glob('%s/*%s.*' % (image_dir, cam_str))
+            for cam_str in ["rgb", "ir", "uv"]:
+                img_fnames = glob.glob("%s/*%s.*" % (image_dir, cam_str))
                 num_images = len(img_fnames)
-                key = '%s_%s_yaml_path' % (sys_str, cam_str)
+                key = "%s_%s_yaml_path" % (sys_str, cam_str)
 
                 try:
                     camera_model_fname = camera_model_paths[key]
                 except KeyError:
-                    print('Camera model path specification file \'%s\' does'
-                          'not include a specification for \'%s\', skipping '
-                          % (sys_config_fname, key))
+                    print(
+                        "Camera model path specification file '%s' does"
+                        "not include a specification for '%s', skipping "
+                        % (sys_config_fname, key)
+                    )
                     continue
 
-                sys_str2 = '%s_%s' % (sys_str, cam_str)
+                sys_str2 = "%s_%s" % (sys_str, cam_str)
 
                 if sys_str2 not in fnames_by_system:
                     fnames_by_system[sys_str2] = []
@@ -1580,27 +1714,32 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
                 if len(img_fnames) > 0:
                     # There are images for this camera.
                     try:
-                        camera_model = load_from_file(camera_model_fname,
-                                                      platform_pose_provider)
+                        camera_model = load_from_file(
+                            camera_model_fname, platform_pose_provider
+                        )
                     except IOError:
-                        print('Could not load the camera model '
-                                      'yaml specified to be located: %s. '
-                                      'Skipping' % camera_model_fname)
+                        print(
+                            "Could not load the camera model "
+                            "yaml specified to be located: %s. "
+                            "Skipping" % camera_model_fname
+                        )
                         continue
 
                     for img_fname in img_fnames:
                         camera_models[img_fname] = camera_model
-                        if camera_model_fname not in process_summary['models']:
-                            process_summary['models'].append(camera_model_fname)
-                        process_summary['fovs'].update({cam_str: len(img_fnames)})
+                        if camera_model_fname not in process_summary["models"]:
+                            process_summary["models"].append(camera_model_fname)
+                        process_summary["fovs"].update({cam_str: len(img_fnames)})
                         count += 1
                         # update_progress(count, total, flight_dir=flight_dir, msg="create_flight_summary")
     # ------------------------------------------------------------------------
 
     # Calculate each image's boundary in latitude and longitude.
-    print2('Calculating each image\'s footprint in latitude and longitude by '
-           'leveraging INS-reported pose and assuming the ground is at mean '
-           'sea level.')
+    print2(
+        "Calculating each image's footprint in latitude and longitude by "
+        "leveraging INS-reported pose and assuming the ground is at mean "
+        "sea level."
+    )
     corner_ll = {}
     aircraft_state = {}
     for sys_str in fnames_by_system:
@@ -1618,8 +1757,8 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
                 frame_time = img_fname_to_time[img_fname]
             except KeyError:
                 print(f"Missing time for image: {img_fname}")
-                failcount = process_summary['fails'].get(sys_str, 0)
-                process_summary['fails'][sys_str] = failcount + 1
+                failcount = process_summary["fails"].get(sys_str, 0)
+                process_summary["fails"][sys_str] = failcount + 1
 
                 continue
 
@@ -1635,17 +1774,20 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
             # Extract aircraft state information.
             nsp = camera_model.platform_pose_provider
             lat, lon, h = nsp.llh(frame_time)
-            heading, pitch, roll, = nsp.ins_heading_pitch_roll(frame_time)
+            (
+                heading,
+                pitch,
+                roll,
+            ) = nsp.ins_heading_pitch_roll(frame_time)
 
-            aircraft_state[img_fname] = [frame_time, lat, lon, h, heading,
-                                         pitch, roll]
+            aircraft_state[img_fname] = [frame_time, lat, lon, h, heading, pitch, roll]
 
     # ------------------------------------------------------------------------
     # Save homographies estimated by INS.
-    homog_dir = '%s/processed_results/homographies_img_to_lonlat' % (flight_dir)
+    homog_dir = "%s/processed_results/homographies_img_to_lonlat" % (flight_dir)
 
     for sys_str in fnames_by_system:
-        homog_dir2 = '%s/%s' % (homog_dir, sys_str)
+        homog_dir2 = "%s/%s" % (homog_dir, sys_str)
         img_fnames = fnames_by_system[sys_str]
         for img_fname in img_fnames:
             try:
@@ -1657,7 +1799,7 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
 
             if False:
                 ll2 = np.dot(h, np.vstack([im_pts.T, np.ones(4)]))
-                ll2 = ll2[:2]/ll2[2]
+                ll2 = ll2[:2] / ll2[2]
                 print(ll2)
                 print(ll[:, ::-1].T)
 
@@ -1670,14 +1812,14 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
                 pass
 
             fname_base = os.path.split(os.path.splitext(img_fname)[0])[1]
-            fname = '%s/%s.txt' % (homog_dir2, fname_base)
-            np.savetxt(fname, h.ravel(order='C'))
+            fname = "%s/%s.txt" % (homog_dir2, fname_base)
+            np.savetxt(fname, h.ravel(order="C"))
 
     # ------------------------------------------------------------------------
     for sys_str in fnames_by_system:
         tic = time.time()
         flid_sys_str = "%s_%s_%s" % (project_id, flight_id, sys_str)
-        print2('Processing image footprints for system:', sys_str)
+        print2("Processing image footprints for system:", sys_str)
         img_fnames = fnames_by_system[sys_str]
 
         if len(img_fnames) == 0:
@@ -1701,11 +1843,10 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
             lls.append(lls[0])
 
             # Check area in m^2.
-            s = [llh_to_enu(_[1], _[0], 0, lls[0][1], lls[0][0], 0)
-                 for _ in lls]
+            s = [llh_to_enu(_[1], _[0], 0, lls[0][1], lls[0][0], 0) for _ in lls]
             area = Polygon(s).area
 
-            if area > 1000*1000:
+            if area > 1000 * 1000:
                 # Must be a bad FOV (e.g., pitched too far up).
                 continue
 
@@ -1746,56 +1887,73 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
             shape_img_basenames.append(os.path.split(img_fname)[1])
             shp_shapes_fnames.append(img_fname)
         if len(shp_shapes) > 0:
-            shapefile_dir = ('%s/processed_results/fov_shapefiles/' %
-                             flight_dir)
+            shapefile_dir = "%s/processed_results/fov_shapefiles/" % flight_dir
 
             try:
                 os.makedirs(shapefile_dir)
             except OSError:
                 pass
 
-            kml.savekmz('%s/%s.kml' % (shapefile_dir, flid_sys_str))
+            kml.savekmz("%s/%s.kml" % (shapefile_dir, flid_sys_str))
 
-            w = shapefile.Writer('%s/%s.shp' % (shapefile_dir, flid_sys_str),
-                                 shapeType=shapefile.POLYGON)
+            w = shapefile.Writer(
+                "%s/%s.shp" % (shapefile_dir, flid_sys_str), shapeType=shapefile.POLYGON
+            )
             w.autoBalance = 1
-            w.field('image_file', 'C', size=255)
-            w.field('time', 'N', decimal=3)
-            w.field('latitude', 'N', decimal=10)
-            w.field('longitude', 'N', decimal=10)
-            w.field('altitude', 'N', decimal=3)
-            w.field('heading', 'N', decimal=5)
-            w.field('pitch', 'N', decimal=5)
-            w.field('roll', 'N', decimal=5)
-            w.field('effort', 'C', size=255)
-            w.field('trigger', 'C', size=255)
-            w.field('reviewed', 'C', size=5)
-            w.field('fate', 'C', size=255)
+            w.field("image_file", "C", size=255)
+            w.field("time", "N", decimal=3)
+            w.field("latitude", "N", decimal=10)
+            w.field("longitude", "N", decimal=10)
+            w.field("altitude", "N", decimal=3)
+            w.field("heading", "N", decimal=5)
+            w.field("pitch", "N", decimal=5)
+            w.field("roll", "N", decimal=5)
+            w.field("effort", "C", size=255)
+            w.field("trigger", "C", size=255)
+            w.field("reviewed", "C", size=5)
+            w.field("fate", "C", size=255)
 
             for i in range(len(shp_shapes)):
                 image_name = shp_shapes_fnames[i]
-                reviewed, fate = get_review_fate(nav_state_provider, basename_to_time,
-                                                    sets_detector_processed, sets_with_detections,
-                                                    image_name)
+                reviewed, fate = get_review_fate(
+                    nav_state_provider,
+                    basename_to_time,
+                    sets_detector_processed,
+                    sets_with_detections,
+                    image_name,
+                )
                 try:
                     w.poly([shp_shapes[i]])
                     tmp = aircraft_state[shp_shapes_fnames[i]]
                     frame_time, lat, lon, h, heading, pitch, roll = tmp
-                    w.record(image_name, frame_time, lat, lon, h, heading,
-                         pitch, roll, effort_type[shp_shapes_fnames[i]],
-                         trigger_type[shp_shapes_fnames[i]], reviewed, fate)
+                    w.record(
+                        image_name,
+                        frame_time,
+                        lat,
+                        lon,
+                        h,
+                        heading,
+                        pitch,
+                        roll,
+                        effort_type[shp_shapes_fnames[i]],
+                        trigger_type[shp_shapes_fnames[i]],
+                        reviewed,
+                        fate,
+                    )
                 except Exception as e:
                     print(e)
 
             w.close()
 
-            with open('%s/%s.prj' % (shapefile_dir, flid_sys_str), "w") as fout:
+            with open("%s/%s.prj" % (shapefile_dir, flid_sys_str), "w") as fout:
                 fout.write(wgs84_wkt)
 
             if save_shapefile_per_image:
                 # Write each individual frame as a seperate shapefile.
-                shapefile_dir = ('%s/processed_results/fov_shapefiles/%s_fovs'
-                                 % (flight_dir, sys_str))
+                shapefile_dir = "%s/processed_results/fov_shapefiles/%s_fovs" % (
+                    flight_dir,
+                    sys_str,
+                )
 
                 try:
                     os.makedirs(shapefile_dir)
@@ -1804,72 +1962,88 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
 
                 for i in range(len(shp_shapes)):
                     base = os.path.splitext(shape_img_basenames[i])[0]
-                    w = shapefile.Writer('%s/%s.shp' % (shapefile_dir, base),
-                                         shapeType=shapefile.POLYGON)
+                    w = shapefile.Writer(
+                        "%s/%s.shp" % (shapefile_dir, base), shapeType=shapefile.POLYGON
+                    )
                     w.autoBalance = 1
-                    w.field('image_file', 'C', size=255)
-                    w.field('time', 'N', decimal=3)
-                    w.field('latitude', 'N', decimal=10)
-                    w.field('longitude', 'N', decimal=10)
-                    w.field('altitude', 'N', decimal=3)
-                    w.field('heading', 'N', decimal=5)
-                    w.field('pitch', 'N', decimal=5)
-                    w.field('roll', 'N', decimal=5)
-                    w.field('effort', 'C', size=255)
-                    w.field('trigger', 'C', size=255)
-                    w.field('reviewed', 'C', size=5)
-                    w.field('fate', 'C', size=255)
+                    w.field("image_file", "C", size=255)
+                    w.field("time", "N", decimal=3)
+                    w.field("latitude", "N", decimal=10)
+                    w.field("longitude", "N", decimal=10)
+                    w.field("altitude", "N", decimal=3)
+                    w.field("heading", "N", decimal=5)
+                    w.field("pitch", "N", decimal=5)
+                    w.field("roll", "N", decimal=5)
+                    w.field("effort", "C", size=255)
+                    w.field("trigger", "C", size=255)
+                    w.field("reviewed", "C", size=5)
+                    w.field("fate", "C", size=255)
 
                     w.poly([shp_shapes[i]])
 
                     image_name = shp_shapes_fnames[i]
-                    reviewed, fate = get_review_fate(nav_state_provider, basename_to_time,
-                                                     sets_detector_processed,
-                                                     sets_with_detections,
-                                                     image_name)
+                    reviewed, fate = get_review_fate(
+                        nav_state_provider,
+                        basename_to_time,
+                        sets_detector_processed,
+                        sets_with_detections,
+                        image_name,
+                    )
 
                     tmp = aircraft_state[shp_shapes_fnames[i]]
                     frame_time, lat, lon, h, heading, pitch, roll = tmp
 
-                    w.record(image_name, frame_time, lat, lon, h,
-                             heading, pitch, roll, effort_type[shp_shapes_fnames[i]],
-                             trigger_type[shp_shapes_fnames[i]], reviewed, fate)
+                    w.record(
+                        image_name,
+                        frame_time,
+                        lat,
+                        lon,
+                        h,
+                        heading,
+                        pitch,
+                        roll,
+                        effort_type[shp_shapes_fnames[i]],
+                        trigger_type[shp_shapes_fnames[i]],
+                        reviewed,
+                        fate,
+                    )
 
                     w.close()
 
-                    with open('%s/%s.prj' % (shapefile_dir, base), "w") as fout:
+                    with open("%s/%s.prj" % (shapefile_dir, base), "w") as fout:
                         fout.write(wgs84_wkt)
 
-                process_summary['shapefile_count'] += 1
+                process_summary["shapefile_count"] += 1
 
         toc = time.time()
-        print("Time to process %s was %0.3fs." % (sys_str, toc-tic))
+        print("Time to process %s was %0.3fs." % (sys_str, toc - tic))
 
     # Convert INS tracks to CSVs
     # ------------------------------------------------------------------------
-    dir_out = '%s/processed_results/ins_csvs' % flight_dir
+    dir_out = "%s/processed_results/ins_csvs" % flight_dir
     try:
         os.makedirs(dir_out)
     except OSError:
         pass
 
     print("Processing dat files.")
-    ins_dir = os.path.join(flight_dir, 'ins_raw')
-    dat_glob = glob.glob(ins_dir + '/*')
+    ins_dir = os.path.join(flight_dir, "ins_raw")
+    dat_glob = glob.glob(ins_dir + "/*")
     for dat_file in dat_glob:
         out_lines = convert_dat_to_csv(dat_file)
-        out_file = os.path.join(dir_out, os.path.basename(dat_file).replace('dat', 'csv'))
-        with open(out_file, 'w') as of:
+        out_file = os.path.join(
+            dir_out, os.path.basename(dat_file).replace("dat", "csv")
+        )
+        with open(out_file, "w") as of:
             of.writelines(out_lines)
 
     toc = time.time()
-    print("Time to process everything was %0.3fs." % (toc-top_tic))
-
+    print("Time to process everything was %0.3fs." % (toc - top_tic))
 
     return process_summary
 
 
-def visualize_registration_homographies(flight_dir, sys_str='rgb'):
+def visualize_registration_homographies(flight_dir, sys_str="rgb"):
     """
 
     :param homography_dir: Directory containing subdirectories for
@@ -1888,13 +2062,15 @@ def visualize_registration_homographies(flight_dir, sys_str='rgb'):
     :type geo_registration_error: float
 
     """
-    img_to_lonlat_homog_dir = ('%s/processed_results/'
-                               'homographies_img_to_lonlat' % flight_dir)
+    img_to_lonlat_homog_dir = (
+        "%s/processed_results/" "homographies_img_to_lonlat" % flight_dir
+    )
 
-    img_to_img_homog_dir = ('%s/processed_results/'
-                            'homographies_img_to_img' % flight_dir)
+    img_to_img_homog_dir = (
+        "%s/processed_results/" "homographies_img_to_img" % flight_dir
+    )
 
-    dir_out = '%s/processed_results/ins_registration_viz' % flight_dir
+    dir_out = "%s/processed_results/ins_registration_viz" % flight_dir
 
     try:
         os.makedirs(dir_out)
@@ -1904,15 +2080,14 @@ def visualize_registration_homographies(flight_dir, sys_str='rgb'):
     # Find homographies
     img_to_lonlat_homog = {}
     for root, dirnames, filenames in os.walk(img_to_lonlat_homog_dir):
-        for fname in glob.glob('%s/*.txt' % root):
+        for fname in glob.glob("%s/*.txt" % root):
             try:
                 h = np.loadtxt(fname)
                 img_fname = os.path.splitext(os.path.split(fname)[1])[0]
-                if img_fname[-len(sys_str):] != sys_str:
+                if img_fname[-len(sys_str) :] != sys_str:
                     continue
 
-                img_to_lonlat_homog[img_fname] = np.reshape(h, (3, 3),
-                                                            order='C')
+                img_to_lonlat_homog[img_fname] = np.reshape(h, (3, 3), order="C")
             except (IOError, OSError):
                 pass
 
@@ -1921,7 +2096,7 @@ def visualize_registration_homographies(flight_dir, sys_str='rgb'):
     def get_image(fname):
         for fov in get_fov_dirs(flight_dir):
             base_dir = os.path.join(flight_dir, fov)
-            fnames = glob.glob('%s/%s.tif' % (base_dir, fname))
+            fnames = glob.glob("%s/%s.tif" % (base_dir, fname))
             if len(fnames) > 0:
                 img = cv2.imread(fnames[0])
                 if img is not None:
@@ -1941,11 +2116,10 @@ def visualize_registration_homographies(flight_dir, sys_str='rgb'):
         h12 = np.dot(np.linalg.inv(h2), h1)
 
         # Check to see if there is actually any overlap.
-        im_pts = points_along_image_border(image_width, image_height,
-                                           num_points=100)
+        im_pts = points_along_image_border(image_width, image_height, num_points=100)
         im_pts = np.vstack([im_pts, np.ones(im_pts.shape[1])])
         im_pts = np.dot(h12, im_pts)
-        im_pts = im_pts[:2]/im_pts[2]
+        im_pts = im_pts[:2] / im_pts[2]
         ind = np.logical_and(im_pts[0] > 0, im_pts[0] < image_width)
         ind = np.logical_and(ind, im_pts[1] > 0)
         ind = np.logical_and(ind, im_pts[1] < image_height)
@@ -1959,14 +2133,14 @@ def visualize_registration_homographies(flight_dir, sys_str='rgb'):
         if img1 is None or img2 is None:
             continue
 
-        fname_out = '%s/%s_to_%s.gif' % (dir_out, fname1, fname2)
+        fname_out = "%s/%s_to_%s.gif" % (dir_out, fname1, fname2)
 
-        print2('Saving image \'%s\'' % fname_out)
+        print2("Saving image '%s'" % fname_out)
 
         save_registration_gif(img1, img2, h12, fname_out)
 
     # ------------------------------------------------------------------------
-    dir_out = '%s/processed_results/refined_registration_viz' % flight_dir
+    dir_out = "%s/processed_results/refined_registration_viz" % flight_dir
 
     try:
         os.makedirs(dir_out)
@@ -1975,15 +2149,15 @@ def visualize_registration_homographies(flight_dir, sys_str='rgb'):
 
     img_to_img_homog = {}
     for root, dirnames, filenames in os.walk(img_to_img_homog_dir):
-        for fname in glob.glob('%s/*.txt' % root):
+        for fname in glob.glob("%s/*.txt" % root):
             try:
                 h = np.loadtxt(fname)
 
                 if len(h) == 6:
-                    h = np.reshape(h, (2, 3), order='C')
+                    h = np.reshape(h, (2, 3), order="C")
                     h = np.vstack([h, [0, 0, 1]])
                 else:
-                    h = np.reshape(h, (3, 3), order='C')
+                    h = np.reshape(h, (3, 3), order="C")
 
                 img_fname = os.path.splitext(os.path.split(fname)[1])[0]
                 img_to_img_homog[img_fname] = h
@@ -1993,7 +2167,7 @@ def visualize_registration_homographies(flight_dir, sys_str='rgb'):
     img_pair_fnames = sorted(list(img_to_img_homog.keys()))
     for img_pair_fname in img_pair_fnames:
 
-        fname1, fname2 = img_pair_fname.split('_to_')
+        fname1, fname2 = img_pair_fname.split("_to_")
         h12 = img_to_img_homog[img_pair_fname]
         img1 = get_image(fname1)
         img2 = get_image(fname2)
@@ -2001,9 +2175,9 @@ def visualize_registration_homographies(flight_dir, sys_str='rgb'):
         if img1 is None or img2 is None:
             continue
 
-        fname_out = '%s/%s_to_%s.gif' % (dir_out, fname1, fname2)
+        fname_out = "%s/%s_to_%s.gif" % (dir_out, fname1, fname2)
 
-        print2('Saving image \'%s\'' % fname_out)
+        print2("Saving image '%s'" % fname_out)
 
         save_registration_gif(img1, img2, h12, fname_out)
 
@@ -2024,19 +2198,31 @@ def save_registration_gif(img1, img2, h_1_to_2, fname):
     img_rect = cv2.warpPerspective(img1, h_1_to_2, img1.shape[:2][::-1])
 
     if max(img_rect.shape) > 3000:
-        s = 3000/max(img_rect.shape)
+        s = 3000 / max(img_rect.shape)
         img_rect = cv2.resize(img_rect, None, fx=s, fy=s)
         img2 = cv2.resize(img2, None, fx=s, fy=s)
 
     images = [Image.fromarray(img2), Image.fromarray(img_rect)]
-    images[0].save(fname, format='GIF', append_images=images[1:],
-                   save_all=True, duration=300, loop=0)
+    images[0].save(
+        fname,
+        format="GIF",
+        append_images=images[1:],
+        save_all=True,
+        duration=300,
+        loop=0,
+    )
 
 
-def detection_summary(flight_dir=None, detection_csvs=None,
-                      img_to_lonlat_homog_dir=None, img_to_img_homog_dir=None,
-                      animal_min_meters=0.1, animal_max_meters=7,
-                      geo_registration_error=10, save_annotations=False):
+def detection_summary(
+    flight_dir=None,
+    detection_csvs=None,
+    img_to_lonlat_homog_dir=None,
+    img_to_img_homog_dir=None,
+    animal_min_meters=0.1,
+    animal_max_meters=7,
+    geo_registration_error=10,
+    save_annotations=False,
+):
     """
     :param flight_dir: Path to flight directory containing subdirectories:
         LEFT, RIGHT, CENTER.
@@ -2087,68 +2273,82 @@ def detection_summary(flight_dir=None, detection_csvs=None,
         detection_csvs = [detection_csvs]
 
     if img_to_lonlat_homog_dir is None:
-        img_to_lonlat_homog_dir = ('%s/processed_results/'
-                                   'homographies_img_to_lonlat' % flight_dir)
+        img_to_lonlat_homog_dir = (
+            "%s/processed_results/" "homographies_img_to_lonlat" % flight_dir
+        )
 
     if img_to_img_homog_dir is None:
-        img_to_img_homog_dir = ('%s/processed_results/'
-                                'homographies_img_to_img' % flight_dir)
+        img_to_img_homog_dir = (
+            "%s/processed_results/" "homographies_img_to_img" % flight_dir
+        )
 
     if not os.path.isdir(img_to_lonlat_homog_dir):
-        raise Exception('This function requires that homographies have '
-                        'already been generated. Try running '
-                        'create_flight_summary on the flight directory '
-                        'first.')
+        raise Exception(
+            "This function requires that homographies have "
+            "already been generated. Try running "
+            "create_flight_summary on the flight directory "
+            "first."
+        )
 
     # Find homographies
     img_to_lonlat_homog = {}
     for root, dirnames, filenames in os.walk(img_to_lonlat_homog_dir):
-        for fname in glob.glob('%s/*.txt' % root):
+        for fname in glob.glob("%s/*.txt" % root):
             try:
                 h = np.loadtxt(fname)
+                if len(h) == 0:
+                    continue
                 img_fname = os.path.splitext(os.path.split(fname)[1])[0]
-                img_to_lonlat_homog[img_fname] = np.reshape(h, (3, 3),
-                                                            order='C')
+                img_to_lonlat_homog[img_fname] = np.reshape(h, (3, 3), order="C")
             except (IOError, OSError):
                 pass
 
-    print2('Found %i image-to-lon/lat homographies' % len(img_to_lonlat_homog))
+    print2("Found %i image-to-lon/lat homographies" % len(img_to_lonlat_homog))
 
     img_to_img_homog = {}
     for root, dirnames, filenames in os.walk(img_to_img_homog_dir):
-        for fname in glob.glob('%s/*.txt' % root):
+        for fname in glob.glob("%s/*.txt" % root):
             try:
                 h = np.loadtxt(fname)
 
                 if len(h) == 6:
-                    h = np.reshape(h, (2, 3), order='C')
+                    h = np.reshape(h, (2, 3), order="C")
                     h = np.vstack([h, [0, 0, 1]])
                 else:
-                    h = np.reshape(h, (3, 3), order='C')
+                    h = np.reshape(h, (3, 3), order="C")
 
                 img_fname = os.path.splitext(os.path.split(fname)[1])[0]
                 img_to_img_homog[img_fname] = h
             except (IOError, OSError):
                 pass
 
-    print2('Found %i image-to-image fine-tuned homographies' %
-           len(img_to_img_homog))
+    print2("Found %i image-to-image fine-tuned homographies" % len(img_to_img_homog))
 
     for detection_csv in detection_csvs:
-        print('Processing \'%s\'' % detection_csv)
-        __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
-                                img_to_img_homog, animal_min_meters,
-                                animal_max_meters, geo_registration_error,
-                                save_annotations)
+        print("Processing '%s'" % detection_csv)
+        __process_detection_csv(
+            flight_dir,
+            detection_csv,
+            img_to_lonlat_homog,
+            img_to_img_homog,
+            animal_min_meters,
+            animal_max_meters,
+            geo_registration_error,
+            save_annotations,
+        )
 
 
-def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
-                            img_to_img_homog, animal_min_meters,
-                            animal_max_meters, geo_registration_error,
-                            save_annotations):
-    """Process one csv.
-
-    """
+def __process_detection_csv(
+    flight_dir,
+    detection_csv,
+    img_to_lonlat_homog,
+    img_to_img_homog,
+    animal_min_meters,
+    animal_max_meters,
+    geo_registration_error,
+    save_annotations,
+):
+    """Process one csv."""
     # Dictionary that accepts the image filename and returns a list of
     # Detection objects.
     detections = {}
@@ -2159,14 +2359,14 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
 
     # Read the detection csv and populate 'detections'.
     with open(detection_csv) as csvfile:
-        csv_reader = csv.reader(csvfile, delimiter=',', quotechar='#')
+        csv_reader = csv.reader(csvfile, delimiter=",", quotechar="#")
         for row in csv_reader:
             if len(row) == 1:
                 continue
 
-            uid = row[0]   # Detection or Track-id
-            image_fname = row[1]    # Video or Image Identifier
-            frame_id = row[2]       # Unique Frame Identifier
+            uid = row[0]  # Detection or Track-id
+            image_fname = row[1]  # Video or Image Identifier
+            frame_id = row[2]  # Unique Frame Identifier
 
             # Img-bbox(TL_x,TL_y,BR_x,BR_y)
             left = float(row[3])
@@ -2175,8 +2375,8 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
             bottom = float(row[6])
             image_bbox = np.array([(left, top), (right, bottom)])
 
-            confidence = row[7]         # Detection confidence
-            length = row[8]             # Fish Length (0 or -1 if invalid)
+            confidence = row[7]  # Detection confidence
+            length = row[8]  # Fish Length (0 or -1 if invalid)
             confidence_pairs = row[9:]
 
             img_fname = os.path.splitext(os.path.split(image_fname)[1])[0]
@@ -2184,32 +2384,42 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
             try:
                 h = img_to_lonlat_homog[img_fname]
             except KeyError:
-                print2('Could not find a homography for \'%s\'. Skipping '
-                       'processing of detections from that image' %
-                       image_fname)
+                print2(
+                    "Could not find a homography for '%s'. Skipping "
+                    "processing of detections from that image" % image_fname
+                )
                 continue
 
             xc, yc = np.mean(image_bbox, axis=0)
 
-            lonlat_bbox = np.dot(h, np.array([[left, right, right, left],
-                                              [top, top, bottom, bottom],
-                                              [1, 1, 1, 1]]))
-            lonlat_bbox = (lonlat_bbox[:2]/lonlat_bbox[2]).T
+            lonlat_bbox = np.dot(
+                h,
+                np.array(
+                    [
+                        [left, right, right, left],
+                        [top, top, bottom, bottom],
+                        [1, 1, 1, 1],
+                    ]
+                ),
+            )
+            lonlat_bbox = (lonlat_bbox[:2] / lonlat_bbox[2]).T
 
             # Calculate GSD
-            lon_lats = np.dot(h, np.array([[xc, xc + 1, xc],
-                                           [yc, yc, yc + 1],
-                                           [1, 1, 1]]))
-            lon_lats = lon_lats[:2]/lon_lats[2]
-            dx = llh_to_enu(lon_lats[1, 1], lon_lats[0, 1], 0,
-                            lon_lats[1, 0], lon_lats[0, 0], 0)
+            lon_lats = np.dot(
+                h, np.array([[xc, xc + 1, xc], [yc, yc, yc + 1], [1, 1, 1]])
+            )
+            lon_lats = lon_lats[:2] / lon_lats[2]
+            dx = llh_to_enu(
+                lon_lats[1, 1], lon_lats[0, 1], 0, lon_lats[1, 0], lon_lats[0, 0], 0
+            )
             dx = np.linalg.norm(dx)
-            dy = llh_to_enu(lon_lats[1, 2], lon_lats[0, 2], 0,
-                            lon_lats[1, 0], lon_lats[0, 0], 0)
+            dy = llh_to_enu(
+                lon_lats[1, 2], lon_lats[0, 2], 0, lon_lats[1, 0], lon_lats[0, 0], 0
+            )
             dy = np.linalg.norm(dy)
 
             # Calculate the diagonal of the bounding box in meters
-            dxy = (np.diff(image_bbox, axis=0)*np.array([dx, dy])).ravel()
+            dxy = (np.diff(image_bbox, axis=0) * np.array([dx, dy])).ravel()
             width_meters, height_meters = dxy
 
             if max(dxy) < animal_min_meters:
@@ -2221,14 +2431,20 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
             else:
                 suppressed = False
 
-            det = Detection(uid=uid, image_fname=image_fname,
-                            frame_id=frame_id, image_bbox=image_bbox,
-                            lonlat_bbox=lonlat_bbox,
-                            confidence=confidence, length=length,
-                            confidence_pairs=confidence_pairs,
-                            gsd=(dx, dy), height_meters=height_meters,
-                            width_meters=width_meters,
-                            suppressed=suppressed)
+            det = Detection(
+                uid=uid,
+                image_fname=image_fname,
+                frame_id=frame_id,
+                image_bbox=image_bbox,
+                lonlat_bbox=lonlat_bbox,
+                confidence=confidence,
+                length=length,
+                confidence_pairs=confidence_pairs,
+                gsd=(dx, dy),
+                height_meters=height_meters,
+                width_meters=width_meters,
+                suppressed=suppressed,
+            )
 
             if img_fname not in detections:
                 detections[img_fname] = []
@@ -2240,22 +2456,22 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
                 img_fnames_set.add(img_fname)
                 img_fnames.append(img_fname)
 
-    print2('Suppressed %i out of %i detections due to constraints on the '
-           'minimum and maximum size of the animal in meters' %
-           (num_suppressed, num_dets))
+    print2(
+        "Suppressed %i out of %i detections due to constraints on the "
+        "minimum and maximum size of the animal in meters" % (num_suppressed, num_dets)
+    )
 
     def get_image(fname):
         for fov in get_fov_dirs(flight_dir):
             base_dir = os.path.join(flight_dir, fov)
-            fnames = glob.glob('%s/%s.tif' % (base_dir, fname))
+            fnames = glob.glob("%s/%s.tif" % (base_dir, fname))
             if len(fnames) > 0:
                 img = cv2.imread(fnames[0])
                 if img is not None:
                     return img
 
     # Track redundant detections.
-    print2('Comparing detections between frames to identify redundant '
-           'detections...')
+    print2("Comparing detections between frames to identify redundant " "detections...")
     num_suppressed = 0
     img_fnames = sorted(img_fnames)
 
@@ -2265,11 +2481,13 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
         for det in detections[fname]:
             det_uid.add(det.uid)
 
-    print('File initially had %i unique detection uid' % len(det_uid))
+    print("File initially had %i unique detection uid" % len(det_uid))
 
     # ------------------------------------------------------------------------
-    print('Running detection tracker to identify redundant detections across '
-          '%i images' % len(img_fnames))
+    print(
+        "Running detection tracker to identify redundant detections across "
+        "%i images" % len(img_fnames)
+    )
     for i in range(len(img_fnames)):
         # Start with detections in this img_fnames[i] and find possible
         # redundancies in subsequent images.
@@ -2284,9 +2502,11 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
             detsj = detections[img_fnames[j]]
 
             if False:
-                print2('Comparing %i detections from image %i/%i against '
-                       '%i detections from nearby image %i' %
-                       (len(detsi), i+1, len(img_fnames), len(detsj), j))
+                print2(
+                    "Comparing %i detections from image %i/%i against "
+                    "%i detections from nearby image %i"
+                    % (len(detsi), i + 1, len(img_fnames), len(detsj), j)
+                )
 
             # Check whether there is an available image-to-image fine-tuned
             # homography available.
@@ -2294,14 +2514,12 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
             try:
                 # Check if ther eis a homography that warps from image i to
                 # image i.
-                h_ij = img_to_img_homog['%s_to_%s' % (img_fnames[i],
-                                                      img_fnames[j])]
+                h_ij = img_to_img_homog["%s_to_%s" % (img_fnames[i], img_fnames[j])]
             except KeyError:
                 # Check if ther eis a homography that warps from image j to
                 # image i.
                 try:
-                    h_ij = img_to_img_homog['%s_to_%s' % (img_fnames[j],
-                                                          img_fnames[i])]
+                    h_ij = img_to_img_homog["%s_to_%s" % (img_fnames[j], img_fnames[i])]
                     h_ij = np.linalg.inv(h_ij)
                 except KeyError:
                     pass
@@ -2321,13 +2539,13 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
                         cxyi = np.mean(deti.image_bbox, axis=0)
                         cxyi = np.hstack([cxyi, 1])
                         cxyi_on_j = np.dot(h_ij, cxyi)
-                        cxyi_on_j = cxyi_on_j[:2]/cxyi_on_j[2]
+                        cxyi_on_j = cxyi_on_j[:2] / cxyi_on_j[2]
                         cxyj = np.mean(detj.image_bbox, axis=0)
 
                         # Distance between images in pixels.
                         d = np.linalg.norm(cxyi_on_j - cxyj)
 
-                        d = d*np.mean(detj.gsd)
+                        d = d * np.mean(detj.gsd)
 
                         # If the distance is less than 2 meters, supress.
                         if d < 2:
@@ -2336,9 +2554,9 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
                         lon_lati = np.mean(deti.lonlat_bbox, axis=0)
                         lon_latj = np.mean(detj.lonlat_bbox, axis=0)
 
-                        dxy = (lon_lati - lon_latj)
-                        dxy = dxy*(meters_per_lon, meters_per_lat)
-                        d = np.sqrt(dxy[0]**2 + dxy[1]**2)
+                        dxy = lon_lati - lon_latj
+                        dxy = dxy * (meters_per_lon, meters_per_lat)
+                        d = np.sqrt(dxy[0] ** 2 + dxy[1] ** 2)
 
                         if d < geo_registration_error:
                             dist[i_, j_] = d
@@ -2404,51 +2622,63 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
         for det in detections[fname]:
             det_uid.add(det.uid)
 
-    print('Tracking reduced down to %i unique detection uid' % len(det_uid))
+    print("Tracking reduced down to %i unique detection uid" % len(det_uid))
 
-    print2('Suppressed %i out of %i detections overlapping detections' %
-           (num_suppressed, num_dets))
+    print2(
+        "Suppressed %i out of %i detections overlapping detections"
+        % (num_suppressed, num_dets)
+    )
 
     # ------------------------------------------------------------------------
     # Save new detection csv with suppresions indicated.
     os.path.splitext(os.path.split(detection_csv)[1])[0]
-    det_csv_dir = '%s/processed_results/detection_csv' % flight_dir
+    det_csv_dir = "%s/processed_results/detection_csv" % flight_dir
 
     try:
         os.makedirs(det_csv_dir)
     except OSError:
         pass
 
-    csv_fname_out = '%s/%s' % (det_csv_dir, os.path.split(detection_csv)[1])
+    csv_fname_out = "%s/%s" % (det_csv_dir, os.path.split(detection_csv)[1])
 
-    print2('Saving new detection csv: \'%s\'' % csv_fname_out)
+    print2("Saving new detection csv: '%s'" % csv_fname_out)
 
-    with open(csv_fname_out, 'w') as out_file:
-        out_file.write('# 1: Detection or Track-id,  2: Video or Image '
-                       'Identifier,  3: Unique Frame Identifier,  4-7: '
-                       'Img-bbox(TL_x,TL_y,BR_x,BR_y),  8: Detection '
-                       'confidence,  9: Fish Length (0 or -1 if invalid),  '
-                       '10-11+: Repeated Species, Confidence Pairs\n')
+    with open(csv_fname_out, "w") as out_file:
+        out_file.write(
+            "# 1: Detection or Track-id,  2: Video or Image "
+            "Identifier,  3: Unique Frame Identifier,  4-7: "
+            "Img-bbox(TL_x,TL_y,BR_x,BR_y),  8: Detection "
+            "confidence,  9: Fish Length (0 or -1 if invalid),  "
+            "10-11+: Repeated Species, Confidence Pairs\n"
+        )
 
         now = datetime.now()
         date_time = now.strftime("%m/%d/%Y, %H:%M:%S")
-        what_wrote = 'detection summary'
-        out_file.write('# Written on: %s   by: %s\n' % (date_time, what_wrote))
+        what_wrote = "detection summary"
+        out_file.write("# Written on: %s   by: %s\n" % (date_time, what_wrote))
 
         for i in range(len(img_fnames)):
             for det in detections[img_fnames[i]]:
                 (left, top), (right, bottom) = det.image_bbox
-                out_file.write('%s,%s,%s,%i,%i,%i,%i,%s,%0.5f,%s\n' %
-                               (det.uid, det.image_fname, det.frame_id,
-                                int(left), int(top), int(right), int(bottom),
-                                det.confidence, max([det.height_meters,
-                                                     det.width_meters]),
-                                ','.join(det.confidence_pairs)))
-
+                out_file.write(
+                    "%s,%s,%s,%i,%i,%i,%i,%s,%0.5f,%s\n"
+                    % (
+                        det.uid,
+                        det.image_fname,
+                        det.frame_id,
+                        int(left),
+                        int(top),
+                        int(right),
+                        int(bottom),
+                        det.confidence,
+                        max([det.height_meters, det.width_meters]),
+                        ",".join(det.confidence_pairs),
+                    )
+                )
 
     # ------------------------------------------------------------------------
     # Save shapefile of detections.
-    shapefile_dir = ('%s/processed_results/detection_shapefiles' % flight_dir)
+    shapefile_dir = "%s/processed_results/detection_shapefiles" % flight_dir
 
     try:
         os.makedirs(shapefile_dir)
@@ -2464,36 +2694,36 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
     len_track_id = 0
     for i in range(len(img_fnames)):
         for det in detections[img_fnames[i]]:
-            len_conf_pairs = max([len(', '.join(det.confidence_pairs)),
-                                  len_conf_pairs])
+            len_conf_pairs = max([len(", ".join(det.confidence_pairs)), len_conf_pairs])
             len_img_filename = max([len_img_filename, len(det.image_fname)])
             len_img_frame_id = max([len_img_frame_id, len(str(det.frame_id))])
             len_track_id = max([len_track_id, len(str(det.uid))])
 
-    print2('Saving detection shapefiles')
-    w = shapefile.Writer('%s/%s.shp' % (shapefile_dir, fname_base),
-                         shapeType=shapefile.POLYGON)
+    print2("Saving detection shapefiles")
+    w = shapefile.Writer(
+        "%s/%s.shp" % (shapefile_dir, fname_base), shapeType=shapefile.POLYGON
+    )
     w.autoBalance = 1
-    w.field('img_filename', 'C', size=len_img_filename)
-    w.field('frame_id', 'C', size=len_img_frame_id)
-    w.field('track_id', 'C', size=len_track_id)
-    w.field('img_left', 'N', decimal=2)
-    w.field('img_right', 'N', decimal=2)
-    w.field('img_top', 'N', decimal=2)
-    w.field('img_bottom', 'N', decimal=2)
-    w.field('confidence', 'N', decimal=10)
-    w.field('length', 'N', decimal=10)
-    w.field('conf_pairs', 'C', size=len_conf_pairs)
-    w.field('gsd_m', 'N', decimal=5)
-    w.field('height_m', 'N', decimal=5)
-    w.field('width_m', 'N', decimal=5)
-    w.field('latitude', 'N', decimal=7)
-    w.field('longitude', 'N', decimal=7)
-    w.field('suppressed', 'C', decimal=5)
+    w.field("img_filename", "C", size=len_img_filename)
+    w.field("frame_id", "C", size=len_img_frame_id)
+    w.field("track_id", "C", size=len_track_id)
+    w.field("img_left", "N", decimal=2)
+    w.field("img_right", "N", decimal=2)
+    w.field("img_top", "N", decimal=2)
+    w.field("img_bottom", "N", decimal=2)
+    w.field("confidence", "N", decimal=10)
+    w.field("length", "N", decimal=10)
+    w.field("conf_pairs", "C", size=len_conf_pairs)
+    w.field("gsd_m", "N", decimal=5)
+    w.field("height_m", "N", decimal=5)
+    w.field("width_m", "N", decimal=5)
+    w.field("latitude", "N", decimal=7)
+    w.field("longitude", "N", decimal=7)
+    w.field("suppressed", "C", decimal=5)
 
     for i in range(len(img_fnames)):
         for det in detections[img_fnames[i]]:
-            confidence_pairs = ', '.join(det.confidence_pairs)
+            confidence_pairs = ", ".join(det.confidence_pairs)
             lats = det.lonlat_bbox[:, 1]
             lons = det.lonlat_bbox[:, 0]
             lls = zip(lons, lats)
@@ -2505,32 +2735,34 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
             xr = int(det.image_bbox[1, 0])
             yt = int(det.image_bbox[0, 1])
             yb = int(det.image_bbox[1, 1])
-            w.record(det.image_fname,       # img_filename
-                     det.frame_id,          # frame_id
-                     det.uid,               # track_id
-                     det.image_bbox[0, 0],  # image_left
-                     det.image_bbox[1, 0],  # image_right
-                     det.image_bbox[0, 1],  # image_top
-                     det.image_bbox[1, 1],  # image_bottom
-                     det.confidence,        # confidence
-                     det.length,            # length
-                     confidence_pairs,      # confidence_pairs
-                     np.mean(det.gsd),      # gsd
-                     det.height_meters,     # height_meters
-                     det.width_meters,      # width_meters
-                     np.mean(lats),         # latitude
-                     np.mean(lons),         # longitude
-                     str(det.suppressed).lower())
+            w.record(
+                det.image_fname,  # img_filename
+                det.frame_id,  # frame_id
+                det.uid,  # track_id
+                det.image_bbox[0, 0],  # image_left
+                det.image_bbox[1, 0],  # image_right
+                det.image_bbox[0, 1],  # image_top
+                det.image_bbox[1, 1],  # image_bottom
+                det.confidence,  # confidence
+                det.length,  # length
+                confidence_pairs,  # confidence_pairs
+                np.mean(det.gsd),  # gsd
+                det.height_meters,  # height_meters
+                det.width_meters,  # width_meters
+                np.mean(lats),  # latitude
+                np.mean(lons),  # longitude
+                str(det.suppressed).lower(),
+            )
 
     w.close()
 
-    with open('%s/%s.prj' % (shapefile_dir, fname_base), "w") as fo:
+    with open("%s/%s.prj" % (shapefile_dir, fname_base), "w") as fo:
         fo.write(wgs84_wkt)
 
     # ------------------------------------------------------------------------
     if save_annotations:
-        print2('Saving images with detections annotations superimposed')
-        save_dir = ('%s/processed_results/annotated_detections' % flight_dir)
+        print2("Saving images with detections annotations superimposed")
+        save_dir = "%s/processed_results/annotated_detections" % flight_dir
 
         try:
             os.makedirs(save_dir)
@@ -2552,9 +2784,8 @@ def __process_detection_csv(flight_dir, detection_csv, img_to_lonlat_homog,
                 else:
                     color = (0, 255, 0)
 
-                cv2.rectangle(img, (xl, yt), (xr, yb), color=color,
-                              thickness=2)
+                cv2.rectangle(img, (xl, yt), (xr, yb), color=color, thickness=2)
 
-            fname = '%s/%s.jpg' % (save_dir, img_fnames[i])
-            print2('Saving \'%s\'' % fname)
+            fname = "%s/%s.jpg" % (save_dir, img_fnames[i])
+            print2("Saving '%s'" % fname)
             cv2.imwrite(fname, img[:, :, ::-1])
