@@ -40,12 +40,15 @@ class ColmapCalibrationData:
 
 class ColmapCalibration(object):
     def __init__(
-        self, flight_dir: str | os.PathLike, colmap_dir: str | os.PathLike
+            self, flight_dir: str | os.PathLike,
+            recon_dir: str | os.PathLike,
+            colmap_dir: str | os.PathLike
     ) -> None:
         self.flight_dir = flight_dir
+        self.recon_dir = recon_dir
         self.colmap_dir = colmap_dir
         # contains the images, 3D points, and cameras of the colmap database
-        self.R = pc.Reconstruction(self.colmap_dir)
+        self.R = pc.Reconstruction(self.recon_dir)
         self.ccd = ColmapCalibrationData
         self.nav_state_provider = self.load_nav_state_provider()
         print(self.R.summary())
@@ -86,13 +89,13 @@ class ColmapCalibration(object):
         """Extract view (e.g. left_view, right_view, center_view) from
         a given kamera filename"""
         base = osp.basename(fname)
-        channel = base.split("_")[3]
+        channel = base.split("_")
         view = "null"
-        if channel == "C":
+        if "C" in channel:
             view = "center_view"
-        elif channel == "L":
+        elif "L" in channel:
             view = "left_view"
-        elif channel == "R":
+        elif "R" in channel:
             view = "right_view"
         return view
 
@@ -320,7 +323,7 @@ class ColmapCalibration(object):
             f"and {colocated_camera_name}."
         )
         ub.ensuredir(gif_dir)
-
+        
         img_fnames = self.ccd.img_fnames
         for k in range(num_gifs):
             inds = list(range(len(img_fnames)))
@@ -330,10 +333,9 @@ class ColmapCalibration(object):
                 fname = img_fnames[inds[i]]
                 if osp.basename(osp.dirname(fname)) != camera_name:
                     continue
-                view = self.get_view(fname)
                 try:
                     bname = osp.basename(fname)
-                    abs_fname = osp.join(self.flight_dir, view, bname)
+                    abs_fname = osp.join(self.colmap_dir, "images0", camera_name, bname)
                     img = cv2.imread(abs_fname, cv2.IMREAD_COLOR)[:, :, ::-1]
                 except Exception as e:
                     print(f"No {modality} image found at path {abs_fname}")
@@ -404,12 +406,12 @@ class ColmapCalibration(object):
             )
 
     def align_model(self, output_dir: str | os.PathLike) -> None:
-        img_fnames = [im.name for im in self.R.images().values()]
+        img_fnames = [im.name for im in self.R.images.values()]
         points = []
         ins_poses = []
         for image_name in img_fnames:
             base_name = self.get_base_name(image_name)
-            t = self.basename_to_time[base_name]
+            t = self.ccd.basename_to_time[base_name]
             # Query the navigation state recorded by the INS for this time.
             pose = self.nav_state_provider.pose(t)
             ins_poses.append(pose)
@@ -483,12 +485,18 @@ def find_best_sparse_model(sparse_dir: str | os.PathLike):
     best_model = ""
     most_images_aligned = 0
     for subdir in all_models:
-        R = pc.Reconstruction(subdir)
+        dir = os.path.join(sparse_dir, subdir)
+        try:
+            R = pc.Reconstruction(dir)
+        except Exception as e:
+            print(e)
+            continue
         num_images = len(R.images.keys())
-        print(f"Number of images in {subdir}: {num_images}")
+        print(f"Number of images in {dir}: {num_images}")
         if num_images > most_images_aligned:
-            best_model = subdir
-    print(f"Selecting {subdir} as the best model.")
+            most_images_aligned = num_images
+            best_model = dir
+    print(f"Selecting {best_model} as the best model.")
     return best_model
 
 
@@ -497,7 +505,10 @@ def main():
     colmap_dir = (
         "/home/local/KHQ/adam.romlein/noaa/data/2024_AOC_AK_Calibration/fl09/colmap_ir"
     )
-    cc = ColmapCalibration(flight_dir, colmap_dir)
+    recon_dir = (
+        "/home/local/KHQ/adam.romlein/noaa/data/2024_AOC_AK_Calibration/fl09/colmap_ir/aligned/0"
+    )
+    cc = ColmapCalibration(flight_dir, recon_dir, colmap_dir)
     cc.calibrate_ir()
 
 

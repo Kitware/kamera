@@ -717,42 +717,36 @@ def transfer_alignment(
     wrld_pts = ray_dir.T * 1e4
     assert np.all(np.isfinite(wrld_pts)), "World points contain non-finite values."
 
-    if colmap_camera.model == "OPENCV":
-        fx, fy, cx, cy, d1, d2, d3, d4 = colmap_camera.params
-    elif colmap_camera.model == "PINHOLE":
-        fx, fy, cx, cy = colmap_camera.params
-        d1 = d2 = d3 = d4 = 0
-
     K = colmap_camera.calibration_matrix()
     if colmap_camera.model.name == "OPENCV":
         fx, fy, cx, cy, d1, d2, d3, d4 = colmap_camera.params
     elif colmap_camera.model.name == "SIMPLE_RADIAL":
-        d1 = d2 = d3 = d4 = 0
-    elif colmap_camera.model.name == "PINHOLE":
+        f, cx, cy, d1 = colmap_camera.params
+        fx = fy = f
+        d2 = d3 = d4 = 0
+    elif colmap_camera.model == "PINHOLE":
+        fx, fy, cx, cy = colmap_camera.params
         d1 = d2 = d3 = d4 = 0
     else:
         raise SystemError(f"Unexpected camera model found: {colmap_camera.model.name}")
-    dist = np.array([d1, d2, d3, d4])
+    dist = np.array([d1, d2, d3, d4, 0])
 
     flags = cv2.CALIB_ZERO_TANGENT_DIST
     flags = flags | cv2.CALIB_USE_INTRINSIC_GUESS
     flags = flags | cv2.CALIB_FIX_PRINCIPAL_POINT
     # Optionally, fix the K intrinsics
-    # flags = flags | cv2.CALIB_FIX_K1
-    # flags = flags | cv2.CALIB_FIX_K2
-    # flags = flags | cv2.CALIB_FIX_K3
-    # flags = flags | cv2.CALIB_FIX_K4
-    # flags = flags | cv2.CALIB_FIX_K5
-    # flags = flags | cv2.CALIB_FIX_K6
+    flags = flags | cv2.CALIB_FIX_K1
+    flags = flags | cv2.CALIB_FIX_K2
+    flags = flags | cv2.CALIB_FIX_K3
+    flags = flags | cv2.CALIB_FIX_K4
+    flags = flags | cv2.CALIB_FIX_K5
+    flags = flags | cv2.CALIB_FIX_K6
 
     criteria = (
         cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
         30000,
         0.0000001,
     )
-
-    print(len(wrld_pts))
-    print(len(im_pts))
 
     ret = cv2.calibrateCamera(
         [wrld_pts.astype(np.float32)],

@@ -20,7 +20,7 @@ def align_model(
             " assuming model is aligned."
         )
         aligned_sparse_dir = os.path.join(align_dir, os.listdir(align_dir)[0])
-        cc = ColmapCalibration(flight_dir, aligned_sparse_dir)
+        cc = ColmapCalibration(flight_dir, aligned_sparse_dir, colmap_dir)
     elif os.path.exists(align_dir) and len(os.listdir(align_dir) > 1):
         raise SystemError(
             f"{len(os.listdir(align_dir))} aligned models are present, only 1 should exist in {align_dir}."
@@ -38,7 +38,8 @@ def align_model(
         # Step 2: Align and save this model
         aligned_sparse_dir = os.path.join(align_dir, sparse_idx)
         ub.ensuredir(aligned_sparse_dir)
-        cc = ColmapCalibration(flight_dir, best_reconstruction_dir)
+        cc = ColmapCalibration(flight_dir, best_reconstruction_dir, colmap_dir)
+        cc.prepare_calibration_data()
         cc.align_model(aligned_sparse_dir)
     return cc
 
@@ -46,7 +47,7 @@ def align_model(
 def main():
     # REQUIREMENTS: Must already have built a reasonable 3-D model using Colmap
     # And have a flight directory populated by the kamera system
-    flight_dir = "/home/local/KHQ/adam.romlein/noaa/data/2024_AOC_AK_Calibration/fl09"
+    flight_dir = "/home/local/KHQ/adam.romlein/noaa/data/052025_Calibration/"
     colmap_dir = os.path.join(flight_dir, "colmap")
     # Location to save KAMERA camera models.
     save_dir = os.path.join(flight_dir, "kamera_models")
@@ -62,7 +63,7 @@ def main():
     # in the same folder
     calibrate_ir = True
     # open the point clicking UI to refine IR calibration?
-    refine_ir = True
+    refine_ir = False
 
     # Step 1: Make sure the model is aligned to the INS readings, if not,
     # find the best model and align it.
@@ -154,6 +155,7 @@ def main():
 
     # IR calibration generally happens in a separate model, since SIFT has a hard
     # time matching between EO and long-wave IR
+    ir_cameras_refined = 0
     if calibrate_ir:
         ir_colmap_dir = os.path.join(flight_dir, "colmap_ir")
         ir_align_dir = os.path.join(ir_colmap_dir, "aligned")
@@ -192,7 +194,6 @@ def main():
                 else:
                     print(f"Calibrating camera {camera_str} failed.")
 
-            ir_cameras_refined = 0
             if refine_ir:
                 # need to define a points per modality/view pair
                 ir_points_json = pathlib.Path(
