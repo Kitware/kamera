@@ -45,7 +45,7 @@ KAMERA was developed in collaboration with:
 We thank all contributors who have helped in developing KAMERA, with special thanks to Mike McDermott and Matt Brown who created the core system back in 2018.
 
 ## License
-This project is licensed under the Apache License 2.0 - see the [LICENSE] () for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) for details.
 
 ## Contact
 For further information, support, or collaboration inquiries, please contact adam.romlein@kitware.com
