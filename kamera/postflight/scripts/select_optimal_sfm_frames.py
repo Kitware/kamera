@@ -75,9 +75,10 @@ def set_new_kf(
     faiss_index: faiss.Index,
     descriptors: np.ndarray,
     keypoints: np.ndarray,
+    prefix: str,
 ) -> dict:
     # set new KF and return a dict of data
-    out_path = os.path.join(outdir, f"frame_{idx:06d}.jpg")
+    out_path = os.path.join(outdir, f"{prefix}_frame_{idx:06d}.jpg")
     cv2.imwrite(out_path, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
     index_descriptors = np.vstack(descriptors, dtype=np.float32)
     faiss_index.reset()
@@ -98,7 +99,8 @@ def main():
     args = ap.parse_args()
 
     vpath = pathlib.Path(args.video)
-    outdir = vpath.parent / vpath.stem
+    prefix = vpath.stem
+    outdir = f"./images/{vpath.stem}"
 
     print(f"Writing images to {outdir}.")
     pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)
@@ -136,6 +138,7 @@ def main():
                 kf_faiss,
                 frame_descriptors,
                 frame_keypoints,
+                prefix,
             )
             saved += 1
         else:
@@ -159,6 +162,7 @@ def main():
                         kf_faiss,
                         frame_descriptors,
                         frame_keypoints,
+                        prefix,
                     )
                     saved += 1
                 else:
@@ -172,6 +176,7 @@ def main():
                         kf_faiss,
                         prev_frame_data["descriptors"],
                         prev_frame_data["keypoints"],
+                        prefix,
                     )
                     saved += 1
                     matches = match_descriptors(frame_descriptors, kf_faiss)
@@ -193,6 +198,7 @@ def main():
                             kf_faiss,
                             frame_descriptors,
                             frame_keypoints,
+                            prefix,
                         )
                         saved += 1
 
