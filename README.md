@@ -1,10 +1,17 @@
-# KAMERA: **K**nowledge-guided Image **A**cquisition **M**anag**ER** and **A**rchiver
+<div align="center">
+
+# KAMERA: Enhancing Aerial Surveys of Ice-associated Seals in Arctic Environments
+
+[![arXiv preprint](https://img.shields.io/badge/arXiv-2412.14428-red)](https://arxiv.org/abs/2509.19129)
 
 Welcome to the official repository for KAMERA, an open-source software platform for data collection, management, and analysis. Developed by Kitware in collaboration with NOAA's Marine Mammal Laboratory, KAMERA utilizes synchronized data streams and deep learning to detect and map key marine species like polar bears and ice-associated seals in Arctic and sub-Arctic regions.
 
-## About KAMERA
+![overview](assets/poster.jpg)
+</div>
 
-KAMERA integrates the latest in technology with environmental research efforts, offering tightly synchronized data streams and real-time deep learning models to facilitate in-depth data analysis and efficient surveying of marine mammals. This tool is designed to assist researchers, conservationists, and data scientists in collecting and analyzing large-scale geographical and environmental data, enhancing the understanding and conservation of marine ecosystems.
+## Overview
+
+KAMERA, or the **K**nowledge-guided Image **A**cquisition **M**anag**ER** and **A**rchiver, integrates the latest in technology with environmental research efforts, offering tightly synchronized data streams and real-time deep learning models to facilitate in-depth data analysis and efficient surveying of marine mammals. This tool is designed to assist researchers, conservationists, and data scientists in collecting and analyzing large-scale geographical and environmental data, enhancing the understanding and conservation of marine ecosystems.
 
 ## Features
 
@@ -30,14 +37,6 @@ make gui
 ```
 Note that these images take up a large amount of disk space, especially the VIAME image which is 30Gb, and it can take several hours to builds. The core images are faster and lighter weight.
 
-## Usage
-
-Please let us know if we can help integrate this software into your solution!
-
-## Contributing
-
-We welcome contributions!
-
 ## Partners and Acknowledgements
 KAMERA was developed in collaboration with:
     - NOAA Marine Mammal Laboratory
@@ -51,3 +50,14 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 For further information, support, or collaboration inquiries, please contact adam.romlein@kitware.com
 
 We hope KAMERA will empower your research and conservation efforts, and we look forward to seeing how you will use this system.
+
+## Citation
+If you found this helpful, please cite our paper:
+```
+@inproceedings{romlein2025kamera,
+  title={KAMERA: Enhancing Aerial Surveys of Ice-associated Seals in Arctic Environments},
+  author={Romlein, Adam and Hou, Benjamin X. and Boss, Yuval and Christman, Cynthia L. and Koslovsky, Stacie and Moreland, Erin E. and Parham, Jason and Hoogs, Anthony},
+  booktitle={IEEE/CVF International Conference on Computer Vision},
+  year={2025}
+}
+```
