@@ -54,10 +54,12 @@ We hope KAMERA will empower your research and conservation efforts, and we look 
 ## Citation
 If you found this helpful, please cite our paper:
 ```
-@inproceedings{romlein2025kamera,
-  title={KAMERA: Enhancing Aerial Surveys of Ice-associated Seals in Arctic Environments},
-  author={Romlein, Adam and Hou, Benjamin X. and Boss, Yuval and Christman, Cynthia L. and Koslovsky, Stacie and Moreland, Erin E. and Parham, Jason and Hoogs, Anthony},
-  booktitle={IEEE/CVF International Conference on Computer Vision},
-  year={2025}
+@InProceedings{Romlein_2025_ICCV,
+    author    = {Romlein, Adam and Hou, Benjamin X. and Boss, Yuval and Christman, Cynthia L. and Koslovsky, Stacie and Moreland, Erin E. and Parham, Jason and Hoogs, Anthony},
+    title     = {KAMERA: Enhancing Aerial Surveys of Ice-associated Seals in Arctic Environments},
+    booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) Workshops},
+    month     = {October},
+    year      = {2025},
+    pages     = {2162-2171}
 }
 ```
