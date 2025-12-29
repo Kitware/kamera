@@ -26,9 +26,6 @@ from shapely.geometry import Polygon, mapping
 import shapefile
 
 # Custom package imports.
-import sys
-
-sys.path.insert(0, "C:/Users/path_to/postflight_scripts/sensor_models/src")
 from kamera.sensor_models import (
     quaternion_multiply,
     quaternion_from_matrix,
@@ -42,10 +39,25 @@ from kamera.sensor_models.nav_conversions import enu_to_llh, llh_to_enu
 from kamera.sensor_models.nav_state import NavStateINSJson
 from kamera.postflight.dat_to_csv import convert_dat_to_csv
 
-# Adjust as necessary
-GEOD_FNAME = "/src/kamera/assets/geods/egm84-15.pgm"
-if not os.path.isfile(GEOD_FNAME):
-    raise FileNotFoundError(GEOD_FNAME)
+# Find geoid file relative to package root (cross-platform)
+# Try multiple possible locations for flexibility
+_package_root = pathlib.Path(__file__).parent.parent.parent
+_possible_geod_paths = [
+    _package_root / "assets" / "geods" / "egm84-15.pgm",  # Development/installed package
+    pathlib.Path("/src/kamera/assets/geods/egm84-15.pgm"),  # Docker container path
+    pathlib.Path("assets/geods/egm84-15.pgm"),  # Relative to current working directory
+]
+
+GEOD_FNAME = None
+for geod_path in _possible_geod_paths:
+    if geod_path.is_file():
+        GEOD_FNAME = str(geod_path.resolve())
+        break
+
+if GEOD_FNAME is None or not os.path.isfile(GEOD_FNAME):
+    raise FileNotFoundError(
+        f"Geoid file not found. Tried: {[str(p) for p in _possible_geod_paths]}"
+    )
 geod = pygeodesy.geoids.GeoidPGM(GEOD_FNAME)
 
 SUFFIX_RGB = "rgb.jpg"

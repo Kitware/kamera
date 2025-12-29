@@ -135,15 +135,16 @@ class ColmapCalibration(object):
                 continue
 
             # Query the navigation state recorded by the INS for this time.
-            pose = self.nav_state_provider.pose(t)
+            ins_pose = self.nav_state_provider.pose(t)
             llh = self.nav_state_provider.llh(t)
 
             # Query Colmaps pose for the camera.
-            R = image.cam_from_world.rotation.matrix()
-            pos = -np.dot(R.T, image.cam_from_world.translation)
+            pose = image.cam_from_world()
+            R = pose.rotation.matrix()
+            pos = -np.dot(R.T, pose.translation)
 
-            image.cam_from_world.rotation.normalize()
-            quat = image.cam_from_world.rotation.quat
+            pose.rotation.normalize()
+            quat = pose.rotation.quat
             # invert the w (rotation) component,
             #  so we get the camera to world rotation
             quat[3] *= -1
@@ -151,7 +152,7 @@ class ColmapCalibration(object):
             sfm_pose = [pos, quat]
 
             img_times.append(t)
-            ins_poses.append(pose)
+            ins_poses.append(ins_pose)
             img_fnames.append(image.name)
             sfm_poses.append(sfm_pose)
             llhs.append(llh)
@@ -241,7 +242,7 @@ class ColmapCalibration(object):
         to bootstrap the calibration process.
         """
         # Find all valid indices of current cameras
-        channel, modality = camera_name.split("_")[2:]
+        channel, modality = camera_name.split("_")[-2:]
         cam_idxs = [
             1 if camera_name == os.path.basename(os.path.dirname(im)) else 0
             for im in self.ccd.img_fnames
@@ -260,7 +261,11 @@ class ColmapCalibration(object):
             if cam_idxs[i] == 1:
                 # Replace with the modality of the already calibrated modality
                 calibrated_fname = fname.replace(modality, calibrated_modality)
-                ii = self.ccd.img_fnames.index(calibrated_fname)
+                try:
+                    ii = self.ccd.img_fnames.index(calibrated_fname)
+                except:
+                    print(f"Missing {calibrated_fname} from calibrated index.")
+                    continue
                 colocated_observations.append(self.ccd.points_per_image[ii])
                 observations.append(self.ccd.points_per_image[i])
         if len(observations) < 10 or len(colocated_observations) < 10:
@@ -316,14 +321,14 @@ class ColmapCalibration(object):
         colocated_camera_model: StandardCamera,
         num_gifs: int = 5,
     ) -> None:
-        channel, modality = camera_name.split("_")[2:]
+        channel, modality = camera_name.split("_")[-2:]
         colocated_camera_name = camera_name.replace(modality, colocated_modality)
         print(
             f"Writing registration gifs for cameras {camera_name} "
             f"and {colocated_camera_name}."
         )
         ub.ensuredir(gif_dir)
-        
+
         img_fnames = self.ccd.img_fnames
         for k in range(num_gifs):
             inds = list(range(len(img_fnames)))
@@ -331,11 +336,14 @@ class ColmapCalibration(object):
             for i in range(len(img_fnames)):
                 colocated_img = img = None
                 fname = img_fnames[inds[i]]
-                if osp.basename(osp.dirname(fname)) != camera_name:
+                base_fname = osp.basename(osp.dirname(fname))
+                chan_mode = "_".join(osp.basename(osp.dirname(fname)).split("_")[-2:])
+                cam_chan_mode = "_".join(camera_name.split("_")[-2:])
+                if chan_mode != cam_chan_mode:
                     continue
                 try:
                     bname = osp.basename(fname)
-                    abs_fname = osp.join(self.colmap_dir, "images0", camera_name, bname)
+                    abs_fname = osp.join(self.colmap_dir, "images0", base_fname, bname)
                     img = cv2.imread(abs_fname, cv2.IMREAD_COLOR)[:, :, ::-1]
                 except Exception as e:
                     print(f"No {modality} image found at path {abs_fname}")
@@ -364,7 +372,7 @@ class ColmapCalibration(object):
                     break
                 except Exception as e:
                     print(
-                        f"No {colocated_modality} image found at filepath {abs_colocated_fname}"
+                        f"No {colocated_modality} image found at filepath {abs_colocated_bname}"
                     )
                     continue
 

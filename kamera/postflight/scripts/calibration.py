@@ -47,8 +47,8 @@ def align_model(
 def main():
     # REQUIREMENTS: Must already have built a reasonable 3-D model using Colmap
     # And have a flight directory populated by the kamera system
-    flight_dir = "/home/local/KHQ/adam.romlein/noaa/data/052025_Calibration/"
-    colmap_dir = os.path.join(flight_dir, "colmap")
+    flight_dir = "/Users/adam.romlein/kitware/noaa/data/fl09_85mm_25_5deg"
+    colmap_dir = os.path.join(flight_dir, "colmap_rgb")
     # Location to save KAMERA camera models.
     save_dir = os.path.join(flight_dir, "kamera_models")
     # Location to find / build aligned model
@@ -86,7 +86,7 @@ def main():
         )
         joint_calibration = False
     for camera_str in cc.ccd.best_cameras.keys():
-        channel, modality = camera_str.split("_")[2:]
+        channel, modality = camera_str.split("_")[-2:]
         # skip all modalities except the "main" ones
         if joint_calibration and modality != main_modality:
             continue
@@ -119,7 +119,7 @@ def main():
     # are colocated to use 3D points obtained from one to project into the other
     if joint_calibration:
         for camera_str in cc.ccd.best_cameras.keys():
-            channel, modality = camera_str.split("_")[2:]
+            channel, modality = camera_str.split("_")[-2:]
             # now calibrate all other modalities
             if modality == main_modality:
                 continue
@@ -165,7 +165,7 @@ def main():
         ir_cc.prepare_calibration_data()
         camera_strs = list(ir_cc.ccd.best_cameras.keys())
         for camera_str in ir_cc.ccd.best_cameras.keys():
-            channel, modality = camera_str.split("_")[2:]
+            channel, modality = camera_str.split("_")[-2:]
             out_path = os.path.join(save_dir, f"{camera_str}_v2.yaml")
             if os.path.exists(out_path) and not force_calibrate:
                 print(
@@ -177,9 +177,7 @@ def main():
             else:
                 print(f"Calibrating camera {camera_str}.")
                 tic = time.perf_counter()
-                camera_model, error = ir_cc.calibrate_camera(
-                    camera_str, error_threshold=100
-                )
+                camera_model, error = ir_cc.calibrate_camera(camera_str)
                 toc = time.perf_counter()
                 if camera_model is not None:
                     print(f"Saving camera model to {out_path}")

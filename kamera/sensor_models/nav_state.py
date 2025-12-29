@@ -240,8 +240,7 @@ class NavStateINSBinary(NavStateProvider):
     def llh(self, t):
         # East/north/up coordinates.
         pos = self.pos(t)
-
-        lat, lon, alt = enu_to_llh(*pos, lat0=self.lat0, lon0=self.lon0,
+        lat, lon, alt = enu_to_llh(pos[0], pos[1], pos[2], lat0=self.lat0, lon0=self.lon0,
                                    h0=self.h0)
         return lat, lon, alt
 
