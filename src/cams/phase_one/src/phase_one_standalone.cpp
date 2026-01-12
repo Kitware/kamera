@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdio>
+#include <cstdlib>
 #include <vector>
 #include <chrono>
 #include <opencv2/opencv.hpp>
@@ -17,6 +18,7 @@
 #include <P1ImageTiffWriter.hpp>
 
 #include <ros/ros.h>
+#include <ros/package.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
 #include <pluginlib/class_list_macros.h>
@@ -110,8 +112,32 @@ namespace phase_one
         } else {
             P1::ImageSdk::SetArchitecture(P1::ImageSdk::Architecture::Cuda);
         }
-        P1::ImageSdk::SetSensorProfilesLocation(
-        "/root/kamera/artifacts/ImageSDKCuda/SensorProfiles");
+        
+        // Get SensorProfiles path - allow override via environment variable
+        std::string sensor_profiles_path;
+        const char* env_path = std::getenv("PHASE_ONE_SENSOR_PROFILES_PATH");
+        if (env_path != nullptr) {
+            sensor_profiles_path = env_path;
+            ROS_INFO("Using SensorProfiles path from environment: %s", sensor_profiles_path.c_str());
+        } else {
+            // Use compile-time path if available, otherwise try common locations
+            #ifdef SENSOR_PROFILES_PATH
+            sensor_profiles_path = SENSOR_PROFILES_PATH;
+            #else
+            // Fallback: try to find relative to package path
+            std::string package_path = ros::package::getPath("phase_one");
+            if (!package_path.empty()) {
+                // Try build directory relative to package
+                sensor_profiles_path = package_path + "/../../build/phase_one/ImageSDK/SensorProfiles";
+            } else {
+                ROS_WARN("Could not determine SensorProfiles path. Set PHASE_ONE_SENSOR_PROFILES_PATH environment variable.");
+                sensor_profiles_path = "/opt/phaseone/ImageSDK/SensorProfiles"; // Last resort default
+            }
+            #endif
+        }
+        
+        ROS_INFO("Setting SensorProfiles location to: %s", sensor_profiles_path.c_str());
+        P1::ImageSdk::SetSensorProfilesLocation(sensor_profiles_path);
         connectToIPCamera(ip_address_);
 
         auto list = camera.AllPropertyIds();

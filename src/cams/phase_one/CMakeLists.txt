@@ -5,8 +5,9 @@ include(FetchContent)
 
 string(TOLOWER ${CMAKE_SYSTEM_NAME} SYSTEM_NAME_LC)
 set(SDK_PACKAGE_EXT ".tgz")
-set(SDK_MAJOR_VERSION "3")
-set(SDK_MINOR_VERSION "1")
+set(CAMERA_SDK_MAJOR_VERSION "3")
+# CUDA is supported 4+
+set(IMAGE_SDK_MAJOR_VERSION "4")
 
 if(NOT APPLE AND UNIX AND CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
     set(LINUX_ARCH "-arm64")
@@ -14,31 +15,35 @@ else()
     set(LINUX_ARCH "")
 endif()
 
-# refs
-# https://developer.phaseone.com/sdk/3.1/releases/imagesdk/3/p1imagesdk-linux.tgz
-# https://developer.phaseone.com/sdk/3.1/releases/camerasdk/3/p1camerasdk-linux.tgz
-
+# ref path: https://developer.phaseone.com/sdk/releases/camerasdk/3/p1camerasdk-linux.tgz
 FetchContent_Declare(CameraSDK
-    URL https://developer.phaseone.com/sdk/${SDK_MAJOR_VERSION}.${SDK_MINOR_VERSION}/releases/camerasdk/${SDK_MAJOR_VERSION}/p1camerasdk-${SYSTEM_NAME_LC}${LINUX_ARCH}${SDK_PACKAGE_EXT}
+    URL https://developer.phaseone.com/sdk/releases/camerasdk/${CAMERA_SDK_MAJOR_VERSION}/p1camerasdk-${SYSTEM_NAME_LC}${LINUX_ARCH}${SDK_PACKAGE_EXT}
     SOURCE_DIR CameraSDK
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
 message(STATUS "Downloading CameraSDK...")
-FetchContent_Populate(CameraSDK)
+FetchContent_MakeAvailable(CameraSDK)
 
 find_package(CameraSDK CONFIG REQUIRED HINTS ${CMAKE_CURRENT_BINARY_DIR}/CameraSDK)
 
-# Leave it to a copy for the GPU version, rather than fetching
-#FetchContent_Declare(ImageSDK
-#    URL https://developer.phaseone.com/sdk/${SDK_MAJOR_VERSION}.${SDK_MINOR_VERSION}/releases/imagesdk/${SDK_MAJOR_VERSION}/p1imagesdk-${SYSTEM_NAME_LC}${LINUX_ARCH}${SDK_PACKAGE_EXT}
-#    SOURCE_DIR ImageSDK
-#)
-#
-#message(STATUS "Downloading ImageSDK...")
-#
-#FetchContent_Populate(ImageSDK)
+# ref path: https://developer.phaseone.com/sdk/releases/imagesdk/4/p1imagesdk-linux.tgz
+FetchContent_Declare(ImageSDK
+   URL https://developer.phaseone.com/sdk/releases/imagesdk/${IMAGE_SDK_MAJOR_VERSION}/p1imagesdk-${SYSTEM_NAME_LC}${LINUX_ARCH}${SDK_PACKAGE_EXT}
+   SOURCE_DIR ImageSDK
+   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
 
-find_package(ImageSDK CONFIG REQUIRED HINTS lib/ImageSDKCuda)
+message(STATUS "Downloading ImageSDK...")
+
+FetchContent_MakeAvailable(ImageSDK)
+
+find_package(CameraSDK CONFIG REQUIRED HINTS ${CMAKE_CURRENT_BINARY_DIR}/ImageSDK)
+#find_package(ImageSDK CONFIG REQUIRED HINTS lib/ImageSDKCuda)
+
+# Define SensorProfiles path relative to build directory
+set(SENSOR_PROFILES_PATH "${CMAKE_CURRENT_BINARY_DIR}/ImageSDK/SensorProfiles")
+message(STATUS "SensorProfiles path: ${SENSOR_PROFILES_PATH}")
 
 ## Compile as C++17, supported in ROS Noetic and newer
 add_compile_options(-std=c++17)
@@ -194,6 +199,9 @@ set(SRC
 
 add_library(phase_one ${SRC})
 
+# Add SensorProfiles path as compile definition
+target_compile_definitions(phase_one PRIVATE SENSOR_PROFILES_PATH="${SENSOR_PROFILES_PATH}")
+
 ## Specify libraries to link a library or executable target against
 target_link_libraries(phase_one PRIVATE
     ${OpenCV_LIBS}
@@ -207,6 +215,9 @@ target_link_libraries(phase_one PRIVATE
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME}_node src/phase_one_node.cpp)
 add_executable(${PROJECT_NAME}_standalone src/phase_one_standalone.cpp src/phase_one_utils.cpp)
+
+# Add SensorProfiles path as compile definition for standalone executable
+target_compile_definitions(${PROJECT_NAME}_standalone PRIVATE SENSOR_PROFILES_PATH="${SENSOR_PROFILES_PATH}")
 
 target_link_libraries(phase_one_node PRIVATE
     ${catkin_LIBRARIES}
