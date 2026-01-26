@@ -140,6 +140,8 @@ namespace phase_one
             std::string effort;
             std::string project;
             std::string base_dir;
+            std::string to_process_filename_;
+            std::string processed_filename_;
             double      auto_trigger_rate_;
             int         num_threads_;
             // Internal data structures / sync structures

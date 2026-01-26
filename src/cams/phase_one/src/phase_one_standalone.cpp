@@ -317,29 +317,47 @@ namespace phase_one
         static double min_image_delay = 0.95; // should depend on exposure time
         event_cache.set_delay(min_image_delay);
         event_cache.set_tolerance(ros::Duration(0.49));
-        std::string to_process_filename = "/mnt/data/to_process.txt";
-        std::string processed_filename = "/mnt/data/processed.txt";
-        std::vector<std::string> to_process_images = loadFile(to_process_filename);
-        std::vector<std::string> processed_images = loadFile(processed_filename);
+        to_process_filename_ = base_dir + "/to_process.txt";
+        processed_filename_ = base_dir + "/processed.txt";
+        std::vector<std::string> to_process_images = loadFile(to_process_filename_);
+        std::vector<std::string> processed_images = loadFile(processed_filename_);
         // write out any files that are left, as well as add to queue
         std::ofstream write_intersection;
-        write_intersection.open(to_process_filename);
-        for (auto& toProcess : to_process_images) {
-            if (std::find(processed_images.begin(), processed_images.end(),
-                    toProcess) != processed_images.end()) {
-            } else {
-                write_intersection << toProcess << std::endl;
-                // sequence doesn't matter if we've cycled, just set to 0
-                filename_to_seq_map_[toProcess] = 0;
-                total_counter++;
+        write_intersection.open(to_process_filename_);
+        if (!write_intersection.is_open()) {
+            ROS_ERROR("Failed to open %s for writing. Check disk space and permissions.", to_process_filename_.c_str());
+        } else {
+            for (auto& toProcess : to_process_images) {
+                if (std::find(processed_images.begin(), processed_images.end(),
+                        toProcess) != processed_images.end()) {
+                } else {
+                    write_intersection << toProcess << std::endl;
+                    if (write_intersection.fail()) {
+                        ROS_ERROR("Failed to write to %s. Check disk space.", to_process_filename_.c_str());
+                        break;
+                    }
+                    // sequence doesn't matter if we've cycled, just set to 0
+                    filename_to_seq_map_[toProcess] = 0;
+                    total_counter++;
+                }
             }
+            write_intersection.flush();
+            if (write_intersection.fail()) {
+                ROS_ERROR("Failed to flush %s. Data may not be written to disk.", to_process_filename_.c_str());
+            }
+            write_intersection.close();
         }
-        write_intersection.close();
         // Just delete processed image file
-        remove(processed_filename.c_str());
+        remove(processed_filename_.c_str());
         // Append new entries to cache
-        to_process_out.open(to_process_filename, std::ios_base::app);
-        processed_out.open(processed_filename, std::ios_base::app);
+        to_process_out.open(to_process_filename_, std::ios_base::app);
+        if (!to_process_out.is_open()) {
+            ROS_ERROR("Failed to open %s in append mode. Check disk space and permissions.", to_process_filename_.c_str());
+        }
+        processed_out.open(processed_filename_, std::ios_base::app);
+        if (!processed_out.is_open()) {
+            ROS_ERROR("Failed to open %s in append mode. Check disk space and permissions.", processed_filename_.c_str());
+        }
 
         // Throw results into redis for access
         std::string base = "/sys/" + hostname + "/p1debayerq/";
@@ -513,10 +531,29 @@ namespace phase_one
                         std::lock_guard<std::mutex> lock(mtx);
                         filename_to_seq_map_[fname] = seq;
                         // write out every file received here, reduce set size with processed_out
-                        to_process_out << fname << std::endl;
+                        if (!to_process_out.is_open()) {
+                            ROS_ERROR("|CAPTURE| to_process_out stream is not open. Attempting to reopen.");
+                            to_process_out.open(to_process_filename_, std::ios_base::app);
+                            if (!to_process_out.is_open()) {
+                                ROS_ERROR("|CAPTURE| Failed to reopen %s. Check disk space and mount.", to_process_filename_.c_str());
+                            }
+                        }
+                        if (to_process_out.is_open()) {
+                            to_process_out << fname << std::endl;
+                            if (to_process_out.fail()) {
+                                ROS_ERROR("|CAPTURE| Failed to write to %s. Check disk space.", to_process_filename_.c_str());
+                            } else {
+                                to_process_out.flush();
+                                if (to_process_out.fail()) {
+                                    ROS_ERROR("|CAPTURE| Failed to flush %s. Data may not be written to disk.", to_process_filename_.c_str());
+                                }
+                            }
+                        }
                         total_counter++;
                     } catch (boost::filesystem::filesystem_error &e) {
                         ROS_ERROR("|CAPTURE| Archive Failed [%d]: %s", e.code().value(), e.what());
+                    } catch (const std::ios_base::failure& e) {
+                        ROS_ERROR("|CAPTURE| I/O error writing IIQ file: %s", e.what());
                     }
                 }
 
@@ -717,7 +754,24 @@ namespace phase_one
             if ( success ) {
                 // delete IIQ file that's been processed
                 remove(filename_iiq.c_str());
-                processed_out << filename_iiq << std::endl;
+                if (!processed_out.is_open()) {
+                    ROS_ERROR("|DEMOSAIC| processed_out stream is not open. Attempting to reopen.");
+                    processed_out.open(processed_filename_, std::ios_base::app);
+                    if (!processed_out.is_open()) {
+                        ROS_ERROR("|DEMOSAIC| Failed to reopen %s. Check disk space and mount.", processed_filename_.c_str());
+                    }
+                }
+                if (processed_out.is_open()) {
+                    processed_out << filename_iiq << std::endl;
+                    if (processed_out.fail()) {
+                        ROS_ERROR("|DEMOSAIC| Failed to write to %s. Check disk space.", processed_filename_.c_str());
+                    } else {
+                        processed_out.flush();
+                        if (processed_out.fail()) {
+                            ROS_ERROR("|DEMOSAIC| Failed to flush %s. Data may not be written to disk.", processed_filename_.c_str());
+                        }
+                    }
+                }
                 processed_counter++;
             } else {
                 ROS_ERROR_STREAM("IIQ File: " << filename_iiq << " failed to save to disk as jpg.");
@@ -1297,7 +1351,24 @@ namespace phase_one
                 if ( count > 0 ) {
                   // add to 'processed' file so that it won't attempt to be processed
                   // after a reboot
-                  processed_out << filename_iiq << std::endl;
+                  if (!processed_out.is_open()) {
+                      ROS_ERROR("|DETECTION| processed_out stream is not open. Attempting to reopen.");
+                      processed_out.open(processed_filename_, std::ios_base::app);
+                      if (!processed_out.is_open()) {
+                          ROS_ERROR("|DETECTION| Failed to reopen %s. Check disk space and mount.", processed_filename_.c_str());
+                      }
+                  }
+                  if (processed_out.is_open()) {
+                      processed_out << filename_iiq << std::endl;
+                      if (processed_out.fail()) {
+                          ROS_ERROR("|DETECTION| Failed to write to %s. Check disk space.", processed_filename_.c_str());
+                      } else {
+                          processed_out.flush();
+                          if (processed_out.fail()) {
+                              ROS_ERROR("|DETECTION| Failed to flush %s. Data may not be written to disk.", processed_filename_.c_str());
+                          }
+                      }
+                  }
                   processed_counter++;
                   // then remove IIQ file
                   remove(filename_iiq.c_str());
