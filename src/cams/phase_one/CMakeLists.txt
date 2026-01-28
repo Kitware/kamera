@@ -92,7 +92,7 @@ if(CUDA_FOUND)
             /usr/local/cuda/lib
         NO_DEFAULT_PATH
     )
-    
+
     if(NVJPEG_LIBRARY)
         message(STATUS "nvjpeg library found: ${NVJPEG_LIBRARY}")
         set(NVJPEG_FOUND TRUE)
@@ -100,7 +100,7 @@ if(CUDA_FOUND)
         message(WARNING "nvjpeg library not found - nvjpeg encoding will not be available")
         set(NVJPEG_FOUND FALSE)
     endif()
-    
+
     # Find nvjpeg header
     find_path(NVJPEG_INCLUDE_DIR
         NAMES nvjpeg.h
@@ -109,7 +109,7 @@ if(CUDA_FOUND)
             /usr/local/cuda/include
         NO_DEFAULT_PATH
     )
-    
+
     if(NVJPEG_INCLUDE_DIR)
         message(STATUS "nvjpeg headers found: ${NVJPEG_INCLUDE_DIR}")
         add_definitions(-DHAVE_NVJPEG)
@@ -245,7 +245,8 @@ set(SRC
 
 # build and install the nodelet
 
-add_library(phase_one ${SRC})
+add_library(${PROJECT_NAME} ${SRC})
+add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(phase_one PRIVATE
