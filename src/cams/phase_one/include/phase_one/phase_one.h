@@ -74,6 +74,11 @@ namespace phase_one
                            const std::string &filename,
                            std::string format);
 
+            // Compress JPEG using nvjpeg (GPU-accelerated)
+            bool compressJpegNvjpeg(const cv::Mat& bgr_image, 
+                                    std::vector<unsigned char>& output,
+                                    int quality = 90);
+
             // Fill in the entries of the maps 'property_to_id_' and 'property_to_type_' given
             // a 'camera' handle. These maps define the values used for setting/getting the
             // parameters in the ROS service calls

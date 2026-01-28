@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <vector>
 #include <chrono>
+#include <fstream>
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -41,9 +42,198 @@
 #include <phase_one/phase_one_utils.h>
 #include <phase_one/phase_one.h>
 
+#ifdef HAVE_NVJPEG
+#include <nvjpeg.h>
+#include <cuda_runtime.h>
+#include <cstring>
+#endif
 
+#ifdef HAVE_NVJPEG
 namespace phase_one
 {
+    // Helper function to convert nvjpeg status to string
+    const char* nvjpeg_error_string(nvjpegStatus_t s) {
+        switch (s) {
+            case NVJPEG_STATUS_SUCCESS:            return "NVJPEG_STATUS_SUCCESS";
+            case NVJPEG_STATUS_NOT_INITIALIZED:    return "NVJPEG_STATUS_NOT_INITIALIZED";
+            case NVJPEG_STATUS_INVALID_PARAMETER:  return "NVJPEG_STATUS_INVALID_PARAMETER";
+            case NVJPEG_STATUS_BAD_JPEG:           return "NVJPEG_STATUS_BAD_JPEG";
+            case NVJPEG_STATUS_JPEG_NOT_SUPPORTED: return "NVJPEG_STATUS_JPEG_NOT_SUPPORTED";
+            case NVJPEG_STATUS_ALLOCATOR_FAILURE:  return "NVJPEG_STATUS_ALLOCATOR_FAILURE";
+            case NVJPEG_STATUS_EXECUTION_FAILED:   return "NVJPEG_STATUS_EXECUTION_FAILED";
+            case NVJPEG_STATUS_ARCH_MISMATCH:      return "NVJPEG_STATUS_ARCH_MISMATCH";
+            case NVJPEG_STATUS_INTERNAL_ERROR:     return "NVJPEG_STATUS_INTERNAL_ERROR";
+            default:                               return "NVJPEG_STATUS_UNKNOWN";
+        }
+    }
+
+    // Helper class for nvjpeg encoding
+    class NvJpegEncoder {
+    public:
+        NvJpegEncoder(int width, int height, int quality = 90)
+            : width_(width), height_(height), quality_(quality)
+        {
+            // Create nvJPEG handle (try hardware backend first, fall back to default)
+            nvjpegStatus_t st = nvjpegCreateEx(
+                NVJPEG_BACKEND_HARDWARE,
+                nullptr, nullptr, 0, &handle_);
+            if (st == NVJPEG_STATUS_ARCH_MISMATCH) {
+                st = nvjpegCreateEx(
+                    NVJPEG_BACKEND_DEFAULT,
+                    nullptr, nullptr, 0, &handle_);
+            }
+            if (st != NVJPEG_STATUS_SUCCESS) {
+                ROS_ERROR("Failed to create nvJPEG handle: %s", nvjpeg_error_string(st));
+                handle_ = nullptr;
+                return;
+            }
+
+            nvjpegStatus_t enc_st = nvjpegEncoderStateCreate(handle_, &encState_, nullptr);
+            if (enc_st != NVJPEG_STATUS_SUCCESS) {
+                ROS_ERROR("Failed to create encoder state: %s", nvjpeg_error_string(enc_st));
+                nvjpegDestroy(handle_);
+                handle_ = nullptr;
+                return;
+            }
+
+            enc_st = nvjpegEncoderParamsCreate(handle_, &encParams_, nullptr);
+            if (enc_st != NVJPEG_STATUS_SUCCESS) {
+                ROS_ERROR("Failed to create encoder params: %s", nvjpeg_error_string(enc_st));
+                nvjpegEncoderStateDestroy(encState_);
+                nvjpegDestroy(handle_);
+                handle_ = nullptr;
+                return;
+            }
+
+            nvjpegEncoderParamsSetQuality(encParams_, quality_, nullptr);
+            nvjpegEncoderParamsSetOptimizedHuffman(encParams_, 1, nullptr);
+            nvjpegEncoderParamsSetSamplingFactors(
+                encParams_, NVJPEG_CSS_420, nullptr);
+            nvjpegEncoderParamsSetEncoding(
+                encParams_, NVJPEG_ENCODING_BASELINE_DCT, nullptr);
+
+            // Allocate a single GPU buffer large enough for interleaved BGR
+            cudaError_t cuda_st = cudaMallocPitch(
+                (void**)&d_img_, &pitch_,
+                width_ * 3 * sizeof(unsigned char),
+                height_);
+            if (cuda_st != cudaSuccess) {
+                ROS_ERROR("Failed to allocate CUDA memory: %s", cudaGetErrorString(cuda_st));
+                nvjpegEncoderParamsDestroy(encParams_);
+                nvjpegEncoderStateDestroy(encState_);
+                nvjpegDestroy(handle_);
+                handle_ = nullptr;
+                return;
+            }
+
+            std::memset(&nvImage_, 0, sizeof(nvImage_));
+            nvImage_.channel[0] = d_img_;
+            nvImage_.pitch[0]   = static_cast<unsigned int>(pitch_);
+
+            input_format_ = NVJPEG_INPUT_BGRI;
+
+            cuda_st = cudaStreamCreate(&stream_);
+            if (cuda_st != cudaSuccess) {
+                ROS_ERROR("Failed to create CUDA stream: %s", cudaGetErrorString(cuda_st));
+                cudaFree(d_img_);
+                nvjpegEncoderParamsDestroy(encParams_);
+                nvjpegEncoderStateDestroy(encState_);
+                nvjpegDestroy(handle_);
+                handle_ = nullptr;
+                return;
+            }
+        }
+
+        ~NvJpegEncoder()
+        {
+            if (d_img_) cudaFree(d_img_);
+            if (stream_) cudaStreamDestroy(stream_);
+            if (encParams_) nvjpegEncoderParamsDestroy(encParams_);
+            if (encState_) nvjpegEncoderStateDestroy(encState_);
+            if (handle_) nvjpegDestroy(handle_);
+        }
+
+        bool encode(const cv::Mat& bgr, std::vector<unsigned char>& output)
+        {
+            if (!handle_) {
+                ROS_ERROR("NvJpegEncoder: handle not initialized");
+                return false;
+            }
+
+            if (bgr.cols != width_ || bgr.rows != height_ || bgr.type() != CV_8UC3) {
+                ROS_ERROR("NvJpegEncoder: input size/type mismatch. Expected %dx%d CV_8UC3, got %dx%d type %d",
+                         width_, height_, bgr.cols, bgr.rows, bgr.type());
+                return false;
+            }
+
+            const unsigned char* h_bgr = bgr.ptr<unsigned char>(0);
+
+            // Upload
+            cudaError_t cuda_st = cudaMemcpy2DAsync(
+                d_img_, pitch_,
+                h_bgr, width_ * 3 * sizeof(unsigned char),
+                width_ * 3 * sizeof(unsigned char),
+                height_,
+                cudaMemcpyHostToDevice,
+                stream_);
+            if (cuda_st != cudaSuccess) {
+                ROS_ERROR("Failed to copy to device: %s", cudaGetErrorString(cuda_st));
+                return false;
+            }
+
+            // Encode
+            nvjpegStatus_t st = nvjpegEncodeImage(
+                handle_, encState_, encParams_,
+                &nvImage_, input_format_,
+                width_, height_, stream_);
+            if (st != NVJPEG_STATUS_SUCCESS) {
+                ROS_ERROR("Failed to encode image: %s", nvjpeg_error_string(st));
+                return false;
+            }
+
+            cudaStreamSynchronize(stream_);
+
+            // Retrieve bitstream
+            size_t jpegSize = 0;
+            st = nvjpegEncodeRetrieveBitstream(
+                handle_, encState_, nullptr, &jpegSize, stream_);
+            if (st != NVJPEG_STATUS_SUCCESS) {
+                ROS_ERROR("Failed to retrieve bitstream size: %s", nvjpeg_error_string(st));
+                return false;
+            }
+            cudaStreamSynchronize(stream_);
+
+            output.resize(jpegSize);
+            st = nvjpegEncodeRetrieveBitstream(
+                handle_, encState_, output.data(), &jpegSize, stream_);
+            if (st != NVJPEG_STATUS_SUCCESS) {
+                ROS_ERROR("Failed to retrieve bitstream: %s", nvjpeg_error_string(st));
+                return false;
+            }
+            cudaStreamSynchronize(stream_);
+
+            return true;
+        }
+
+        bool isValid() const { return handle_ != nullptr; }
+
+    private:
+        int width_;
+        int height_;
+        int quality_;
+
+        nvjpegHandle_t handle_ = nullptr;
+        nvjpegEncoderState_t encState_ = nullptr;
+        nvjpegEncoderParams_t encParams_ = nullptr;
+        nvjpegImage_t nvImage_{};
+
+        unsigned char* d_img_ = nullptr;
+        size_t pitch_ = 0;
+        nvjpegInputFormat_t input_format_;
+        cudaStream_t stream_ = nullptr;
+    };
+#endif // HAVE_NVJPEG
+
     PhaseOne::PhaseOne()
     {
     }
@@ -351,11 +541,11 @@ namespace phase_one
                 } catch (...) {
                     ROS_ERROR("|CAPTURE| Failed to convert preview.");
                 };
-                
-                // grab all tags for image, and shove into frame ID. faster 
+
+                // grab all tags for image, and shove into frame ID. faster
                 // than adding to EXIF, can do that later
                 auto ticid = std::chrono::high_resolution_clock::now();
-                
+
                 P1::ImageSdk::ImageTag tag;
                 std::stringstream frame_id;
                 tag = raw_img.GetTag(ids.Make);
@@ -385,7 +575,7 @@ namespace phase_one
                 auto tocid = std::chrono::high_resolution_clock::now();
                 auto dtid = tocid - ticid;
                 ROS_INFO_STREAM("|CAPTURE| adding tags time: " << dtid.count() / 1e9 << "s");
-          
+
                 output_msg.header.frame_id = frame_id.str();
                 image_pub.publish(output_msg);
                 stat_pub_.publish(stat_msg);
@@ -547,6 +737,44 @@ namespace phase_one
         return 0;
     };
 
+    bool PhaseOne::compressJpegNvjpeg(const cv::Mat& bgr_image,
+                                      std::vector<unsigned char>& output,
+                                      int quality)
+    {
+#ifdef HAVE_NVJPEG
+        try {
+            if (bgr_image.empty() || bgr_image.type() != CV_8UC3) {
+                ROS_ERROR("compressJpegNvjpeg: Invalid input image (empty or wrong type)");
+                return false;
+            }
+
+            // Create encoder for this image size
+            NvJpegEncoder encoder(bgr_image.cols, bgr_image.rows, quality);
+            if (!encoder.isValid()) {
+                ROS_ERROR("compressJpegNvjpeg: Failed to create nvjpeg encoder");
+                return false;
+            }
+
+            // Encode the image
+            if (!encoder.encode(bgr_image, output)) {
+                ROS_ERROR("compressJpegNvjpeg: Failed to encode image");
+                return false;
+            }
+
+            return true;
+        } catch (const std::exception& e) {
+            ROS_ERROR_STREAM("compressJpegNvjpeg: Exception: " << e.what());
+            return false;
+        } catch (...) {
+            ROS_ERROR("compressJpegNvjpeg: Unknown exception");
+            return false;
+        }
+#else
+        ROS_ERROR("compressJpegNvjpeg: nvjpeg not available (compiled without HAVE_NVJPEG)");
+        return false;
+#endif
+    }
+
     bool PhaseOne::dumpImage(P1::ImageSdk::RawImage rawImage,
                              P1::ImageSdk::BitmapImage bitmap,
                              const std::string &filename,
@@ -561,9 +789,40 @@ namespace phase_one
                 jpegConfig.quality = quality;
                 auto ticj = std::chrono::high_resolution_clock::now();
                 int use_p1 = std::stoi(envoy_->get("/sys/arch/use_p1jpeg"));
+                int use_nvjpeg = std::stoi(envoy_->get("/sys/arch/use_nvjpeg"));
+
                 // This function for some reason takes ~5x as long
                 if ( use_p1 == 1 ) {
                   P1::ImageSdk::JpegWriter(filename, bitmap, rawImage, jpegConfig);
+                } else if ( use_nvjpeg == 1 ) {
+                  // Use nvjpeg for GPU-accelerated encoding
+                  cv::Mat cvImage_raw = cv::Mat(cv::Size(
+                                       bitmap.Width(), bitmap.Height()), CV_8UC3);
+                  cvImage_raw.data = bitmap.Data().get();
+                  cv::Mat cvImage = cv::Mat(cv::Size(
+                                      bitmap.Width(), bitmap.Height()), CV_8UC3);
+                  cv::cvtColor(cvImage_raw, cvImage, cv::COLOR_BGR2RGB);
+
+                  std::vector<unsigned char> jpeg_buffer;
+                  if (compressJpegNvjpeg(cvImage, jpeg_buffer, quality)) {
+                      // Write the compressed JPEG to file
+                      std::ofstream out_file(filename, std::ios::binary);
+                      if (out_file.is_open()) {
+                          out_file.write(reinterpret_cast<const char*>(jpeg_buffer.data()),
+                                       jpeg_buffer.size());
+                          out_file.close();
+                      } else {
+                          ROS_ERROR("|DUMP| Failed to open file for writing: %s", filename.c_str());
+                          return false;
+                      }
+                  } else {
+                      ROS_ERROR("|DUMP| nvjpeg compression failed, falling back to OpenCV");
+                      // Fallback to OpenCV
+                      std::vector<int> compression_params;
+                      compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
+                      compression_params.push_back(quality);
+                      cv::imwrite(filename, cvImage, compression_params);
+                  }
                 } else {
                   cv::Mat cvImage_raw = cv::Mat(cv::Size(
                                        bitmap.Width(), bitmap.Height()), CV_8UC3);
@@ -785,14 +1044,36 @@ namespace phase_one
             output_msg.format = "jpg";
             output_msg.header = header;
             int quality = std::stoi(envoy_->get("/sys/arch/jpg/quality"));
-            std::vector<int> compression_params;
-            compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
-            compression_params.push_back(quality);
+            int use_nvjpeg = std::stoi(envoy_->get("/sys/arch/use_nvjpeg"));
+
             std::vector<uchar> buffer;
-            int MB = 1024 * 1024;
-            buffer.resize(100 * MB);
-            ROS_INFO("Calling imencode");
-            cv::imencode(".jpg", cvImage_raw, buffer, compression_params);
+            if (use_nvjpeg == 1) {
+                // Use nvjpeg for GPU-accelerated encoding
+                ROS_INFO("Calling nvjpeg encode");
+                std::vector<unsigned char> nvjpeg_buffer;
+                if (compressJpegNvjpeg(cvImage_raw, nvjpeg_buffer, quality)) {
+                    buffer.assign(nvjpeg_buffer.begin(), nvjpeg_buffer.end());
+                    ROS_INFO("nvjpeg encode successful, size: %zu bytes", buffer.size());
+                } else {
+                    ROS_WARN("nvjpeg encode failed, falling back to OpenCV");
+                    // Fallback to OpenCV
+                    int MB = 1024 * 1024;
+                    buffer.resize(100 * MB);
+                    std::vector<int> compression_params;
+                    compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
+                    compression_params.push_back(quality);
+                    cv::imencode(".jpg", cvImage_raw, buffer, compression_params);
+                }
+            } else {
+                // Use OpenCV imencode
+                int MB = 1024 * 1024;
+                buffer.resize(100 * MB);
+                std::vector<int> compression_params;
+                compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
+                compression_params.push_back(quality);
+                ROS_INFO("Calling imencode");
+                cv::imencode(".jpg", cvImage_raw, buffer, compression_params);
+            }
             ROS_INFO("Calling tocompressimage");
             output_msg.data = buffer;
             img_bridge.toCompressedImageMsg(output_msg);
@@ -1031,7 +1312,7 @@ namespace phase_one
                   } else {
                     ROS_WARN("Detections were found on an image that does not exist locally.");
                   }
-                } 
+                }
                 lock.unlock();
                 // "touch" jpeg file, so timestamp still exists
                 std::ofstream output(fname);
