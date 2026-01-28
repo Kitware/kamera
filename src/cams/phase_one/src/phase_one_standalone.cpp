@@ -234,8 +234,6 @@ namespace phase_one
     };
 #endif // HAVE_NVJPEG
 
-namespace phase_one
-{
     PhaseOne::PhaseOne()
     {
     }
@@ -543,11 +541,11 @@ namespace phase_one
                 } catch (...) {
                     ROS_ERROR("|CAPTURE| Failed to convert preview.");
                 };
-                
-                // grab all tags for image, and shove into frame ID. faster 
+
+                // grab all tags for image, and shove into frame ID. faster
                 // than adding to EXIF, can do that later
                 auto ticid = std::chrono::high_resolution_clock::now();
-                
+
                 P1::ImageSdk::ImageTag tag;
                 std::stringstream frame_id;
                 tag = raw_img.GetTag(ids.Make);
@@ -577,7 +575,7 @@ namespace phase_one
                 auto tocid = std::chrono::high_resolution_clock::now();
                 auto dtid = tocid - ticid;
                 ROS_INFO_STREAM("|CAPTURE| adding tags time: " << dtid.count() / 1e9 << "s");
-          
+
                 output_msg.header.frame_id = frame_id.str();
                 image_pub.publish(output_msg);
                 stat_pub_.publish(stat_msg);
@@ -739,7 +737,7 @@ namespace phase_one
         return 0;
     };
 
-    bool PhaseOne::compressJpegNvjpeg(const cv::Mat& bgr_image, 
+    bool PhaseOne::compressJpegNvjpeg(const cv::Mat& bgr_image,
                                       std::vector<unsigned char>& output,
                                       int quality)
     {
@@ -792,7 +790,7 @@ namespace phase_one
                 auto ticj = std::chrono::high_resolution_clock::now();
                 int use_p1 = std::stoi(envoy_->get("/sys/arch/use_p1jpeg"));
                 int use_nvjpeg = std::stoi(envoy_->get("/sys/arch/use_nvjpeg"));
-                
+
                 // This function for some reason takes ~5x as long
                 if ( use_p1 == 1 ) {
                   P1::ImageSdk::JpegWriter(filename, bitmap, rawImage, jpegConfig);
@@ -804,13 +802,13 @@ namespace phase_one
                   cv::Mat cvImage = cv::Mat(cv::Size(
                                       bitmap.Width(), bitmap.Height()), CV_8UC3);
                   cv::cvtColor(cvImage_raw, cvImage, cv::COLOR_BGR2RGB);
-                  
+
                   std::vector<unsigned char> jpeg_buffer;
                   if (compressJpegNvjpeg(cvImage, jpeg_buffer, quality)) {
                       // Write the compressed JPEG to file
                       std::ofstream out_file(filename, std::ios::binary);
                       if (out_file.is_open()) {
-                          out_file.write(reinterpret_cast<const char*>(jpeg_buffer.data()), 
+                          out_file.write(reinterpret_cast<const char*>(jpeg_buffer.data()),
                                        jpeg_buffer.size());
                           out_file.close();
                       } else {
@@ -1047,7 +1045,7 @@ namespace phase_one
             output_msg.header = header;
             int quality = std::stoi(envoy_->get("/sys/arch/jpg/quality"));
             int use_nvjpeg = std::stoi(envoy_->get("/sys/arch/use_nvjpeg"));
-            
+
             std::vector<uchar> buffer;
             if (use_nvjpeg == 1) {
                 // Use nvjpeg for GPU-accelerated encoding
@@ -1314,7 +1312,7 @@ namespace phase_one
                   } else {
                     ROS_WARN("Detections were found on an image that does not exist locally.");
                   }
-                } 
+                }
                 lock.unlock();
                 // "touch" jpeg file, so timestamp still exists
                 std::ofstream output(fname);
