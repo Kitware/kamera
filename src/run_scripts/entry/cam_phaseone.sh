@@ -104,6 +104,10 @@ if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/rebuild ) == "true" ]]; then
   fi
 fi
 
+echo "Building to_process.txt"
+rm -f /mnt/data/to_process.txt
+find /mnt/data/iiq_buffer -name "*.IIQ" > /mnt/data/to_process.txt
+
 export ROS_NAMESPACE="/${NODE_HOSTNAME}/${CAM_MODE}"
 exec roslaunch "${ROSWAIT}" phase_one phase_one_standalone.launch \
     ip_address:=${CAM_IP} \
