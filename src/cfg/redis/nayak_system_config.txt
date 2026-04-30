@@ -16,3 +16,4 @@
 /sys/arch/hosts/cas2/fov right
 /sys/arch/jpg/quality 90
 /sys/arch/load_shapefile 0
+/sys/arch/use_nvjpeg 1
