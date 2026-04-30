@@ -4,12 +4,17 @@
     - name: Make nuvo images
       command:
         chdir: "{{ kamera_dir }}"
-        cmd: make build-nuvo
+        cmd: make nuvo
 
     - name: Make viame images
       command:
         chdir: "{{ kamera_dir }}"
-        cmd: make build-viame
+        cmd: make viame
+    
+    - name: Make postflight images
+      command:
+        chdir: "{{ kamera_dir }}"
+        cmd: make postflight
 
     - name: Clean dangling images
       command:

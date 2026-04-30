@@ -15,11 +15,11 @@
           update: True
           force: True
 
-      - name: Set redis configuration
+      - name: "Set redis configuration to {{ kamera_dir }}/src/cfg/redis.conf"
         become: True
         when: redis_host
         copy:
-          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/redis.conf"
+          src: "{{ kamera_dir }}/src/cfg/redis.conf"
           remote_src: true
           dest: /etc/redis/redis.conf
           owner: root
@@ -68,6 +68,18 @@
           path: ~/.config/kamera
           state: directory
           mode: '0755'
+
+      - name: Create ~/kw/SYSTEM_NAME if it does not exist
+        file:
+          path: ~/kw/SYSTEM_NAME
+          state: touch
+          mode: '0755'
+
+      - name: Insert system name into ~/kw/SYSTEM_NAME
+        copy:
+          dest: ~/kw/SYSTEM_NAME
+          content: |
+            {{ config_dir }}
 
       - name: Create repo dir symlink
         file:
@@ -181,33 +193,11 @@
         when: follower or leader or gui
         shell: sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 
-      - name: Create ~/.local/bin if it does not exist
-        when: gui
-        file:
-          path: ~/.local/bin
-          state: directory
-          mode: '0755'
-
       - name: Create ~/.tmuxinator if it does not exist
         file:
           path: ~/.tmuxinator
           state: directory
           mode: '0755'
-
-      - name: Create bootstrap symlink
-        file:
-          src: "{{ kamera_dir }}/src/run_scripts/bootstrap_app.sh"
-          dest: ~/.config/kamera/repo_dir.bash
-          owner: "{{ ansible_user }}"
-          state: link
-
-      - name: Create kamera_run symlink
-        when: gui
-        file:
-          src: "{{ kamera_dir }}/src/run_scripts/newstartup/kamera_run.sh"
-          dest: ~/.local/bin/kamera_run
-          owner: "{{ ansible_user }}"
-          state: link
 
       - name: Create udev rule for mcc_daq
         become: True
