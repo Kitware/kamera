@@ -30,9 +30,12 @@
         service: name=redis-server state=restarted enabled=yes
 
         # Sets all system-wide parameters (except for REDIS_HOST)
-      - name: Set Redis defaults
+      - name: Seed Redis defaults
         when: redis_host
-        shell: cat "{{ kamera_dir }}/src/cfg/redis/{{ config_dir }}_system_config.conf" | xargs -n 2 bash -c 'redis-cli -h {{ inventory_hostname }} set $0 $1'
+        command: >
+          python3 {{ kamera_dir }}/scripts/seed_redis.py
+            --redis-host {{ inventory_hostname }}
+            --config {{ kamera_dir }}/src/cfg/{{ config_dir }}/default_system_state.json
 
       - name: Set up supervisor trampoline
         become: True

@@ -37,6 +37,8 @@
     pip_packages: [
                     "ansible",
                     "ruff",
+                    "redis",   # seed_redis.py: Redis client for provisioning
+                    "pyyaml",  # seed_redis.py: YAML config loading
                   ]
 
   pre_tasks:
