@@ -51,10 +51,10 @@ class ImageManager(object):
         self._image_exts = ['jpg', 'tif', 'json']
         self.modalities = ['rgb', 'ir', 'uv', 'meta']
         self.modality2ext = {'rgb':'jpg', 'ir':'tif', 'uv':'jpg', 'meta':'json'}
-        self._effort = envoy.kv.get("/sys/arch/effort")
-        self._wait_time_sec = int(envoy.kv.get("/sys/effort_metadata_dict/%s/wait_time_sec" % self._effort))
-        self._delete_old_images_sec = int(envoy.kv.get("/sys/effort_metadata_dict/%s/delete_old_images_sec" % self._effort))
-        self._save_every_x_image = int(envoy.kv.get("/sys/effort_metadata_dict/%s/save_every_x_image" % self._effort))
+        self._effort = envoy.get("/sys/arch/effort")
+        self._wait_time_sec = int(envoy.get("/sys/effort_metadata_dict/%s/wait_time_sec" % self._effort))
+        self._delete_old_images_sec = int(envoy.get("/sys/effort_metadata_dict/%s/delete_old_images_sec" % self._effort))
+        self._save_every_x_image = int(envoy.get("/sys/effort_metadata_dict/%s/save_every_x_image" % self._effort))
         self._log_file = '/root/kamera_ws/image_manager.log'
         self._image_dir = ""
         self._secondary_image_dir = ""
@@ -91,7 +91,7 @@ class ImageManager(object):
     @property
     def delete_old_images_sec(self):
         try:
-            self._delete_old_images_sec = int(envoy.kv.get(
+            self._delete_old_images_sec = int(envoy.get(
                 "/sys/effort_metadata_dict/%s/delete_old_images_sec"
                 % self.effort))
         except Exception as e:
@@ -101,7 +101,7 @@ class ImageManager(object):
     @property
     def save_every_x_image(self):
         try:
-            self._save_every_x_image = int(envoy.kv.get(
+            self._save_every_x_image = int(envoy.get(
                 "/sys/effort_metadata_dict/%s/save_every_x_image"
                 % self.effort))
         except:
@@ -111,17 +111,17 @@ class ImageManager(object):
 
     @property
     def image_dir(self):
-        primary_storage = envoy.kv.get("/sys/local_ssd_mnt")
+        primary_storage = envoy.get("/sys/local_ssd_mnt")
         syscfg_dir = get_arch_path(base=primary_storage)
-        view = envoy.kv.get("/sys/arch/hosts/%s/fov" % hostname) + "_view"
+        view = envoy.get("/sys/arch/hosts/%s/fov" % hostname) + "_view"
         self._image_dir = os.path.join(syscfg_dir, view)
         return self._image_dir
 
     @property
     def secondary_image_dir(self):
-        secondary_storage = envoy.kv.get("/sys/nas_mnt")
+        secondary_storage = envoy.get("/sys/nas_mnt")
         syscfg_dir = get_arch_path(base=secondary_storage)
-        view = envoy.kv.get("/sys/arch/hosts/%s/fov" % hostname) + "_view"
+        view = envoy.get("/sys/arch/hosts/%s/fov" % hostname) + "_view"
         self._secondary_image_dir = os.path.join(syscfg_dir, view)
         return self._secondary_image_dir
 

@@ -8,7 +8,7 @@ import json
 import yaml
 
 from roskv.impl.redis_envoy import RedisEnvoy, redis_encode
-from vprint import vprint
+
 
 def menu_parser(description="roskv interface"):
     import argparse
@@ -21,18 +21,19 @@ def menu_parser(description="roskv interface"):
     parser.add_argument("-i", "--input_uri", default=None, action="store", type=str, help="an input file path")
     parser.add_argument('val', nargs='?', default=None, type=str, help="Value to be set")
     parser.add_argument("-H", "--host", default="nuvo0", action="store", type=str, help="redis host")
-
     parser.add_argument("-D", "--debug", action="store_true", help="Start in debug mode")
 
     return parser
 
 
-def load_dict(input_uri, read_in=False):
-    # type: (str, bool) -> dict
+def load_dict(input_uri, read_in=False, debug=False):
+    # type: (str, bool, bool) -> dict
     if read_in:
-        vprint("reading stdin")
+        if debug:
+            print("reading stdin")
         return json.load(sys.stdin)
-    vprint('loading {}'.format(input_uri))
+    if debug:
+        print('loading {}'.format(input_uri))
     ext = os.path.splitext(input_uri)[1]
     if ext == '.json':
         with open(input_uri, 'r') as fp:
@@ -67,17 +68,16 @@ def do_put(key, val, envoy, dry_run=False):
         tups = redis_encode(key, val)
         for line in format_tups(tups):
             print(line)
-
         return
     envoy.put(key, val)
-
     return do_get(key, envoy)
 
 
 def main():
     parser = menu_parser()
     args = parser.parse_args()
-    vprint(args)
+    if args.debug:
+        print(args)
     envoy = RedisEnvoy(args.host, client_name="roskv")
 
     if args.get:
@@ -85,7 +85,7 @@ def main():
 
     elif args.set:
         if args.input_uri or args.read:
-            val = load_dict(args.input_uri, args.read)
+            val = load_dict(args.input_uri, args.read, args.debug)
         else:
             val = args.val
         do_put(args.set, val, envoy, args.dry_run)

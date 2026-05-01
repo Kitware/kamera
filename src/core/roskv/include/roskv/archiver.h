@@ -8,17 +8,14 @@
 
 #include <iostream>
 #include <string>
-#include <fmt/core.h>
-#include <boost/filesystem.hpp>
-#include <boost/regex.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
+#include <regex>
+#include <chrono>
 #include <nlohmann/json.hpp>
 #include <sw/redis++/redis++.h>
 
 inline std::string isoformat_u(time_t tv_sec, long tv_nsec);
 
 using namespace sw;
-namespace fs = boost::filesystem;
 namespace json = nlohmann;
 
 /** Gets attributes (modality/fov) about a camera from the environment */
@@ -39,18 +36,7 @@ namespace FormatterHelper {
 
     inline std::string applyFormat(const std::string &fmtr, const json::json &kwargs);
 
-
-
     std::string generateFilename(RedisEnvoy &envoy, const std::string &ext);
-//        fetchArchiveKwargs(_key);
-//        std::string fmtr = _kwargs["template"];
-//        std::string stime = boost::posix_time::to_iso_string(time);
-//        stime[8] = '_';
-//        _kwargs["time"] = stime;
-//        _kwargs["ext"] = ext;
-//        auto tmp = FormatterHelper::conformKwargsToFormatter(fmtr, _kwargs);
-//        return FormatterHelper::applyFormat(fmtr, tmp);
-
 };
 
 class ArchiverOpts {
@@ -90,7 +76,7 @@ public:
     bool fetchKwargs();
 
     /** \brief Emit a filename based on the timestamp */
-    std::string generateFilename(const boost::posix_time::ptime &time, const std::string &ext);
+    std::string generateFilename(const std::chrono::system_clock::time_point &tp, const std::string &ext);
     std::string generateFilename(const std::string &ext);
 
     json::json kwargs();
