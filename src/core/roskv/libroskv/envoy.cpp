@@ -1,6 +1,5 @@
 #include <fstream>
 #include <vector>
-#include <fmt/args.h>
 #include "roskv/envoy.h"
 
 
@@ -37,7 +36,7 @@ namespace RedisHelper {
         }
         std::vector<std::string> keys;
         while (true) {
-            cursor = rc.scan(cursor, key_ + '*', 20, std::inserter(keys, keys.begin()));
+            cursor = rc.scan(cursor, key_ + '*', 20, std::back_inserter(keys));
             if (cursor == 0) {
                 break;
             }
@@ -139,8 +138,8 @@ RedisEnvoyOpts RedisEnvoyOpts::from_env(const std::string &client_name) {
     std::string scfg;
     std::string arch_key;
     if (env_cfg_file && env_cfg_file[0]) {
-        boost::filesystem::path cfg_path{env_cfg_file};
-        if (!boost::filesystem::exists(cfg_path)) {
+        fs::path cfg_path{env_cfg_file};
+        if (!fs::exists(cfg_path)) {
             std::cerr << "Warning: specified ENVOY_CFG_PATH but does not exist: " << cfg_path << std::endl;
         } else {
             std::ifstream ifs(cfg_path.string());
@@ -201,11 +200,6 @@ RedisEnvoy::RedisEnvoy(const std::string &client_name,
     std::cerr << "DEPRECATED RedisEnvoy " << client_name << " created at " << redis_uri;
 }
 
-RedisEnvoy::~RedisEnvoy() {
-//    logr << "~Envoy dtor" << endl;
-//    rc.~Redis();
-}
-
 RedisEnvoy RedisEnvoy::from_env() {
     return EnvoyHelper::from_env();
 }
@@ -239,14 +233,6 @@ std::string RedisEnvoy::echo(const std::string &msg) {
     }
     return out;
 }
-
-void RedisEnvoy::register_() {
-
-}
-void RedisEnvoy::deregister_() {
-
-}
-
 
 namespace EnvoyHelper {
     RedisEnvoy from_env() {

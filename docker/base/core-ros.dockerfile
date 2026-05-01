@@ -80,7 +80,6 @@ RUN     pip install --upgrade --no-cache-dir pip \
     &&  pip install --no-cache-dir \
             ipython \
             ipdb \
-            python-benedict \
             pyserial \
             typing \
             pathlib \

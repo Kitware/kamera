@@ -115,7 +115,7 @@ class CamParamMonitor(object):
             return
         if mode == "rgb":
             param = '_'.join(param.split(' '))
-        self.envoy.kv.set("/sys/actual_geni_params/%s/%s/%s"
+        self.envoy.set("/sys/actual_geni_params/%s/%s/%s"
                             % (host, mode, param), getsrv_val)
         if param == "GainValue" or param == "ExposureValue"\
                 or param == "ISO" or param == "Shutter_Speed"\
