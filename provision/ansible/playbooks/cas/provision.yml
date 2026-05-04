@@ -50,14 +50,14 @@
       ignore_errors: yes
       register: uname_m
 
-    - name: Install aptitude
-      become: True
-      apt: name=aptitude state=present
-
     - name: Fully Update System
       become: True
       become_user: root
       apt: update_cache=True upgrade=full
+
+    - name: Install aptitude
+      become: True
+      apt: name=aptitude state=present
 
     - name: Add nvidia-drivers apt repository
       become: True
