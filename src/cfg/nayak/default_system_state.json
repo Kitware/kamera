@@ -81,7 +81,7 @@
         "archive_all_ir_images": 0, 
         "base": "/mnt/data", 
         "base_template": "{base}/{project}/fl{flight}/{sys_cfg}/", 
-        "effort": "OFF", 
+        "effort": "default_effort", 
         "ext_evt": "json", 
         "ext_ins": "json", 
         "ext_ir": "tif", 
@@ -491,6 +491,16 @@
             "wait_time_sec": 1
         }
     }, 
+    "effort_metadata_dict": {
+        "default_effort": {
+            "aircraft": "N94S",
+            "delete_old_images_sec": 60,
+            "field_notes": "Default effort, this should be edited",
+            "project_name": "default_effort",
+            "save_every_x_image": 5,
+            "wait_time_sec": 60
+        }
+    },
     "enabled": {
         "center": {
             "ir": true, 
