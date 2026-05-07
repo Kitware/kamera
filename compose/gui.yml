@@ -1,6 +1,5 @@
 ---
 ## container configuration for GUI
-version: '3.7'
 services:
 ## =========================== gui =============================
   gui:

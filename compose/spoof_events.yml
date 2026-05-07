@@ -1,6 +1,5 @@
 ---
 ## Bring up the core nodes (aside from roscore)
-version: '3.7'
 services:
   spoof_events:
     container_name: spoof_events

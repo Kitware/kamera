@@ -1,5 +1,4 @@
 ---
-version: "3.7"
 ## =======================image sync publisher===================
 services:
   sync-publisher:

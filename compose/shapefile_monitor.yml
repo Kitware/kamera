@@ -1,6 +1,5 @@
 ---
 ## Core processes
-version: '3.7'
 services:
   shapefile_monitor:
     container_name: shapefile_monitor

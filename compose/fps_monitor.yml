@@ -1,6 +1,5 @@
 ---
 ## Core processes
-version: '3.7'
 services:
   fps_monitor:
     container_name: fps_monitor

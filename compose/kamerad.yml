@@ -1,6 +1,5 @@
 ---
 ## Core processes
-version: '3.7'
 services:
   ## =========================== headless nodes =============================
   kamerad:
