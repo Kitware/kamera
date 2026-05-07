@@ -4,5 +4,4 @@
 . /opt/ros/noetic/setup.sh
 
 rosclean purge -y
-mkdir -p ~/.tmuxinator
 mkdir -p ~/.config/kamera/gui
