@@ -14,6 +14,6 @@ source "${DIR}/../env.sh"
 
 echo "Start session 'core'."
 tmux new-session -d -s core -n webvideo -c "${KAMERA_DIR}" \
-    "docker-compose -f compose/core.yml up webvideo"
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/core.yml up webvideo'"
 
 sleep infinity

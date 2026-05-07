@@ -14,8 +14,8 @@ source "${DIR}/../env.sh"
 
 echo "Starting session 'sensors'."
 tmux new-session -d -s sensors -n rgb_cam -c "${KAMERA_DIR}" \
-    "docker-compose -f compose/sensors.yml up cam_rgb"
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/sensors.yml up cam_rgb'"
 tmux new-window -t sensors: -n ir_cam -c "${KAMERA_DIR}" \
-    "docker-compose -f compose/sensors.yml up cam_ir"
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/sensors.yml up cam_ir'"
 
 sleep infinity
