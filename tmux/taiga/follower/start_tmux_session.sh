@@ -19,6 +19,6 @@ source "${DIR}/../env.sh"
 
 echo "Starting session '${SESSION}'."
 tmux new-session -d -s "${SESSION}" -c "${KAMERA_DIR}" \
-    "docker compose -f compose/${SESSION}.yml up ${SESSION}"
+    "bash -c 'source ${DIR}/../env.sh && docker compose -f compose/${SESSION}.yml up ${SESSION}'"
 
 sleep infinity

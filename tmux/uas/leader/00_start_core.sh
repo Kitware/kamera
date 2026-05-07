@@ -14,16 +14,16 @@ source "${DIR}/../env.sh"
 
 echo "Start session 'core'."
 tmux new-session -d -s core -n core -c "${KAMERA_DIR}" \
-    "docker-compose -f compose/core.yml up roscore"
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/core.yml up roscore'"
 tmux new-window -t core: -n webvideo -c "${KAMERA_DIR}" \
-    "docker-compose -f compose/core.yml up webvideo"
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/core.yml up webvideo'"
 tmux new-window -t core: -n influxdb -c "${KAMERA_DIR}" \
-    "docker-compose -f compose/core.yml up influxdb"
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/core.yml up influxdb'"
 tmux new-window -t core: -n diagnostics -c "${KAMERA_DIR}" \
-    "docker-compose -f compose/core.yml up diagnostics2influxdb"
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/core.yml up diagnostics2influxdb'"
 tmux new-window -t core: -n diagnostic_aggregator -c "${KAMERA_DIR}" \
-    "docker-compose -f compose/core.yml up diagnostic_aggregator"
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/core.yml up diagnostic_aggregator'"
 tmux new-window -t core: -n cam_param_monitor -c "${KAMERA_DIR}" \
-    "docker-compose -f compose/core.yml up cam_param_monitor"
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/core.yml up cam_param_monitor'"
 
 sleep infinity

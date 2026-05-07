@@ -14,12 +14,12 @@ source "${DIR}/../env.sh"
 
 echo "Starting session 'processing'."
 tmux new-session -d -s processing -n viewport_rgb -c "${KAMERA_DIR}" \
-    "docker-compose -f compose/processing.yml up viewport_rgb"
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/processing.yml up viewport_rgb'"
 tmux new-window -t processing: -n viewport_ir -c "${KAMERA_DIR}" \
-    "docker-compose -f compose/processing.yml up viewport_ir"
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/processing.yml up viewport_ir'"
 tmux new-window -t processing: -n nexus -c "${KAMERA_DIR}" \
-    "docker-compose -f compose/processing.yml up nexus"
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/processing.yml up nexus'"
 tmux new-window -t processing: -n shapefile_monitor -c "${KAMERA_DIR}" \
-    "docker-compose -f compose/processing.yml up shapefile_monitor"
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/processing.yml up shapefile_monitor'"
 
 sleep infinity
