@@ -15,7 +15,7 @@ cleanup() {
 trap cleanup EXIT
 
 . "${DIR}/../startup.sh"
-source "${DIR}/../env.sh"
+export KAMERA_DIR=$(${HOME}/.config/kamera/repo_dir.bash)
 
 echo "Starting session '${SESSION}'."
 tmux new-session -d -s "${SESSION}" -c "${KAMERA_DIR}" \
