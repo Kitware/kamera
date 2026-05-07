@@ -15,16 +15,19 @@ export REDIS_HOST=$(cq ".redis_host")
 # (without nuvo0, 1, etc. hooked up)
 # export REDIS_HOST="localhost"
 
-RESP=$(redis-cli -h ${REDIS_HOST} ping)
-while [ "$RESP" != "PONG" ]
-do
-    echo "Got '$RESP', wanted 'PONG'."
-    echo "Waiting for redis host $REDIS_HOST to come online..."
-    RESP=$(redis-cli -h ${REDIS_HOST} ping)
-    sleep 1;
+_redis_elapsed=0
+RESP=$(redis-cli -h "${REDIS_HOST}" ping 2>/dev/null)
+while [ "$RESP" != "PONG" ]; do
+    if [ $((_redis_elapsed % 30)) -eq 0 ]; then
+        echo "Waiting for Redis at ${REDIS_HOST} (${_redis_elapsed}s elapsed, got '${RESP}')..."
+    fi
+    sleep 1
+    _redis_elapsed=$((_redis_elapsed + 1))
+    RESP=$(redis-cli -h "${REDIS_HOST}" ping 2>/dev/null)
 done
+unset _redis_elapsed
 
-echo "Redis successfully connected at $REDIS_HOST, starting."
+echo "Redis successfully connected at ${REDIS_HOST}, starting."
 
 export ROS_MASTER="$(cq .master_host)"
 export NODE_HOSTNAME=$(hostname)

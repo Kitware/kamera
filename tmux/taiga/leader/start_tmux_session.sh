@@ -1,22 +1,24 @@
 #!/bin/bash
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-if [ $# != 1 ]
-then
-  echo "Must enter session name."
-  exit 1
+if [ $# != 1 ]; then
+    echo "Must enter session name." >&2
+    exit 1
 fi
 export SESSION="$1"
 
-# Kills running containers and processes
-trap "{ echo Stopping session ${SESSION}; tmuxinator stop ${SESSION}; exit 0; }" EXIT
+cleanup() {
+    echo "Stopping session ${SESSION}"
+    docker compose -f "${KAMERA_DIR}/compose/${SESSION}.yml" down
+    tmux kill-session -t "${SESSION}" 2>/dev/null
+}
+trap cleanup EXIT
 
-source $DIR/../env.sh
+. "${DIR}/../startup.sh"
+source "${DIR}/../env.sh"
 
 echo "Starting session '${SESSION}'."
-ln -sf $DIR/config/generic.yml ~/.tmuxinator/${SESSION}.yml
+tmux new-session -d -s "${SESSION}" -c "${KAMERA_DIR}" \
+    "docker compose -f compose/${SESSION}.yml up ${SESSION}"
 
-tmuxinator start -n ${SESSION} -p ~/.tmuxinator/${SESSION}.yml
-
-# Keep process alive for supervisor
 sleep infinity
