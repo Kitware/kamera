@@ -1,6 +1,5 @@
 ---
 ## Core processes
-version: '3.7'
 services:
   cam_param_monitor:
     container_name: cam_param_monitor

@@ -1,6 +1,5 @@
 ---
 ## Bring up the core nodes
-version: '3.7'
 services:
   ## =========================== headless nodes =============================
   roscore:

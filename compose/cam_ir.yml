@@ -1,6 +1,5 @@
 ---
 ## Auxiliary node to attach to master
-version: '3.7'
 services:
   cam_ir:
     container_name: "cam-ir-${CAM_FOV}"

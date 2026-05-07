@@ -1,5 +1,4 @@
 ---
-version: '3.7'
 services:
   imageview:
     container_name: "imageview-${CAM_FOV}"
