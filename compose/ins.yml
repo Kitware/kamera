@@ -4,7 +4,7 @@ version: '3.7'
 services:
   ins:
     container_name: ins
-    image: kitware/kamera:core
+    image: ${KAMERA_CORE_IMAGE}
     tty: true
     devices:
       - "${PULSE_TTY}:${PULSE_TTY}"

@@ -5,7 +5,7 @@ services:
   ## =========================== headless nodes =============================
   roscore:
     container_name: roscore
-    image: kitware/kamera:core
+    image: ${KAMERA_CORE_IMAGE}
     tty: true
     network_mode: host
     environment:
