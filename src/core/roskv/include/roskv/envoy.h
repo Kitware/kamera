@@ -8,16 +8,13 @@
 
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include <string>
-#include <fmt/core.h>
-#include <boost/filesystem.hpp>
-#include <boost/regex.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <nlohmann/json.hpp>
 #include <sw/redis++/redis++.h>
 
 using namespace sw;
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 namespace json = nlohmann;
 
 
@@ -55,7 +52,6 @@ namespace RedisHelper {
 class RedisEnvoyOpts {
 public:
     static RedisEnvoyOpts from_env(const std::string &client_name);
-//    RedisEnvoyOpts();
     RedisEnvoyOpts(const RedisEnvoyOpts& opts);
     RedisEnvoyOpts(const std::string &client_name,
                    const std::string &redis_uri,
@@ -70,12 +66,11 @@ std::ostream& operator<<(std::ostream &os, const RedisEnvoyOpts &opts);
 
 
 /**
- * \brief Bridge to Redis with health checks
+ * \brief Bridge to Redis
  */
 class RedisEnvoy {
 public:
     static RedisEnvoy from_env();
-
 
 /// rule of 5
     RedisEnvoy(const RedisEnvoyOpts &opts);
@@ -92,26 +87,20 @@ public:
     RedisEnvoy(RedisEnvoy &&) = default;
     RedisEnvoy& operator=(RedisEnvoy &&) = default;
 
-    ~RedisEnvoy();
+    ~RedisEnvoy() = default;
 
-    /// this is just for very limited access. if you need more, create a separate redis client
     std::string get(const std::string &key);
     bool put(const std::string &key, const std::string &val);
     json::json get_dict(const std::string &key);
     json::json put_dict(const std::string &key, const json::json &val);
-    json::json del(const std::string &key);
     std::string client_name();
     std::string echo(const std::string &msg);
 
-
 protected:
-    void register_();
-    void deregister_();
     const std::string client_name_;
     const std::string redis_uri;
     const std::string keypath_;
     redis::Redis rc;
-    json::json _kwargs;
 
 };
 

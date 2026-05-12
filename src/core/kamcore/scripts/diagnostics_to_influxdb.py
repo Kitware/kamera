@@ -46,7 +46,7 @@ class D2I(object):
                     chan = parts[1]
                     topic = '/'.join(['', 'sys', "actual_geni_params", host, chan, "fps"])
                     print("Setting %s to %s fps" % (topic, value))
-                    self.envoy.kv.set(topic, value)
+                    self.envoy.set(topic, value)
                 payload += measurement + "," + tag_key + "=" + tag_value + " "
                 payload += key + "=" + value + "\n"
             payload=payload[:-1]

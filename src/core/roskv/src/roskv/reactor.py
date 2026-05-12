@@ -5,9 +5,8 @@ from __future__ import division, print_function
 import os
 import sys
 import json
-from benedict import benedict
 import threading
-from six.moves.queue import Queue, Empty
+from queue import Queue, Empty
 
 import rospy
 import rosservice
@@ -99,7 +98,7 @@ class KeyWatcher(object):
     def __init__(self, cmd_queue, host="nuvo0"):
         node_host = rospy.get_namespace().strip("/")
         self.envoy = RedisEnvoy(host, client_name=node_host + "-reactor")
-        self.cmd_recv = benedict()
+        self.cmd_recv = dict()
         self.cmd_queue = cmd_queue
         self.queue_timer = rospy.Timer(ROS_INSTANT, self.cb_sync, oneshot=True)
 
@@ -108,7 +107,7 @@ class KeyWatcher(object):
             resp = self.envoy.get_dict("/cmd", flatten=True)
         except KeyError as e:
             resp = {}
-        cmd_recv = benedict(resp)
+        cmd_recv = dict(resp)
         if cmd_recv:
             rospy.loginfo("Got command(s): {}".format(cmd_recv))
             self.cmd_recv.update(cmd_recv)

@@ -3,7 +3,6 @@
 //
 
 #include <vector>
-#include <fmt/args.h>
 #include "roskv/envoy.h"
 #include "roskv/archiver.h"
 
@@ -42,16 +41,16 @@ Cameratype Cameratype::from_env() {
 
 
 json::json FormatterHelper::conformKwargsToFormatter(const std::string &fmtr, const json::json &kwargs) {
-    static const boost::regex PAT_get_braced(R"((?<=\{)(\w+)(?=\}))");
+    static const std::regex PAT_get_braced(R"(\{(\w+)\})");
 
     // ensure that all the necessary named _kwargs in the template are present in the dict
-    boost::sregex_iterator m1(fmtr.begin(), fmtr.end(), PAT_get_braced);
-    boost::sregex_iterator m2;
+    auto m1 = std::sregex_iterator(fmtr.begin(), fmtr.end(), PAT_get_braced);
+    auto m2 = std::sregex_iterator();
     json::json fmt_kwargs;
 
     for (auto el = m1; el != m2; ++el) {
         auto match = *el;
-        std::string sval = match.str();
+        std::string sval = match[1].str();  // capture group 1 = word inside braces
         bool has = kwargs.contains(sval);
 //        fmt::print("{}: {}\n", sval, has);
         if (has) {
@@ -65,16 +64,18 @@ json::json FormatterHelper::conformKwargsToFormatter(const std::string &fmtr, co
 }
 
 std::string FormatterHelper::applyFormat(const std::string &fmtr, const json::json &kwargs, bool partial) {
-    fmt::dynamic_format_arg_store<fmt::format_context> store;
-    for (auto &el : kwargs.items()) {
-        std::string key = el.key();
-        std::string val = el.value();
-//        fmt::print("pushing {}: {}\n", _key, val);
-        store.push_back(fmt::arg(key.c_str(), val.c_str()));
+    static const std::regex placeholder(R"(\{(\w+)\})");
+    std::string out;
+    std::size_t last_pos = 0;
+    auto begin = std::sregex_iterator(fmtr.begin(), fmtr.end(), placeholder);
+    for (auto it = begin; it != std::sregex_iterator(); ++it) {
+        const auto &match = *it;
+        out += fmtr.substr(last_pos, match.position() - last_pos);
+        std::string key = match[1].str();
+        out += kwargs.contains(key) ? std::string(kwargs[key]) : match[0].str();
+        last_pos = match.position() + match.length();
     }
-
-    auto out = std::string(fmt::vformat(fmtr, store));
-    /// Optionally convert the parens to braces e.g. to allow partial application
+    out += fmtr.substr(last_pos);
     if (partial) {
         std::replace(out.begin(), out.end(), '(', '{');
         std::replace(out.begin(), out.end(), ')', '}');
@@ -157,11 +158,14 @@ bool ArchiverFormatter::fetchKwargs() {
     return true;
 }
 
-std::string ArchiverFormatter::generateFilename(const boost::posix_time::ptime &time, const std::string &ext) {
+std::string ArchiverFormatter::generateFilename(const std::chrono::system_clock::time_point &tp, const std::string &ext) {
     fetchKwargs();
     std::string fmtr = _kwargs["template"];
-    std::string stime = boost::posix_time::to_iso_string(time);
-    stime[8] = '_';
+    auto duration = tp.time_since_epoch();
+    auto secs = std::chrono::duration_cast<std::chrono::seconds>(duration);
+    auto nsecs = std::chrono::duration_cast<std::chrono::nanoseconds>(duration) -
+                 std::chrono::duration_cast<std::chrono::nanoseconds>(secs);
+    std::string stime = isoformat_u(static_cast<time_t>(secs.count()), nsecs.count());
     _kwargs["time"] = stime;
     _kwargs["ext"] = ext;
     auto tmp = FormatterHelper::conformKwargsToFormatter(fmtr, _kwargs);
@@ -169,8 +173,7 @@ std::string ArchiverFormatter::generateFilename(const boost::posix_time::ptime &
 }
 
 std::string ArchiverFormatter::generateFilename(const std::string &ext) {
-    auto now = boost::posix_time::microsec_clock::universal_time();
-    return generateFilename(now, ext);
+    return generateFilename(std::chrono::system_clock::now(), ext);
 }
 
 json::json ArchiverFormatter::kwargs() {
