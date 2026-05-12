@@ -5,15 +5,15 @@
 
   - name: Crewed system tasks
     block:
-      - name: Clone kamera repo
-        git:
-          repo: "git@github.com:Kitware/kamera.git"
-          dest: "{{ kamera_dir }}"
-          version: main
-          recursive: True
-          accept_hostkey: True
-          update: True
-          force: True
+      # - name: Clone kamera repo
+      #   git:
+      #     repo: "git@github.com:Kitware/kamera.git"
+      #     dest: "{{ kamera_dir }}"
+      #     version: main
+      #     recursive: True
+      #     accept_hostkey: True
+      #     update: True
+      #     force: True
 
       - name: "Set redis configuration to {{ kamera_dir }}/src/cfg/redis.conf"
         become: True
@@ -100,13 +100,13 @@
           dest: /etc/netplan/{{ inventory_hostname }}-netplan.yaml
           owner: root
 
-      - name: Add mappings to /etc/hosts
-        become: True
-        copy:
-          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/{{ inventory_hostname }}/hosts"
-          remote_src: true
-          dest: /etc/hosts
-          owner: root
+      # - name: Add mappings to /etc/hosts
+      #   become: True
+      #   copy:
+      #     src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/{{ inventory_hostname }}/hosts"
+      #     remote_src: true
+      #     dest: /etc/hosts
+      #     owner: root
 
         # Overwrite default, this is for our 10G cameras
       - name: Add sysctl rmem params.
@@ -195,12 +195,6 @@
         become: True
         when: follower or leader or gui
         shell: sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
-
-      - name: Create ~/.tmuxinator if it does not exist
-        file:
-          path: ~/.tmuxinator
-          state: directory
-          mode: '0755'
 
       - name: Create udev rule for mcc_daq
         become: True

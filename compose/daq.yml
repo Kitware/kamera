@@ -1,10 +1,9 @@
 ---
 ## Bring up the core nodes (aside from roscore)
-version: '3.7'
 services:
   daq:
     container_name: daq
-    image: kitware/kamera:core
+    image: ${KAMERA_CORE_IMAGE}
     tty: true
     devices:
       - "${MCC_DAQ}:${MCC_DAQ}"

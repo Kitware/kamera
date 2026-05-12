@@ -4,7 +4,7 @@ services:
   ## =========================== headless nodes =============================
   nodelist:
     container_name: nodelist
-    image: kitware/kamera:core
+    image: ${KAMERA_CORE_IMAGE}
     tty: true
     network_mode: host
     environment:

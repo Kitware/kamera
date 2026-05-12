@@ -1,11 +1,10 @@
 ---
 ## container configuration for GUI
-version: '3.7'
 services:
 ## =========================== gui =============================
   gui:
     container_name: gui
-    image: kitware/kamera:gui
+    image: ${KAMERA_GUI_IMAGE}
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"

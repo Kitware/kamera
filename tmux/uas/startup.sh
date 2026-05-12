@@ -2,5 +2,4 @@
 source /opt/ros/melodic/setup.bash
 
 rosclean purge -y
-mkdir -p ~/.tmuxinator
 mkdir -p ~/.config/kamera/gui

@@ -1,10 +1,9 @@
 ---
 ## Core processes
-version: '3.7'
 services:
   fps_monitor:
     container_name: fps_monitor
-    image: kitware/kamera:core
+    image: ${KAMERA_CORE_IMAGE}
     tty: true
     environment:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"

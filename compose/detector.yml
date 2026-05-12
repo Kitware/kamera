@@ -1,13 +1,12 @@
 ---
 ## container configuration for viame interactive building
 # use compose v2 to use runtime config
-version: '2.4'
 
 services:
 ## ========================== viame =============================
   detector:
     container_name: "viame-${CAM_FOV}"
-    image: kitware/kamera:viame
+    image: ${KAMERA_VIAME_IMAGE}
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"
