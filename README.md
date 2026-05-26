@@ -38,9 +38,7 @@ make gui
 Note that these images take up a large amount of disk space, especially the VIAME image which is 30Gb, and it can take several hours to builds. The core images are faster and lighter weight.
 
 ## Partners and Acknowledgements
-KAMERA was developed in collaboration with:
-    - NOAA Marine Mammal Laboratory
-    - University of Washington
+KAMERA was developed in collaboration with the NOAA Marine Mammal Laboratory and the University of Washington.
 We thank all contributors who have helped in developing KAMERA, with special thanks to Mike McDermott and Matt Brown who created the core system back in 2018.
 
 ## License
