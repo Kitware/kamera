@@ -12,17 +12,17 @@
         "ext_uv": "jpg",
         "flight": "00",
         "hosts": {
-            "nuvo0": {
+            "center-0-taiga": {
                 "enabled": true,
                 "fov": "center",
                 "idx": 0
             },
-            "nuvo1": {
+            "left-1-taiga": {
                 "enabled": true,
                 "fov": "left",
                 "idx": 1
             },
-            "nuvo2": {
+            "right-2-taiga": {
                 "enabled": true,
                 "fov": "right",
                 "idx": 2
@@ -379,7 +379,7 @@
             "uv": "uv_n2"
         }
     },
-    "master_host": "nuvo0",
+    "master_host": "center-0-taiga",
     "max_mpix": 200000,
     "models": {
         "allied_gt4907_uv": {
@@ -434,7 +434,7 @@
         }
     },
     "nas_mnt": "/mnt/flight_data",
-    "nuvo0": {
+    "center-0-taiga": {
         "detector": {
             "desired": "down",
             "health": {
@@ -449,7 +449,7 @@
             "total": 0
         }
     },
-    "nuvo1": {
+    "left-1-taiga": {
         "detector": {
             "desired": "down",
             "health": {
@@ -460,7 +460,7 @@
             "pipefile": null
         }
     },
-    "nuvo2": {
+    "right-2-taiga": {
         "detector": {
             "desired": "down",
             "health": {
@@ -477,9 +477,9 @@
         "homography",
         "detections"
     ],
-    "redis_host": "nuvo0",
+    "redis_host": "center-0-taiga",
     "requested_geni_params": {
-        "nuvo0": {
+        "center-0-taiga": {
             "ir": {
                 "CorrectionAutoEnabled": 1,
                 "CorrectionAutoUseDeltaTime": 0
@@ -495,17 +495,17 @@
                 "Shutter_Speed_Min": 0.008
             },
             "uv": {
-                "ExposureAuto": "Continuous", 
-                "ExposureAutoMax": 2400.0, 
-                "ExposureAutoMin": 400.0, 
-                "ExposureValue": 0, 
-                "GainAuto": "Auto", 
-                "GainAutoMax": 30, 
-                "GainAutoMin": 0, 
+                "ExposureAuto": "Continuous",
+                "ExposureAutoMax": 2400.0,
+                "ExposureAutoMin": 400.0,
+                "ExposureValue": 0,
+                "GainAuto": "Auto",
+                "GainAutoMax": 30,
+                "GainAutoMin": 0,
                 "GainValue": 0
             }
         },
-        "nuvo1": {
+        "left-1-taiga": {
             "ir": {
                 "CorrectionAutoEnabled": 1,
                 "CorrectionAutoUseDeltaTime": 0
@@ -521,17 +521,17 @@
                 "Shutter_Speed_Min": 0.008
             },
             "uv": {
-                "ExposureAuto": "Continuous", 
-                "ExposureAutoMax": 2400.0, 
-                "ExposureAutoMin": 400.0, 
-                "ExposureValue": 0, 
-                "GainAuto": "Auto", 
-                "GainAutoMax": 30, 
-                "GainAutoMin": 0, 
+                "ExposureAuto": "Continuous",
+                "ExposureAutoMax": 2400.0,
+                "ExposureAutoMin": 400.0,
+                "ExposureValue": 0,
+                "GainAuto": "Auto",
+                "GainAutoMax": 30,
+                "GainAutoMin": 0,
                 "GainValue": 0
             }
         },
-        "nuvo2": {
+        "right-2-taiga": {
             "ir": {
                 "CorrectionAutoEnabled": 1,
                 "CorrectionAutoUseDeltaTime": 0
@@ -547,13 +547,13 @@
                 "Shutter_Speed_Min": 0.008
             },
             "uv": {
-                "ExposureAuto": "Continuous", 
-                "ExposureAutoMax": 2400.0, 
-                "ExposureAutoMin": 400.0, 
-                "ExposureValue": 0, 
-                "GainAuto": "Auto", 
-                "GainAutoMax": 30, 
-                "GainAutoMin": 0, 
+                "ExposureAuto": "Continuous",
+                "ExposureAutoMax": 2400.0,
+                "ExposureAutoMin": 400.0,
+                "ExposureValue": 0,
+                "GainAuto": "Auto",
+                "GainAutoMax": 30,
+                "GainAutoMin": 0,
                 "GainValue": 0
             }
         }
