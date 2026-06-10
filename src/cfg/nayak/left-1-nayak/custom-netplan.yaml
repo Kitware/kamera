@@ -1,5 +1,4 @@
 ---
-## Netplan for cas1
 network:
   version: 2
   ethernets:
