@@ -5,21 +5,21 @@
 
   - name: Crewed system tasks
     block:
-      # - name: Clone kamera repo
-      #   git:
-      #     repo: "git@github.com:Kitware/kamera.git"
-      #     dest: "{{ kamera_dir }}"
-      #     version: main
-      #     recursive: True
-      #     accept_hostkey: True
-      #     update: True
-      #     force: True
+      - name: Clone kamera repo
+        git:
+          repo: "git@github.com:Kitware/kamera.git"
+          dest: "{{ kamera_dir }}"
+          version: develop
+          recursive: True
+          accept_hostkey: True
+          update: True
+          force: True
 
-      - name: "Set redis configuration to {{ kamera_dir }}/src/cfg/redis.conf"
+      - name: "Set redis configuration to {{ kamera_dir }}/src/cfg/{{ config_dir }}redis.conf"
         become: True
         when: redis_host
         copy:
-          src: "{{ kamera_dir }}/src/cfg/redis.conf"
+          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/redis.conf"
           remote_src: true
           dest: /etc/redis/redis.conf
           owner: root
@@ -100,13 +100,13 @@
           dest: /etc/netplan/{{ inventory_hostname }}-netplan.yaml
           owner: root
 
-      # - name: Add mappings to /etc/hosts
-      #   become: True
-      #   copy:
-      #     src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/{{ inventory_hostname }}/hosts"
-      #     remote_src: true
-      #     dest: /etc/hosts
-      #     owner: root
+      - name: Add mappings to /etc/hosts
+        become: True
+        copy:
+          src: "{{ kamera_dir }}/src/cfg/hosts"
+          remote_src: true
+          dest: /etc/hosts
+          owner: root
 
         # Overwrite default, this is for our 10G cameras
       - name: Add sysctl rmem params.
@@ -185,11 +185,6 @@
           src: "{{ kamera_dir }}/src/run_scripts/alias/basic-aliases.sh"
           remote_src: true
           dest: /home/user/.bash_aliases
-
-      - name: Disable timesyncd on subsystems.
-        become: True
-        when: follower or leader or gui
-        shell: sudo systemctl disable systemd-timesyncd
 
       - name: Disable sleep state on subsystems.
         become: True
