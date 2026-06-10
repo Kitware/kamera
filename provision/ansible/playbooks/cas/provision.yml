@@ -3,8 +3,8 @@
 
 - hosts: all
   vars:
-    nvidia_driver_version: 590
-    linux_distro: ubuntu22.04
+    nvidia_driver_version: 595
+    linux_distro: ubuntu24.04
     ansible_user: user
     sys_packages: [
                     'apt-transport-https', 'gnupg-agent', # secure socket / signing
@@ -32,14 +32,9 @@
                     'openssh-server', # For ssh key use
                     'redis-server', 'redis-tools', # Redis tools
                     'ubuntu-drivers-common', # For hardware drivers
-                    'python3-pip' # Pip goodness
+                    'python3-pip', # Pip goodness
+                    'python3-redis',
                     ]
-    pip_packages: [
-                    "ansible",
-                    "ruff",
-                    "redis",   # seed_redis.py: Redis client for provisioning
-                    "pyyaml",  # seed_redis.py: YAML config loading
-                  ]
 
   pre_tasks:
     - shell: uname -s
@@ -65,7 +60,7 @@
         repo: ppa:graphics-drivers/ppa
         state: present
       tags:
-        - nuvo
+        - cuda
 
     - name: Install "nvidia-driver-{{ nvidia_driver_version }}"
       become: True
@@ -74,7 +69,7 @@
         state: present
         update_cache: yes
       tags:
-        - nuvo
+        - cuda
 
     - name: Install required system packages
       become: True
@@ -96,11 +91,12 @@
     - name: Get nvidia-docker key
       become: True
       shell: |
-        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey -o /usr/share/keyrings/nvidia-container-toolkit-keyring
-        gpg --dearmor /usr/share/keyrings/nvidia-container-toolkit-keyring
-        curl -s -L https://nvidia.github.io/libnvidia-container/{{ linux_distro }}/libnvidia-container.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --dearmor --batch --yes -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+        && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+          sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+          tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
       tags:
-        - nuvo
+        - cuda
 
     - name: Add NVIDIA GPG key
       become: True
@@ -152,9 +148,6 @@
       group:
         name: dialout
         state: present
-      tags:
-        - base
-        - nuvo
 
     - name: "Add the user {{ ansible_user }} to group 'docker' and 'dialout'"
       become: True
@@ -170,13 +163,6 @@
         url: "https://github.com/mikefarah/yq/releases/download/2.4.0/yq_{{ uname_s.stdout }}_amd64"
         dest: /usr/local/bin/yq
         mode: '0755'
-
-    - name: Install pip packages
-      become: True
-      pip:
-        name: "{{ pip_packages }}"
-        state: latest
-        executable: pip3
 
           #    - name: Reboot system
           #      become: True
