@@ -1,6 +1,6 @@
-FROM ros:noetic-robot as noetic-robot
-ENV PYTHON=python3 \
-    ROS_PKG_VERS=1.5.0-1
+FROM ros:kinetic-robot as kinetic-robot
+ENV PYTHON=python2 \
+    ROS_PKG_VERS=1.3.2-0
 
 ## Necessary, followed by unessential but useful packages
 RUN     apt-key adv --keyserver hkps://keyserver.ubuntu.com --refresh-keys
