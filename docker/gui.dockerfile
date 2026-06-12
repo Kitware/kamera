@@ -1,5 +1,5 @@
 ARG BRANCH=latest
-FROM kamera/base/kamera-gui-deps:latest
+FROM kamera/base/core-gui-deps:latest
 
 
 # Create a non-root user and switch to it. Running X11 applications as root does
