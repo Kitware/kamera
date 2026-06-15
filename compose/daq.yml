@@ -4,6 +4,7 @@ services:
   daq:
     container_name: daq
     image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     devices:
       - "${MCC_DAQ}:${MCC_DAQ}"

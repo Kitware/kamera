@@ -4,6 +4,7 @@ services:
   fps_monitor:
     container_name: fps_monitor
     image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     environment:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"

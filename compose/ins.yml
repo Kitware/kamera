@@ -4,6 +4,7 @@ services:
   ins:
     container_name: ins
     image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     devices:
       - "${PULSE_TTY}:${PULSE_TTY}"

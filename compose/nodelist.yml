@@ -5,6 +5,7 @@ services:
   nodelist:
     container_name: nodelist
     image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     network_mode: host
     environment:

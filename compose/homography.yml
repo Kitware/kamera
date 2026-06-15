@@ -4,6 +4,7 @@ services:
   ## =========================== headless nodes =============================
   homography:
     image: ${KAMERA_POSTPROC_IMAGE}
+    init: true
     network_mode: host
     environment:
       REDIS_HOST: "${REDIS_HOST}"
