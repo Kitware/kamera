@@ -37,6 +37,14 @@
             --redis-host {{ inventory_hostname }}
             --config {{ kamera_dir }}/src/cfg/{{ config_dir }}/default_system_state.json
 
+      - name: Seed Redis debug defaults
+        when: redis_host
+        command: >
+          python3 {{ kamera_dir }}/scripts/seed_redis.py
+            --redis-host {{ inventory_hostname }}
+            --prefix /debug
+            --config {{ kamera_dir }}/src/cfg/debug_defaults.json
+
       - name: Set up supervisor trampoline
         become: True
         file:
