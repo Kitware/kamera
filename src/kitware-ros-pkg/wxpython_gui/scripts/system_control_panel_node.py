@@ -37,6 +37,20 @@ Library handling imagery simulation.
 from __future__ import division, print_function
 import os
 
+# The GUI runs background threads (per-panel image fetchers, disk-status
+# checks). Xlib must be told the client is multi-threaded *before* any X
+# connection is opened, otherwise we get non-deterministic Xlib/xcb errors
+# ("Unknown sequence number" / "XInitThreads has not been called"). This must
+# happen before wx (and thus GTK/X11) is imported.
+import ctypes
+import ctypes.util
+
+try:
+    _x11 = ctypes.cdll.LoadLibrary(ctypes.util.find_library("X11") or "libX11.so")
+    _x11.XInitThreads()
+except Exception as _exc:  # pragma: no cover - non-fatal best effort
+    print("Warning: XInitThreads() failed: {}".format(_exc))
+
 import wx
 import rospy
 
