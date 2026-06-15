@@ -49,8 +49,6 @@ services:
       context: .
       dockerfile: docker/base/core-deps.dockerfile
     image: "kamera/base/core-deps:${TAG_KAMERA_DEPS:-latest}"
-    depends_on:
-      - core-ros
     profiles:
       - core
       - follower
@@ -65,8 +63,6 @@ services:
     image: "kitware/kamera:core"
     tty: true
     network_mode: host
-    depends_on:
-      - core-deps
     volumes:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
       - "${PWD}/src:/root/kamera/src"
@@ -117,8 +113,6 @@ services:
     tty: true
     network_mode: host
     command: ["bash"]
-    depends_on:
-      - viame-base
     profiles:
       - viame
       - follower
@@ -142,8 +136,6 @@ services:
       context: .
       dockerfile: docker/base/gui-deps.dockerfile
     image: "kamera/base/core-gui-deps:${TAG_KAMERA_GUI_DEPS:-latest}"
-    depends_on:
-      - core-deps-kinetic
     profiles:
       - gui
       - leader
@@ -155,8 +147,6 @@ services:
       context: .
       dockerfile: docker/gui.dockerfile
     image: "kitware/kamera:gui"
-    depends_on:
-      - core-gui-deps
     profiles:
       - gui
       - leader
@@ -169,8 +159,6 @@ services:
       context: .
       dockerfile: docker/base/gui-deps-noetic.dockerfile
     image: "kamera/base/gui-deps-noetic:${TAG_KAMERA_GUI_DEPS:-latest}"
-    depends_on:
-      - core-deps
     profiles:
       - gui-noetic
 
@@ -182,8 +170,6 @@ services:
       args:
         GUI_DEPS_IMAGE: "kamera/base/gui-deps-noetic:${TAG_KAMERA_GUI_DEPS:-latest}"
     image: "kitware/kamera:gui-noetic"
-    depends_on:
-      - gui-deps-noetic
     profiles:
       - gui-noetic
 
