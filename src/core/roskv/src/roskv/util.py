@@ -119,6 +119,26 @@ def wildcard(pat, s):
     return mat is not None
 
 
+def filter_hosts_by_system(all_hosts, system_name=None):
+    """Return host names belonging to the current system.
+
+    Redis (/sys) can accumulate host entries from other systems; host
+    names are suffixed with the system name, e.g. "center0taiga".
+    """
+    import os
+    if system_name is None:
+        system_name = os.environ.get("SYSTEM_NAME")
+    all_hosts = sorted(all_hosts)
+    if system_name:
+        hosts = [h for h in all_hosts if h.endswith(system_name)]
+    else:
+        hosts = []
+    if not hosts:
+        # Fall back to every host if the naming convention doesn't match.
+        hosts = all_hosts
+    return hosts
+
+
 def redis_decode(keys, values, key=None, flatten=False, as_json=True):
     # type: (List[str], List[str], Optional[str], bool, bool) -> dict
     """

@@ -42,6 +42,7 @@ import rospy
 
 from wxpython_gui.system_control_panel.gui import MainFrame
 from roskv.impl.redis_envoy import RedisEnvoy
+from roskv.util import filter_hosts_by_system
 
 
 def main():
@@ -50,7 +51,8 @@ def main():
 
     envoy = RedisEnvoy(os.environ["REDIS_HOST"], client_name=node_name)
     channels = envoy.get("/sys/channels").keys()
-    hosts = envoy.get("/sys/arch/hosts")
+    all_hosts = envoy.get("/sys/arch/hosts")
+    hosts = {h: all_hosts[h] for h in filter_hosts_by_system(all_hosts.keys())}
 
     topic_names = {}
 

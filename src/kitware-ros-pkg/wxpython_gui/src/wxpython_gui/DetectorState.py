@@ -3,6 +3,7 @@ import time
 from enum import Enum
 from wxpython_gui.cfg import SYS_CFG, kv
 from wxpython_gui.utils import diffpair
+from roskv.util import filter_hosts_by_system
 
 
 class EPodStatus(Enum):
@@ -161,4 +162,8 @@ def set_detector_state(system, host, desired):
     system.run_command("detector", host, verb)
 
 
-detector_state = DetectorState(kv, SYS_CFG["arch"]["hosts"])
+_hosts = SYS_CFG["arch"]["hosts"]
+detector_state = DetectorState(
+    kv,
+    {h: _hosts[h] for h in filter_hosts_by_system(_hosts.keys())},
+)
