@@ -199,7 +199,7 @@ class MainFrame(form_builder_output.MainFrame):
         # initialize parent class
         form_builder_output.MainFrame.__init__(self, parent)
         self.SetTitle(window_title)
-        icon = wx.EmptyIcon()
+        icon = wx.Icon()
         icon.CopyFromBitmap(
             wx.Bitmap(
                 os.path.expanduser("~/noaa_kamera/src/cfg/seal-icon.png"),
@@ -439,62 +439,75 @@ class MainFrame(form_builder_output.MainFrame):
 
         # ----------------------------- Hot Keys -----------------------------
         entries = []
+        # Retain the id refs so their reserved ids aren't recycled (NewIdRef
+        # releases the id once the ref is garbage collected).
+        self._accel_ids = []
 
         # Bind ctrl+s to start/stop recording.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.reverse_collecting_state, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("S"), random_id)
         # Bind ctrl+d to start detectors.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.on_start_detectors, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("D"), random_id)
 
         # Bind ctrl+f to stop detectors.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.on_stop_detectors, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("F"), random_id)
         # Bind ctrl+h to hot key menu.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.on_hot_key_help, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("H"), random_id)
 
         # Bind ctrl+e to set context to exposure entry.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.set_focus_to_exposure, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("E"), random_id)
 
         # Bind ctrl+n to add note to log.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.on_add_to_event_log, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("N"), random_id)
 
         # Bind ctrl+o to next previous camera configuration.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.previous_camera_config, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("O"), random_id)
 
         # Bind ctrl+p to next camera configuration.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.next_camera_config, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("P"), random_id)
 
         # Bind ctrl+i to next previous effort configuration.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.previous_effort_config, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("I"), random_id)
 
         # Bind ctrl+k to next effort configuration.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.next_effort_config, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("K"), random_id)
 
@@ -1837,7 +1850,7 @@ class MainFrame(form_builder_output.MainFrame):
     def load_camera_model(self, name, fname):
         wildcard = "Camera model (*.yaml)"
         dialog = wx.FileDialog(
-            None, "Choose a file", os.getcwd(), "", wildcard, wx.OPEN
+            None, "Choose a file", os.getcwd(), "", wildcard, wx.FD_OPEN
         )
         if dialog.ShowModal() == wx.ID_OK:
             print(dialog.GetPath())
@@ -1846,7 +1859,7 @@ class MainFrame(form_builder_output.MainFrame):
 
     def save_flight_summary(self, event=None):
         wildcard = "Camera model (*.yaml)"
-        dialog = wx.FileDialog(None, "Choose a file", "/mnt", "", wildcard, wx.SAVE)
+        dialog = wx.FileDialog(None, "Choose a file", "/mnt", "", wildcard, wx.FD_SAVE)
         if dialog.ShowModal() == wx.ID_OK:
             print(dialog.GetPath())
 

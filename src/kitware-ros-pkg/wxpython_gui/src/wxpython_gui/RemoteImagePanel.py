@@ -114,7 +114,7 @@ class RemoteImagePanel(object):
             if self.raw_image is not None:
                 #print('on_size')
                 panel_width, panel_height = self.wx_panel.GetSize()
-                self.wx_image = wx.EmptyImage(panel_width, panel_height)
+                self.wx_image = wx.Image(panel_width, panel_height)
                 self.update_homography()
                 self.update_inverse_homography()
                 self.warp_image()
@@ -182,8 +182,8 @@ class RemoteImagePanel(object):
                                                self.panel_image_height),
                                                flags=flags)
 
-            wx_image = wx.EmptyImage(self.panel_image_width,
-                                     self.panel_image_height)
+            wx_image = wx.Image(self.panel_image_width,
+                                self.panel_image_height)
             try:
                 wx_image.SetData(image.tobytes())
             except ValueError as err:
@@ -276,7 +276,7 @@ class RemoteImagePanel(object):
             image = cv2.resize(self._histogram, dsize=(panel_width,
                                panel_height), interpolation=cv2.INTER_NEAREST)
 
-            wx_image = wx.EmptyImage(panel_width, panel_height)
+            wx_image = wx.Image(panel_width, panel_height)
             wx_image.SetData(image.tobytes())
             wx_histogram_bitmap = wx_image.ConvertToBitmap()
 

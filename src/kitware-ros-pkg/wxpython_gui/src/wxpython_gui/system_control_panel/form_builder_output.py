@@ -186,7 +186,7 @@ class MainFrame ( wx.Frame ):
         bSizer511.Add( self.m_staticText181713131, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL|wx.TOP|wx.RIGHT|wx.LEFT, 5 )
 
         self.gnss_status_flag_txtctrl = wx.TextCtrl( self.ins_control_panel, wx.ID_ANY, u"not available", wx.DefaultPosition, wx.Size( -1,-1 ), wx.TE_CENTRE|wx.TE_READONLY )
-        bSizer511.Add( self.gnss_status_flag_txtctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL|wx.EXPAND|wx.BOTTOM|wx.RIGHT|wx.LEFT, 5 )
+        bSizer511.Add( self.gnss_status_flag_txtctrl, 0, wx.EXPAND|wx.BOTTOM|wx.RIGHT|wx.LEFT, 5 )
 
 
         bSizer18171313.Add( bSizer511, 1, wx.EXPAND, 5 )
@@ -515,7 +515,7 @@ class MainFrame ( wx.Frame ):
         bSizer20.Add( self.m_panel7, 0, wx.EXPAND|wx.TOP, 5 )
 
 
-        main_size.Add( bSizer20, 0, wx.ALIGN_CENTER_VERTICAL|wx.EXPAND|wx.ALL, 5 )
+        main_size.Add( bSizer20, 0, wx.EXPAND|wx.ALL, 5 )
 
         bsizer12 = wx.BoxSizer( wx.VERTICAL )
 
@@ -679,7 +679,7 @@ class MainFrame ( wx.Frame ):
         self.m_panel_left_ir.SetSizer( left_bsizer1 )
         self.m_panel_left_ir.Layout()
         left_bsizer1.Fit( self.m_panel_left_ir )
-        middle_row_bSizer.Add( self.m_panel_left_ir, 1, wx.EXPAND|wx.ALIGN_CENTER_VERTICAL, 5 )
+        middle_row_bSizer.Add( self.m_panel_left_ir, 1, wx.EXPAND, 5 )
 
         self.m_panel_center_ir = wx.Panel( self.images_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
         right_bsizer1 = wx.BoxSizer( wx.VERTICAL )
@@ -1064,7 +1064,7 @@ class MainFrame ( wx.Frame ):
 
         self.SetMenuBar( self.m_menubar1 )
 
-        self.m_status_bar = self.CreateStatusBar( 1, wx.ST_SIZEGRIP, wx.ID_ANY )
+        self.m_status_bar = self.CreateStatusBar( 1, wx.STB_SIZEGRIP, wx.ID_ANY )
 
         self.Centre( wx.BOTH )
 

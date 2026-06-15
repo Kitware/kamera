@@ -56,7 +56,7 @@ class CameraConfiguration(fbocc.MainFrame):
             select_str - select this str after updating.
         """
         # First cache which camera configuration is currently selected.
-        if select_str is "":
+        if select_str == "":
             select_str = self.camera_config_combo.GetStringSelection()
 
         self.camera_config_combo.SetEditable(True)
@@ -300,7 +300,7 @@ class CameraConfiguration(fbocc.MainFrame):
 
     def file_picker(self, wildcard='*'):
         dialog = wx.FileDialog(None, "Choose a file", SYS_CFG["nas_mnt"], '',
-                               wildcard, wx.OPEN)
+                               wildcard, wx.FD_OPEN)
         if dialog.ShowModal() == wx.ID_OK:
             file_path = dialog.GetPath()
         else:

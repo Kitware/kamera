@@ -101,7 +101,7 @@ class MainFrame ( wx.Frame ):
 		self.field_notes_textCtrl = wx.TextCtrl( self.m_panel33, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, wx.TE_MULTILINE )
 		self.field_notes_textCtrl.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 
-		bSizer454.Add( self.field_notes_textCtrl, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL|wx.EXPAND, 5 )
+		bSizer454.Add( self.field_notes_textCtrl, 1, wx.ALL|wx.EXPAND, 5 )
 
 
 		bSizer44.Add( bSizer454, 1, wx.EXPAND, 5 )

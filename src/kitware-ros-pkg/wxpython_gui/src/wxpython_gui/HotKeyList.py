@@ -13,7 +13,9 @@ class HotKeyList(form_builder_output_hot_key_list.MainFrame):
         # ----------------------------- Hot Keys -----------------------------
         entries = [wx.AcceleratorEntry() for _ in range(1)]
 
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        # Retain the id ref so its reserved id isn't recycled.
+        self._accel_id = random_id
         self.Bind(wx.EVT_MENU, self.on_cancel, id=random_id)
         entries[0].Set(wx.ACCEL_NORMAL, wx.WXK_ESCAPE, random_id)
 
