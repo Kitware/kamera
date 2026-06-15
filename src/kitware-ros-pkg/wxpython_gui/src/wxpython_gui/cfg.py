@@ -93,7 +93,10 @@ config_filename = os.path.join(USER_CFG["gui_cfg_dir"], "system_state.json")
 # create from template if it doesn't exist
 if not os.path.isfile(config_filename):
     wxpython_gui.utils.make_path(config_filename, from_file=True)
-    with open(os.path.join(PKG_DIR, "config/default_system_state.json"), "r") as infile:
+    default_system_state_file = os.path.join(
+        REAL_KAM_REPO_DIR, "src/cfg", system_name, "default_system_state.json"
+    )
+    with open(default_system_state_file, "r") as infile:
         with open(config_filename, "w") as outfile:
             outfile.write(infile.read())
             print("Created config from scratch: {}".format(config_filename))
