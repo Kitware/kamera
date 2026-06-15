@@ -8,14 +8,13 @@
 ##
 ## Deployment profiles:
 ##   follower  -- headless sensor node: core + VIAME + postproc
-##   leader    -- operator workstation: Kinetic GUI + postproc
+##   leader    -- operator workstation: GUI + postproc
 ##   all       -- everything
 ##
 ## Individual layer profiles:
 ##   core      -- Noetic base images only (no VIAME, no GUI)
 ##   viame     -- VIAME detector images only
-##   gui       -- Kinetic GUI images only
-##   gui-noetic -- Noetic GUI images only (parallel chain until cutover)
+##   gui       -- Noetic GUI images only
 ##   pf        -- postproc / postflight only
 
 services:
@@ -41,7 +40,8 @@ services:
       - core
       - follower
       - all
-      - gui-noetic
+      - gui
+      - leader
 
   # System dependencies (drivers, C++ libs, ROS packages). No source copy.
   core-deps:
@@ -53,7 +53,8 @@ services:
       - core
       - follower
       - all
-      - gui-noetic
+      - gui
+      - leader
 
   # KAMERA source + catkin build on top of core-deps.
   core:
@@ -118,24 +119,14 @@ services:
       - follower
       - all
 
-## ========================== Kinetic GUI chain ================================
+## ========================== GUI chain ========================================
 
-  # Kinetic ROS base for the GUI — independent of the Noetic core chain.
-  core-deps-kinetic:
-    build:
-      context: .
-      dockerfile: docker/base/gui-ros.dockerfile
-    image: "kamera/base/core-deps-kinetic:latest"
-    profiles:
-      - gui
-      - leader
-      - all
-
-  core-gui-deps:
+  # GUI deps layered on the Noetic core-deps image.
+  gui-deps:
     build:
       context: .
       dockerfile: docker/base/gui-deps.dockerfile
-    image: "kamera/base/core-gui-deps:${TAG_KAMERA_GUI_DEPS:-latest}"
+    image: "kamera/base/gui-deps:${TAG_KAMERA_GUI_DEPS:-latest}"
     profiles:
       - gui
       - leader
@@ -146,32 +137,13 @@ services:
     build:
       context: .
       dockerfile: docker/gui.dockerfile
+      args:
+        GUI_DEPS_IMAGE: "kamera/base/gui-deps:${TAG_KAMERA_GUI_DEPS:-latest}"
     image: "kitware/kamera:gui"
     profiles:
       - gui
       - leader
       - all
-
-## ========================== Noetic GUI chain (parallel) ======================
-
-  gui-deps-noetic:
-    build:
-      context: .
-      dockerfile: docker/base/gui-deps-noetic.dockerfile
-    image: "kamera/base/gui-deps-noetic:${TAG_KAMERA_GUI_DEPS:-latest}"
-    profiles:
-      - gui-noetic
-
-  gui-noetic:
-    container_name: gui-noetic
-    build:
-      context: .
-      dockerfile: docker/gui.dockerfile
-      args:
-        GUI_DEPS_IMAGE: "kamera/base/gui-deps-noetic:${TAG_KAMERA_GUI_DEPS:-latest}"
-    image: "kitware/kamera:gui-noetic"
-    profiles:
-      - gui-noetic
 
 ## ====================================================================
 ...
