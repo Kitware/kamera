@@ -1,4 +1,6 @@
+import wx
 import wxpython_gui.system_control_panel.form_builder_output_system_startup as form_builder_output_system_startup
+from wxpython_gui.system_control_panel.gui_utils import unclip_static_text
 
 
 class SystemStartup(form_builder_output_system_startup.MainFrame):
@@ -8,6 +10,8 @@ class SystemStartup(form_builder_output_system_startup.MainFrame):
         """
         # Initialize parent class
         form_builder_output_system_startup.MainFrame.__init__(self, parent)
+        # Recompute enlarged title fonts so they are not clipped under Phoenix.
+        wx.CallAfter(unclip_static_text, self)
 
         # Store the function that allow us to send logging requests.
         self.add_to_event_log = parent.add_to_event_log

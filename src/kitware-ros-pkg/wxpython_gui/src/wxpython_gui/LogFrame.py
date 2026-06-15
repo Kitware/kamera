@@ -1,5 +1,6 @@
 import wx
 import wxpython_gui.system_control_panel.form_builder_output_log_panel as form_builder_output_log_panel
+from wxpython_gui.system_control_panel.gui_utils import unclip_static_text
 
 
 class LogFrame(form_builder_output_log_panel.MainFrame):
@@ -42,6 +43,8 @@ class LogFrame(form_builder_output_log_panel.MainFrame):
 
         self.Show()
         self.SetMinSize(self.GetSize())
+        # Recompute enlarged title fonts so they are not clipped under Phoenix.
+        wx.CallAfter(unclip_static_text, self)
 
     def add_message(self, msg_type, msg):
         tstamp = str(datetime.datetime.utcfromtimestamp(time.time()))
