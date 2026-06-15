@@ -11,14 +11,14 @@ ff02::3 ip6-allhosts
 # Inserted from KAMERA
 192.168.88.1 mikrotik
 
-192.168.88.10 center-0-taiga
-192.168.88.11 left-1-taiga
-192.168.88.12 right-2-taiga
+192.168.88.10 center0taiga
+192.168.88.11 left1taiga
+192.168.88.12 right2taiga
 
-192.168.88.100 center-0-nayak
-192.168.88.101 left-1-nayak
-192.168.88.102 right-2-nayak
-192.168.88.103 center-1-nayak
+192.168.88.100 center0nayak
+192.168.88.101 left1nayak
+192.168.88.102 right2nayak
+192.168.88.103 center1nayak
 
 # Fallback static connections
 192.168.88.210 nuvo0bak

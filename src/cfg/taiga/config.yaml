@@ -30,15 +30,15 @@ arch:
   ext_evt: json
   ext_ins: json
   hosts:
-    center-0-taiga:
+    center0taiga:
       fov: center
       idx: 0
       enabled: true
-    left-1-taiga:
+    left1taiga:
       fov: left
       idx: 1
       enabled: true
-    right-2-taiga:
+    right2taiga:
       fov: right
       idx: 2
       enabled: true
@@ -50,8 +50,8 @@ nas_mnt: "/mnt/flight_data"
 local_ssd_mnt: "/mnt/data"
 kamera_dir: "/home/user/kw/kamera"
 gui_cfg_dir: "/home/user/.config/kamera/gui"
-master_host: center-0-taiga
-redis_host: center-0-taiga
+master_host: center0taiga
+redis_host: center0taiga
 verbosity: 9
 max_mpix: 200000 # 0.2e6
 
