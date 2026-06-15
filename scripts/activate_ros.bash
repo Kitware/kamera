@@ -3,17 +3,6 @@
 # Activate the ROS bash environment, either sourcing the current workspace
 # devel setup or the base ROS environment setup script.  This cascades down
 # ROS versions when a development environment does not exist.
-#
-# $WS_DIR and $ROS_DISTRO should be provided by the container
-# If not, define them here:
-#ROS_DISTRO=kinetic
-#WS_DIR=/root/kamera_ws
-
-#source ${REPO_DIR}/src/run_scripts/entry/setup_kamera_env.sh
-
-#myips() {
-#    echo $(ip addr | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v 127.0) || "false"
-#}
 
 # may have changed
 MASTER_HOST=$(echo $ROS_MASTER_URI| grep -Po -e '(?<=http:\/\/)([\w\.]+)(?=:)')
@@ -26,20 +15,16 @@ HOSTNAME        : `hostname`
 NODE_HOSTNAME   : ${NODE_HOSTNAME}
 ROS_HOST/IP     : ${ROS_HOSTNAME} ${ROS_IP}
 ROS_MASTER_URI  : ${ROS_MASTER_URI}
+REPO_DIR        : ${REPO_DIR}
 "
-#RMU DIG         : $(dig +short ${MASTER_HOST})
-#This Host's dig : $(dig +short `hostname`)
-
-#printf "WS_DIR          : ${WS_DIR}
-#SERVICE_NAME    : ${SERVICE_NAME}
-#SYSIDX          : ${SYSIDX}"
 }
+
 
 rosinfo
 
 echo "Sourcing files and establishing environment"
 ## This presumes ROS_DISTRO is set
-DEVEL_SETUP="${WS_DIR}/devel/setup.bash"
+DEVEL_SETUP="${REPO_DIR}/devel/setup.bash"
 VERSION_SETUP_PATH="/opt/ros/${ROS_DISTRO}/setup.bash"
 if [ -f "${VERSION_SETUP_PATH}" ]
 then
