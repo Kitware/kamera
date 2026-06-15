@@ -70,6 +70,7 @@ services:
     profiles:
       - core
       - follower
+      - leader
       - all
 
   postproc:
