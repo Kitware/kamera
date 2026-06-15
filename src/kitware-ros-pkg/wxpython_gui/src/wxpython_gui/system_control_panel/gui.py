@@ -24,6 +24,7 @@ import requests
 
 # GUI imports
 import wx
+import wx.adv
 from wx.lib.wordwrap import wordwrap
 
 # Vision / math
@@ -2201,7 +2202,7 @@ class MainFrame(form_builder_output.MainFrame):
 
     def on_menu_item_about(self, event):
         about_panel = wx.Panel(self, wx.ID_ANY)
-        info = wx.AboutDialogInfo()
+        info = wx.adv.AboutDialogInfo()
         info.Name = "KAMERA System Control Panel"
         info.Version = "2.0.0"
         info.Copyright = "(C) 2023 Kitware"
@@ -2213,8 +2214,7 @@ class MainFrame(form_builder_output.MainFrame):
         info.WebSite = ("http://www.kitware.com", "Kitware")
         info.Developers = ["Matt Brown, Adam Romlein, Mike McDermott"]
         info.License = wordwrap(LICENSE_STR, 500, wx.ClientDC(about_panel))
-        # Show the wx.AboutBox
-        wx.AboutBox(info)
+        wx.adv.AboutBox(info)
 
     # ------------------------------------------------------------------------
 
