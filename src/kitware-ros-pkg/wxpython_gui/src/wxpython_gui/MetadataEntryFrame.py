@@ -1,6 +1,7 @@
 import wx
 import wxpython_gui.system_control_panel.form_builder_output_effort_metadata as form_builder_output_effort_metadata
 from wxpython_gui.cfg import SYS_CFG
+from wxpython_gui.system_control_panel.gui_utils import unclip_static_text
 
 
 class MetadataEntryFrame(form_builder_output_effort_metadata.MainFrame):
@@ -28,6 +29,8 @@ class MetadataEntryFrame(form_builder_output_effort_metadata.MainFrame):
         """
         # Initialize parent class
         form_builder_output_effort_metadata.MainFrame.__init__(self, parent)
+        # Recompute enlarged title fonts so they are not clipped under Phoenix.
+        wx.CallAfter(unclip_static_text, self)
         self.parent = parent
         self.effort_metadata_dict = effort_metadata_dict
         self.effort_combo_box = effort_combo_box

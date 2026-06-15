@@ -199,6 +199,8 @@ class MainFrame(form_builder_output.MainFrame):
         # initialize parent class
         form_builder_output.MainFrame.__init__(self, parent)
         self.SetTitle(window_title)
+        # Recompute enlarged title fonts so they are not clipped under Phoenix.
+        wx.CallAfter(gui_utils.unclip_static_text, self)
         icon = wx.Icon()
         icon.CopyFromBitmap(
             wx.Bitmap(

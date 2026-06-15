@@ -7,6 +7,7 @@ import sys
 from wxpython_gui.camera_models import load_from_file
 import wxpython_gui.system_control_panel.form_builder_output_camera_configuration as fbocc
 from wxpython_gui.cfg import SYS_CFG, save_camera_config
+from wxpython_gui.system_control_panel.gui_utils import unclip_static_text
 
 class CameraConfiguration(fbocc.MainFrame):
     """Defines how the cameras are layed out.
@@ -22,6 +23,8 @@ class CameraConfiguration(fbocc.MainFrame):
         """
         # Initialize parent class
         fbocc.MainFrame.__init__(self, parent)
+        # Recompute enlarged title fonts so they are not clipped under Phoenix.
+        wx.CallAfter(unclip_static_text, self)
         self.parent = parent
         self.curr_cfg = sel_camera_config
 
