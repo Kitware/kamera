@@ -34,10 +34,11 @@ follower:
 	docker compose --profile follower build viame-base
 	docker compose --profile follower build
 
-# Leader node: operator workstation — GUI + postproc
+# Leader node: operator workstation — GUI + VIAME + postproc
 leader:
 	docker compose --profile leader build core-ros
 	docker compose --profile leader build core-deps
+	docker compose --profile leader build viame-base
 	docker compose --profile leader build gui-deps
 	docker compose --profile leader build
 
