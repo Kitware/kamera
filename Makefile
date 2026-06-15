@@ -1,6 +1,6 @@
 ROS_DISTRO ?= noetic
 
-.PHONY: build core viame gui postflight follower leader all clean
+.PHONY: build core viame gui gui-noetic postflight follower leader all clean
 
 build:
 	docker compose build
@@ -15,6 +15,9 @@ viame:
 
 gui:
 	ROS_DISTRO=kinetic docker compose --profile gui build
+
+gui-noetic:
+	docker compose --profile gui-noetic build
 
 postflight:
 	docker compose --profile pf build

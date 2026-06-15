@@ -7,7 +7,6 @@ RUN     apt-get update && apt-get install -y \
             python-tk \
             libgl1-mesa-glx \
             libqt5x11extras5 \
-            openssh-server \
     &&  rm -rf /var/lib/apt/lists/*
 
 RUN     pip install --upgrade \
