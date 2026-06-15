@@ -276,7 +276,7 @@ class MainFrame ( wx.Frame ):
         bSizer442.Add( self.exposure_min_value_txt_ctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        bSizer442.Add( ( 10, 0), 1, wx.EXPAND, 5 )
+        bSizer442.Add( ( 40, 0), 0, 0, 5 )
 
         self.m_staticText4231 = wx.StaticText( self.camera_panel, wx.ID_ANY, u"Max:", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText4231.Wrap( -1 )
@@ -288,7 +288,7 @@ class MainFrame ( wx.Frame ):
         bSizer442.Add( self.exposure_max_value_txt_ctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        m_staticText14211.Add( bSizer442, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 10 )
+        m_staticText14211.Add( bSizer442, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
         self.m_staticline51 = wx.StaticLine( self.camera_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         m_staticText14211.Add( self.m_staticline51, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )
@@ -311,7 +311,7 @@ class MainFrame ( wx.Frame ):
         bSizer4421.Add( self.gain_min_value_txt_ctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        bSizer4421.Add( ( 10, 0), 1, wx.EXPAND, 5 )
+        bSizer4421.Add( ( 40, 0), 0, 0, 5 )
 
         self.m_staticText42311 = wx.StaticText( self.camera_panel, wx.ID_ANY, u"Max:", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText42311.Wrap( -1 )
@@ -323,7 +323,7 @@ class MainFrame ( wx.Frame ):
         bSizer4421.Add( self.gain_max_value_txt_ctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        m_staticText14211.Add( bSizer4421, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 10 )
+        m_staticText14211.Add( bSizer4421, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
         self.m_staticline52 = wx.StaticLine( self.camera_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         m_staticText14211.Add( self.m_staticline52, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )
@@ -520,7 +520,7 @@ class MainFrame ( wx.Frame ):
         bSizer17 = wx.BoxSizer( wx.VERTICAL )
 
         self.close_button = wx.Button( self.m_panel7, wx.ID_ANY, u"Close", wx.DefaultPosition, wx.Size( -1,-1 ), 0 )
-        bSizer17.Add( self.close_button, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 3 )
+        bSizer17.Add( self.close_button, 0, wx.ALL|wx.ALIGN_LEFT, 3 )
 
 
         self.m_panel7.SetSizer( bSizer17 )
