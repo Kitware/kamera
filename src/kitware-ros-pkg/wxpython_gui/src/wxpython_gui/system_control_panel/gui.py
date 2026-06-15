@@ -60,16 +60,16 @@ from custom_msgs.srv import (
 )
 from wxpython_gui.camera_models import load_from_file
 
-# Relative Imports
-import form_builder_output
-import form_builder_output_effort_metadata
-import form_builder_output_imagery_inspection
-import form_builder_output_event_log_note
-import form_builder_output_hot_key_list
-import form_builder_output_collection_mode
-import form_builder_output_log_panel
-import form_builder_output_system_startup
-import form_builder_output_camera_configuration
+# Sibling modules within the system_control_panel package
+import wxpython_gui.system_control_panel.form_builder_output as form_builder_output
+import wxpython_gui.system_control_panel.form_builder_output_effort_metadata as form_builder_output_effort_metadata
+import wxpython_gui.system_control_panel.form_builder_output_imagery_inspection as form_builder_output_imagery_inspection
+import wxpython_gui.system_control_panel.form_builder_output_event_log_note as form_builder_output_event_log_note
+import wxpython_gui.system_control_panel.form_builder_output_hot_key_list as form_builder_output_hot_key_list
+import wxpython_gui.system_control_panel.form_builder_output_collection_mode as form_builder_output_collection_mode
+import wxpython_gui.system_control_panel.form_builder_output_log_panel as form_builder_output_log_panel
+import wxpython_gui.system_control_panel.form_builder_output_system_startup as form_builder_output_system_startup
+import wxpython_gui.system_control_panel.form_builder_output_camera_configuration as form_builder_output_camera_configuration
 
 # Absolute imports
 from wxpython_gui.cfg import (
@@ -108,7 +108,7 @@ from wxpython_gui.SystemStartup import SystemStartup
 from wxpython_gui.SystemCommands import SystemCommands
 from wxpython_gui.DetectorState import set_detector_state, detector_state, EPodStatus
 
-import gui_utils
+import wxpython_gui.system_control_panel.gui_utils as gui_utils
 
 
 G_time_note_started = None  # type: datetime.datetime
