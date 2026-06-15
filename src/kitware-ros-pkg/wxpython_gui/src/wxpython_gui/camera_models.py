@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 ckwg +31
 Copyright 2017-2018 by Kitware, Inc.
@@ -640,7 +640,7 @@ class Camera(object):
             # Compressed image
             image_message = CompressedImage()
             image_message.format = "jpeg"
-            image_message.data = np.array(cv2.imencode('.jpg', img)[1]).tostring()
+            image_message.data = np.array(cv2.imencode('.jpg', img)[1]).tobytes()
 
         image_message.header.frame_id = self._frame_id
         image_message.header.stamp = genpy.Time.from_sec(t)

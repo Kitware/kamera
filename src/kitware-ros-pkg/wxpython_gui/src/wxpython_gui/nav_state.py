@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 ckwg +31
 Copyright 2017-2019 by Kitware, Inc.

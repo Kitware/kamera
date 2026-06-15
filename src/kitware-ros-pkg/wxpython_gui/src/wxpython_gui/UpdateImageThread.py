@@ -3,7 +3,7 @@ from __future__ import division, print_function
 import datetime
 import threading
 import rospy
-import StringIO
+from io import BytesIO
 import cv2
 import sys
 import time
@@ -163,7 +163,7 @@ class UpdateImageThread(threading.Thread):
         if len(image_msg.data) == 0:
             return
         if self._compressed:
-            sio = StringIO.StringIO(image_msg.data)
+            sio = BytesIO(image_msg.data)
             im = PILImage.open(sio)
             preview = np.array(im)
             raw_preview = preview.copy()
@@ -253,7 +253,7 @@ class UpdateImageThread(threading.Thread):
             if len(image_msg.data) == 0:
                 return
             if self._compressed:
-                sio = StringIO.StringIO(image_msg.data)
+                sio = BytesIO(image_msg.data)
                 im = PILImage.open(sio)
                 image = np.array(im)
                 image = image.copy()
@@ -281,12 +281,12 @@ class UpdateImageThread(threading.Thread):
             )
             return
 
-        except wx._core.PyDeadObjectError as e:
+        except RuntimeError as e:
             rospy.logwarn(e)
             return
 
     def update_status_msg(self, img_header):
-        # type: (std_msgs.msg.Header) -> unicode
+        # type: (std_msgs.msg.Header) -> str
         """Update the status bar for an image view"""
         t = img_header.stamp.to_sec()
         t = datetime.datetime.utcfromtimestamp(t)
