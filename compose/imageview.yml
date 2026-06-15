@@ -3,6 +3,7 @@ services:
   imageview:
     container_name: "imageview-${CAM_FOV}"
     image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"

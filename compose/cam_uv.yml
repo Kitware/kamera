@@ -5,6 +5,7 @@ services:
   cam_uv:
     container_name: "cam-uv-${CAM_FOV}"
     image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     environment:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"

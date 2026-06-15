@@ -5,6 +5,7 @@ services:
   gui:
     container_name: gui
     image: ${KAMERA_GUI_IMAGE}
+    init: true
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"
@@ -31,8 +32,7 @@ services:
       - "${PWD}/assets:/home/user/noaa_kamera/assets:ro"
       - "save-gui:/home/user/.config/kamera/gui"
       - "${HOME}/.ssh:/home/user/.ssh"
-    entrypoint: ["/bin/tini", "--"]
-    command: ["/entry/gui.sh"]
+    entrypoint: ["/entry/gui.sh"]
     #command: ["bash"]
 
 volumes:

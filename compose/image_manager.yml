@@ -5,6 +5,7 @@ services:
   image_manager:
     container_name: "image_manager"
     image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"
