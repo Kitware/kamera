@@ -103,7 +103,7 @@
       - name: Setup netplan configuration.
         become: True
         copy:
-          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/{{ inventory_hostname }}/custom-netplan.yaml"
+          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/custom-netplan.yaml"
           remote_src: true
           dest: /etc/netplan/{{ inventory_hostname }}-netplan.yaml
           owner: root
