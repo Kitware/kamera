@@ -1,6 +1,6 @@
 {
     "actual_geni_params": {
-        "center-0-nayak": {
+        "center0nayak": {
             "ir": {
                 "CorrectionAutoEnabled": 1,
                 "CorrectionAutoUseDeltaTime": 0
@@ -27,7 +27,7 @@
                 "GainValue": 30
             }
         },
-        "left-1-nayak": {
+        "left1nayak": {
             "ir": {
                 "CorrectionAutoEnabled": 1
             },
@@ -51,7 +51,7 @@
                 "GainValue": 30
             }
         },
-        "right-2-nayak": {
+        "right2nayak": {
             "ir": {
                 "CorrectionAutoEnabled": 1
             },
@@ -90,17 +90,17 @@
         "ext_uv": "jpg",
         "flight": "02",
         "hosts": {
-            "center-0-nayak": {
+            "center0nayak": {
                 "enabled": true,
                 "fov": "center",
                 "idx": 0
             },
-            "left-1-nayak": {
+            "left1nayak": {
                 "enabled": true,
                 "fov": "left",
                 "idx": 1
             },
-            "right-2-nayak": {
+            "right2nayak": {
                 "enabled": true,
                 "fov": "right",
                 "idx": 2
@@ -271,7 +271,7 @@
             "right_uv_yaml_path": ""
         }
     },
-    "center-0-nayak": {
+    "center0nayak": {
         "cam_fov": "center",
         "detector": {
             "actual": "failed",
@@ -288,7 +288,7 @@
             "total": 0
         }
     },
-    "left-1-nayak": {
+    "left1nayak": {
         "cam_fov": "right",
         "detector": {
             "actual": "stalled",
@@ -305,7 +305,7 @@
             "total": 0
         }
     },
-    "right-2-nayak": {
+    "right2nayak": {
         "cam_fov": "left",
         "detector": {
             "actual": "stalled",
@@ -673,7 +673,7 @@
             "uv": "uv_n2"
         }
     },
-    "master_host": "center-0-nayak",
+    "master_host": "center0nayak",
     "max_mpix": 200000,
     "models": {
         "allied_gt4907_uv": {
@@ -734,9 +734,9 @@
         "homography",
         "detections"
     ],
-    "redis_host": "center-0-nayak",
+    "redis_host": "center0nayak",
     "requested_geni_params": {
-        "center-0-nayak": {
+        "center0nayak": {
             "ir": {
                 "CorrectionAutoEnabled": 1,
                 "CorrectionAutoUseDeltaTime": 0
@@ -761,7 +761,7 @@
                 "GainValue": 0
             }
         },
-        "left-1-nayak": {
+        "left1nayak": {
             "ir": {
                 "CorrectionAutoEnabled": 1
             },
@@ -785,7 +785,7 @@
                 "GainValue": 0
             }
         },
-        "right-2-nayak": {
+        "right2nayak": {
             "ir": {
                 "CorrectionAutoEnabled": 1
             },

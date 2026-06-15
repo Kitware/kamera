@@ -12,17 +12,17 @@
         "ext_uv": "jpg",
         "flight": "00",
         "hosts": {
-            "center-0-taiga": {
+            "center0taiga": {
                 "enabled": true,
                 "fov": "center",
                 "idx": 0
             },
-            "left-1-taiga": {
+            "left1taiga": {
                 "enabled": true,
                 "fov": "left",
                 "idx": 1
             },
-            "right-2-taiga": {
+            "right2taiga": {
                 "enabled": true,
                 "fov": "right",
                 "idx": 2
@@ -379,7 +379,7 @@
             "uv": "uv_n2"
         }
     },
-    "master_host": "center-0-taiga",
+    "master_host": "center0taiga",
     "max_mpix": 200000,
     "models": {
         "allied_gt4907_uv": {
@@ -434,7 +434,7 @@
         }
     },
     "nas_mnt": "/mnt/flight_data",
-    "center-0-taiga": {
+    "center0taiga": {
         "detector": {
             "desired": "down",
             "health": {
@@ -449,7 +449,7 @@
             "total": 0
         }
     },
-    "left-1-taiga": {
+    "left1taiga": {
         "detector": {
             "desired": "down",
             "health": {
@@ -460,7 +460,7 @@
             "pipefile": null
         }
     },
-    "right-2-taiga": {
+    "right2taiga": {
         "detector": {
             "desired": "down",
             "health": {
@@ -477,9 +477,9 @@
         "homography",
         "detections"
     ],
-    "redis_host": "center-0-taiga",
+    "redis_host": "center0taiga",
     "requested_geni_params": {
-        "center-0-taiga": {
+        "center0taiga": {
             "ir": {
                 "CorrectionAutoEnabled": 1,
                 "CorrectionAutoUseDeltaTime": 0
@@ -505,7 +505,7 @@
                 "GainValue": 0
             }
         },
-        "left-1-taiga": {
+        "left1taiga": {
             "ir": {
                 "CorrectionAutoEnabled": 1,
                 "CorrectionAutoUseDeltaTime": 0
@@ -531,7 +531,7 @@
                 "GainValue": 0
             }
         },
-        "right-2-taiga": {
+        "right2taiga": {
             "ir": {
                 "CorrectionAutoEnabled": 1,
                 "CorrectionAutoUseDeltaTime": 0

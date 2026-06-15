@@ -230,10 +230,10 @@ class MainFrame(form_builder_output.MainFrame):
         all_hosts = sorted(SYS_CFG["arch"]["hosts"].keys())
         # Only manage hosts belonging to the current system. Redis (/sys) can
         # accumulate host entries from other systems (cas, nayak, ...); host
-        # names are suffixed with the system name, e.g. "center-0-taiga".
+        # names are suffixed with the system name, e.g. "center0taiga".
         system_name = os.environ.get("SYSTEM_NAME")
         if system_name:
-            self.hosts = [h for h in all_hosts if h.endswith("-" + system_name)]
+            self.hosts = [h for h in all_hosts if h.endswith(system_name)]
         else:
             self.hosts = []
         if not self.hosts:
