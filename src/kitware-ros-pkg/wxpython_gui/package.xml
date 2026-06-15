@@ -49,8 +49,8 @@
   <depend>cv_bridge</depend>
   <depend>image_view</depend>
   <depend>genpy</depend>
-  <depend>python-numpy</depend>
-  <depend>python-wxgtk2.8</depend>
+  <depend>python3-numpy</depend>
+  <depend>python3-wxgtk4.0</depend>
   <depend>sensor_models</depend>
   <depend>roskv</depend>
 
