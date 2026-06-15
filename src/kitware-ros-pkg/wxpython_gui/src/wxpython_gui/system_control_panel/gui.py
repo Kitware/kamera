@@ -206,7 +206,7 @@ class MainFrame(form_builder_output.MainFrame):
         icon = wx.Icon()
         icon.CopyFromBitmap(
             wx.Bitmap(
-                os.path.expanduser("~/noaa_kamera/src/cfg/seal-icon.png"),
+                os.path.expanduser("~/kamera/src/cfg/seal-icon.png"),
                 wx.BITMAP_TYPE_ANY,
             )
         )
