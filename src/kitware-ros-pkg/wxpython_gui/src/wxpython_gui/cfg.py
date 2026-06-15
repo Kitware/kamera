@@ -150,8 +150,13 @@ CAMERA_CFGS["camera_cfgs"] = check_default(CAMERA_CFGS_KV, CAMERA_CFGS_DEFAULT)
 # =================== FINISHED CAMERA CONFIG =======================
 
 
+# Tracks conflict paths already reported so the same divergence isn't logged
+# once per merge pass (merge_two_dicts is called several times below).
+_reported_conflicts = set()
+
+
 def merge_two_dicts(a, b, path=None):
-    "merges b into a"
+    "merges b into a; on a leaf conflict a's value is kept and b's is ignored"
     if path is None:
         path = []
     for key in b:
@@ -161,7 +166,13 @@ def merge_two_dicts(a, b, path=None):
             elif a[key] == b[key]:
                 pass  # same leaf value
             else:
-                print("Warning: conflict at %s" % ".".join(path + [str(key)]))
+                dotted = ".".join(path + [str(key)])
+                if dotted not in _reported_conflicts:
+                    _reported_conflicts.add(dotted)
+                    print(
+                        "Warning: config conflict at %s -> keeping %r, ignoring %r"
+                        % (dotted, a[key], b[key])
+                    )
         else:
             a[key] = b[key]
     return a
