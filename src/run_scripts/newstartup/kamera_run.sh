@@ -85,7 +85,7 @@ if [[ -n ${SKIP_PING} ]]; then
 else
   for host in $(cq '.arch.hosts | keys | join("\n" )') ; do
       echo "Waiting on ping $host."
-      if [[ $(cq ".arch.hosts.${host}.enabled") == 'true' ]]; then
+      if [[ $(cq ".arch.hosts[\"${host}\"].enabled") == 'true' ]]; then
           until ping -c1 -W1 ${host} &>/dev/null; do
               printf "\b${SP:i++%${#SP}:1}"
           done
@@ -107,7 +107,7 @@ else
 fi
 declare -A PIDS
 for host in $(cq '.arch.hosts | keys | join("\n" )') ; do
-    if [[ $(cq ".arch.hosts.${host}.enabled") == 'true' ]]; then
+    if [[ $(cq ".arch.hosts[\"${host}\"].enabled") == 'true' ]]; then
 	python3 ${KAM_REPO_DIR}/scripts/system.py $host restart nas &
         PIDS[${host}]=$!
     else
@@ -154,7 +154,7 @@ hosts=$(cq '.arch.hosts | keys | join("\n" )')
 IFS=$'\n' sorted_hosts=($(sort <<<"${hosts[*]}"))
 unset IFS
 for host in "${sorted_hosts[@]}"; do
-    if [[ $(cq ".arch.hosts.${host}.enabled") == 'true' ]]; then
+    if [[ $(cq ".arch.hosts[\"${host}\"].enabled") == 'true' ]]; then
 	python3 ${KAM_REPO_DIR}/scripts/system.py $host "${ARGS[@]}" pod &
         PIDS[${host}]=$!
     else

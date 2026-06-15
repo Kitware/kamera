@@ -33,7 +33,7 @@ export NODE_HOSTNAME=$(hostname)
 export ROS_MASTER_URI="http://${ROS_HOSTNAME}:11311"
 export DOCKER_KAMERA_DIR="/root/kamera"
 export DATA_MOUNT_POINT=$(cq .local_ssd_mnt)
-export CAM_FOV=$(cq .arch.hosts.${NODE_HOSTNAME}.fov)
+export CAM_FOV=$(cq ".arch.hosts[\"${NODE_HOSTNAME}\"].fov")
 
 export ROS_DISTRO="noetic"
 export KAMERA_DNS_IP="192.168.88.1"
