@@ -9,6 +9,7 @@
 
 import wx
 import wx.xrc
+import wx.lib.scrolledpanel as scrolledpanel
 
 ID_START_DETECTOR_SYS0_CENTER = 1000
 ID_START_DETECTOR_SYS1_LEFT = 1001
@@ -35,7 +36,13 @@ class MainFrame ( wx.Frame ):
 
         bSizer20 = wx.BoxSizer( wx.VERTICAL )
 
-        self.ins_control_panel = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
+        # The left control column can be taller than the work area on smaller
+        # (e.g. 1920x1080) displays. Host it in a scrolled panel so the controls
+        # keep their natural size and a vertical scrollbar appears only when the
+        # column does not fully fit, instead of squishing the bottom rows.
+        self.left_scroll_panel = scrolledpanel.ScrolledPanel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
+
+        self.ins_control_panel = wx.Panel( self.left_scroll_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
         bSizer191 = wx.BoxSizer( wx.VERTICAL )
 
         self.m_staticText142 = wx.StaticText( self.ins_control_panel, wx.ID_ANY, u"Navigation Data", wx.DefaultPosition, wx.DefaultSize, 0 )
@@ -214,7 +221,7 @@ class MainFrame ( wx.Frame ):
         bSizer191.Fit( self.ins_control_panel )
         bSizer20.Add( self.ins_control_panel, 0, wx.EXPAND|wx.BOTTOM, 5 )
 
-        self.camera_panel = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
+        self.camera_panel = wx.Panel( self.left_scroll_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
         m_staticText14211 = wx.BoxSizer( wx.VERTICAL )
 
         self.m_staticText142111 = wx.StaticText( self.camera_panel, wx.ID_ANY, u"Camera Settings", wx.DefaultPosition, wx.DefaultSize, 0 )
@@ -346,7 +353,7 @@ class MainFrame ( wx.Frame ):
         m_staticText14211.Fit( self.camera_panel )
         bSizer20.Add( self.camera_panel, 0, wx.EXPAND|wx.BOTTOM, 5 )
 
-        self.flight_data_panel = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
+        self.flight_data_panel = wx.Panel( self.left_scroll_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
         bSizer391 = wx.BoxSizer( wx.VERTICAL )
 
         self.m_staticText14211 = wx.StaticText( self.flight_data_panel, wx.ID_ANY, u"Data Collection", wx.DefaultPosition, wx.DefaultSize, 0 )
@@ -482,7 +489,7 @@ class MainFrame ( wx.Frame ):
         bSizer443.Add( self.stop_detectors_button, 0, wx.ALIGN_CENTER_VERTICAL|wx.BOTTOM|wx.RIGHT|wx.LEFT, 5 )
 
 
-        bSizer391.Add( bSizer443, 1, wx.EXPAND, 5 )
+        bSizer391.Add( bSizer443, 0, wx.EXPAND, 5 )
 
         self.m_staticline13 = wx.StaticLine( self.flight_data_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         bSizer391.Add( self.m_staticline13, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )
@@ -502,7 +509,7 @@ class MainFrame ( wx.Frame ):
         bSizer391.Fit( self.flight_data_panel )
         bSizer20.Add( self.flight_data_panel, 1, wx.EXPAND, 5 )
 
-        self.m_panel7 = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
+        self.m_panel7 = wx.Panel( self.left_scroll_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
         bSizer17 = wx.BoxSizer( wx.VERTICAL )
 
         self.close_button = wx.Button( self.m_panel7, wx.ID_ANY, u"Close", wx.DefaultPosition, wx.Size( -1,-1 ), 0 )
@@ -515,7 +522,11 @@ class MainFrame ( wx.Frame ):
         bSizer20.Add( self.m_panel7, 0, wx.EXPAND|wx.TOP, 5 )
 
 
-        main_size.Add( bSizer20, 0, wx.EXPAND|wx.ALL, 5 )
+        self.left_scroll_panel.SetSizer( bSizer20 )
+        self.left_scroll_panel.Layout()
+        self.left_scroll_panel.SetupScrolling( scroll_x = False, scroll_y = True )
+
+        main_size.Add( self.left_scroll_panel, 0, wx.EXPAND|wx.ALL, 5 )
 
         bsizer12 = wx.BoxSizer( wx.VERTICAL )
 
