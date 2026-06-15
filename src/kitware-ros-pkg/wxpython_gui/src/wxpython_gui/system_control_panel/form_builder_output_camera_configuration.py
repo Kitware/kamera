@@ -47,19 +47,19 @@ class MainFrame ( wx.Frame ):
 		bSizer9.Add( self.camera_config_combo, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
 		
-		bSizer9.AddSpacer( ( 20, 0), 1, wx.EXPAND, 5 )
+		bSizer9.Add( ( 20, 0), 1, wx.EXPAND, 5 )
 		
 		self.m_button4 = wx.Button( self.m_panel2, wx.ID_ANY, u"New", wx.DefaultPosition, wx.DefaultSize, 0 )
 		bSizer9.Add( self.m_button4, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
 		
-		bSizer9.AddSpacer( ( 20, 0), 1, wx.EXPAND, 5 )
+		bSizer9.Add( ( 20, 0), 1, wx.EXPAND, 5 )
 		
 		self.m_button41 = wx.Button( self.m_panel2, wx.ID_ANY, u"New from Current", wx.DefaultPosition, wx.Size( 150,-1 ), 0 )
 		bSizer9.Add( self.m_button41, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
 		
-		bSizer9.AddSpacer( ( 20, 0), 1, wx.EXPAND, 5 )
+		bSizer9.Add( ( 20, 0), 1, wx.EXPAND, 5 )
 		
 		self.m_button42 = wx.Button( self.m_panel2, wx.ID_ANY, u"Delete", wx.DefaultPosition, wx.DefaultSize, 0 )
 		bSizer9.Add( self.m_button42, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )

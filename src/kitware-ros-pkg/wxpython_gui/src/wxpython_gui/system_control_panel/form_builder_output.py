@@ -259,7 +259,7 @@ class MainFrame ( wx.Frame ):
         bSizer442.Add( self.exposure_min_value_txt_ctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        bSizer442.AddSpacer( ( 10, 0), 1, wx.EXPAND, 5 )
+        bSizer442.Add( ( 10, 0), 1, wx.EXPAND, 5 )
 
         self.m_staticText4231 = wx.StaticText( self.camera_panel, wx.ID_ANY, u"Max:", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText4231.Wrap( -1 )
@@ -294,7 +294,7 @@ class MainFrame ( wx.Frame ):
         bSizer4421.Add( self.gain_min_value_txt_ctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        bSizer4421.AddSpacer( ( 10, 0), 1, wx.EXPAND, 5 )
+        bSizer4421.Add( ( 10, 0), 1, wx.EXPAND, 5 )
 
         self.m_staticText42311 = wx.StaticText( self.camera_panel, wx.ID_ANY, u"Max:", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText42311.Wrap( -1 )
@@ -494,7 +494,7 @@ class MainFrame ( wx.Frame ):
         bSizer391.Add( self.nas_disk_space, 0, wx.TOP|wx.RIGHT|wx.LEFT, 5 )
 
 
-        bSizer391.AddSpacer( ( 0, 0), 1, wx.EXPAND, 5 )
+        bSizer391.Add( ( 0, 0), 1, wx.EXPAND, 5 )
 
 
         self.flight_data_panel.SetSizer( bSizer391 )
@@ -535,7 +535,7 @@ class MainFrame ( wx.Frame ):
         bSizer61.Add( self.camera_config_combo, 0, wx.ALL, 5 )
 
 
-        bSizer61.AddSpacer( ( 20, 0), 1, wx.EXPAND, 5 )
+        bSizer61.Add( ( 20, 0), 1, wx.EXPAND, 5 )
 
 
         bSizer59.Add( bSizer61, 1, wx.ALIGN_CENTER_HORIZONTAL, 5 )
