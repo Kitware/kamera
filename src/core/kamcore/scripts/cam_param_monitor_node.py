@@ -14,6 +14,7 @@ import rospy
 from roskv.impl.redis_envoy import RedisEnvoy
 from phase_one.srv import GetPhaseOneParameter, SetPhaseOneParameter
 from custom_msgs.srv import CamGetAttr, CamSetAttr
+from roskv.util import filter_hosts_by_system
 
 p1setsrv = "set_phaseone_parameter"
 p1getsrv = "get_phaseone_parameter"
@@ -30,7 +31,9 @@ class CamParamMonitor(object):
         print("Redis host: %s" % redis_host)
         self.envoy = RedisEnvoy(os.environ["REDIS_HOST"],
                                 client_name="cam_param_monitor")
-        self.hosts = self.envoy.get("/sys/arch/hosts").keys()
+        self.hosts = filter_hosts_by_system(
+            self.envoy.get("/sys/arch/hosts").keys()
+        )
         self.modes = self.envoy.get("/sys/channels").keys()
         print("hosts: ")
         print(self.hosts)

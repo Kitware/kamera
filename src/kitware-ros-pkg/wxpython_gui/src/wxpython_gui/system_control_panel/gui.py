@@ -49,7 +49,7 @@ from cv_bridge import CvBridge, CvBridgeError
 # from roskv.impl.rosparam_kv import RosParamKV as ImplKV
 from roskv.impl.redis_envoy import RedisEnvoy as ImplEnvoy
 from roskv.rendezvous import ConditionalRendezvous  # , Governor
-from roskv.util import simple_hash_args, MyTimeoutError
+from roskv.util import simple_hash_args, MyTimeoutError, filter_hosts_by_system
 
 # Kamera imports
 from custom_msgs.srv import (
@@ -228,17 +228,7 @@ class MainFrame(form_builder_output.MainFrame):
         }
 
         all_hosts = sorted(SYS_CFG["arch"]["hosts"].keys())
-        # Only manage hosts belonging to the current system. Redis (/sys) can
-        # accumulate host entries from other systems (cas, nayak, ...); host
-        # names are suffixed with the system name, e.g. "center0taiga".
-        system_name = os.environ.get("SYSTEM_NAME")
-        if system_name:
-            self.hosts = [h for h in all_hosts if h.endswith(system_name)]
-        else:
-            self.hosts = []
-        if not self.hosts:
-            # Fall back to every host if the naming convention doesn't match.
-            self.hosts = all_hosts
+        self.hosts = filter_hosts_by_system(all_hosts)
         print("HOSTS: ")
         print(self.hosts)
         self.last_busy = {h: False for h in self.hosts}
