@@ -552,12 +552,35 @@ class MainFrame(form_builder_output.MainFrame):
         self.delay = 0
         self.Show()
         print(self.GetSize())
-        self.SetMinSize((1500, 980))
+        self._fit_to_display()
         # self.detector_gauge.Hide()
 
         if self.collecting:
             self._disable_state_controls()
         # Add in pause before displaying imagery
+
+    def _fit_to_display(self):
+        """Keep the window within the usable area of its display.
+
+        On smaller monitors (e.g. 1920x1080) the design size is taller than the
+        work area, which pushes the bottom of the side panel (detector /
+        archiving controls, Close button) off-screen. Clamp the window size and
+        position to the display's client area, and cap the minimum size so the
+        window can always be shrunk to fit.
+        """
+        idx = wx.Display.GetFromWindow(self)
+        if idx == wx.NOT_FOUND:
+            idx = 0
+        area = wx.Display(idx).GetClientArea()
+
+        min_w = min(1500, area.width)
+        min_h = min(980, area.height)
+        self.SetMinSize((min_w, min_h))
+
+        w, h = self.GetSize()
+        self.SetSize(min(w, area.width), min(h, area.height))
+        self.SetPosition((area.x, area.y))
+        self.Layout()
 
     def system_sanity_check(self):
         # Run the disk / NAS checks off the UI thread so unreachable hosts
