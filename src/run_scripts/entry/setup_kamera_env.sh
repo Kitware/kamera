@@ -55,7 +55,6 @@ fi
 if [[ -z $IS_CONTAINER ]] ; then
     SUBDIR=/kw
     export REPO_DIR=${HOME}${SUBDIR}/kamera
-    export WS_DIR=${HOME}${SUBDIR}/kamera_ws
 fi
 
 
