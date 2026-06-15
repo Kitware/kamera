@@ -180,19 +180,19 @@ class MainFrame ( wx.Frame ):
 
         bSizer1817131 = wx.BoxSizer( wx.HORIZONTAL )
 
-        self.m_staticText1817131 = wx.StaticText( self.ins_control_panel, wx.ID_ANY, u"Time", wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.m_staticText1817131 = wx.StaticText( self.ins_control_panel, wx.ID_ANY, u"Time (s)", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText1817131.Wrap( -1 )
         self.m_staticText1817131.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
-        bSizer1817131.Add( self.m_staticText1817131, 0, wx.ALIGN_CENTER_VERTICAL|wx.LEFT, 2 )
+        bSizer1817131.Add( self.m_staticText1817131, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
         self.ins_time_txtctrl = wx.TextCtrl( self.ins_control_panel, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, wx.TE_CENTRE|wx.TE_READONLY )
-        bSizer1817131.Add( self.ins_time_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 2 )
+        bSizer1817131.Add( self.ins_time_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5 )
 
+
+        bSizer191.Add( bSizer1817131, 0, wx.EXPAND, 5 )
 
         bSizer18171313 = wx.BoxSizer( wx.HORIZONTAL )
-
-        bSizer18171313.Add( bSizer1817131, 1, wx.EXPAND, 2 )
 
         bSizer511 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -243,7 +243,7 @@ class MainFrame ( wx.Frame ):
         bSizer55 = wx.BoxSizer( wx.HORIZONTAL )
 
         camera_setting_rgb_uv_comboChoices = [ u"RGB", u"IR", u"UV" ]
-        self.camera_setting_rgb_uv_combo = wx.ComboBox( self.camera_panel, wx.ID_ANY, u"RGB", wx.DefaultPosition, wx.Size( 70,-1 ), camera_setting_rgb_uv_comboChoices, wx.CB_READONLY )
+        self.camera_setting_rgb_uv_combo = wx.ComboBox( self.camera_panel, wx.ID_ANY, u"RGB", wx.DefaultPosition, wx.Size( 90,-1 ), camera_setting_rgb_uv_comboChoices, wx.CB_READONLY )
         self.camera_setting_rgb_uv_combo.SetSelection( 0 )
         bSizer55.Add( self.camera_setting_rgb_uv_combo, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
@@ -251,7 +251,7 @@ class MainFrame ( wx.Frame ):
         bSizer55.Add( ( 10, 0), 1, wx.EXPAND, 5 )
 
         camera_setting_subsysChoices = [ u"Left", u"Center", u"Right", u"All" ]
-        self.camera_setting_subsys = wx.ComboBox( self.camera_panel, wx.ID_ANY, u"Right", wx.DefaultPosition, wx.Size( 70,-1 ), camera_setting_subsysChoices, wx.CB_READONLY )
+        self.camera_setting_subsys = wx.ComboBox( self.camera_panel, wx.ID_ANY, u"Right", wx.DefaultPosition, wx.Size( 90,-1 ), camera_setting_subsysChoices, wx.CB_READONLY )
         self.camera_setting_subsys.SetSelection( 3 )
         bSizer55.Add( self.camera_setting_subsys, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
@@ -339,31 +339,26 @@ class MainFrame ( wx.Frame ):
 
         bSizer44211.Add( self.txtNUC, 0, wx.ALIGN_CENTER_VERTICAL|wx.LEFT|wx.RIGHT, 5 )
 
-        self.ir_nuc_time = wx.TextCtrl( self.camera_panel, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.Size( 80,-1 ), wx.TE_CENTRE )
-        bSizer44211.Add( self.ir_nuc_time, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
+        self.ir_nuc_time = wx.TextCtrl( self.camera_panel, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.Size( 60,-1 ), wx.TE_CENTRE )
+        bSizer44211.Add( self.ir_nuc_time, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        m_staticText14211.Add( bSizer44211, 1, wx.EXPAND, 5 )
+        m_staticText14211.Add( bSizer44211, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.TOP, 12 )
 
         bSizer442111 = wx.BoxSizer( wx.HORIZONTAL )
 
 
         m_staticText14211.Add( bSizer442111, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.BOTTOM, 5 )
 
-        camera_buttons_row = wx.BoxSizer( wx.HORIZONTAL )
-
         self.m_button10 = wx.Button( self.camera_panel, wx.ID_ANY, u"Set Camera Parameter", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_button10.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
-        camera_buttons_row.Add( self.m_button10, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 3 )
+        m_staticText14211.Add( self.m_button10, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.TOP|wx.RIGHT|wx.LEFT, 3 )
 
         self.m_manual_ir_nuc = wx.Button( self.camera_panel, wx.ID_ANY, u"Manual IR NUC", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_manual_ir_nuc.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
-        camera_buttons_row.Add( self.m_manual_ir_nuc, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 3 )
-
-
-        m_staticText14211.Add( camera_buttons_row, 0, wx.ALIGN_CENTER_HORIZONTAL, 3 )
+        m_staticText14211.Add( self.m_manual_ir_nuc, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.RIGHT|wx.LEFT, 3 )
 
 
         self.camera_panel.SetSizer( m_staticText14211 )
@@ -472,7 +467,7 @@ class MainFrame ( wx.Frame ):
         bSizer611.Add( self.m_button81, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
 
-        bSizer391.Add( bSizer611, 0, wx.EXPAND, 5 )
+        bSizer391.Add( bSizer611, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
         bSizer44 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -487,7 +482,7 @@ class MainFrame ( wx.Frame ):
         bSizer44.Add( self.m_button8, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 
-        bSizer391.Add( bSizer44, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
+        bSizer391.Add( bSizer44, 0, wx.EXPAND, 5 )
 
         self.m_staticline411 = wx.StaticLine( self.flight_data_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         bSizer391.Add( self.m_staticline411, 0, wx.EXPAND|wx.BOTTOM|wx.RIGHT|wx.LEFT, 5 )
