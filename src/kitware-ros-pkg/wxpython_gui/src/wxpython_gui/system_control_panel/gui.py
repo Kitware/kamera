@@ -552,6 +552,7 @@ class MainFrame(form_builder_output.MainFrame):
         # self.lastCdet = kv.get("/nuvo0/detector/health//frame")
         # self.lastRdet = kv.get("/nuvo2/detector/health//frame")
         self.delay = 0
+        self.detectors_gauge.SetBackgroundColour(FLAT_GRAY)
         self.Show()
         print(self.GetSize())
         self._fit_to_display()
@@ -1036,19 +1037,22 @@ class MainFrame(form_builder_output.MainFrame):
 
         print(d_status.values())
 
-        if not len(d_desired):
+        active_statuses = [
+            status for status in d_status.values()
+            if status is not EPodStatus.Unknown
+        ]
+        if not d_desired or not active_statuses:
             self.detectors_gauge.SetBackgroundColour(FLAT_GRAY)
+        elif any(status is EPodStatus.Failed for status in active_statuses):
+            self.detectors_gauge.SetBackgroundColour(ERROR_RED)
+        elif any(status is EPodStatus.Pending for status in active_statuses):
+            self.detectors_gauge.SetBackgroundColour(WARN_AMBER)
+        elif any(status is EPodStatus.Stalled for status in active_statuses):
+            self.detectors_gauge.SetBackgroundColour(WARN_AMBER)
+        elif all(status.is_ok() for status in active_statuses):
+            self.detectors_gauge.SetBackgroundColour(BRIGHT_GREEN)
         else:
-            if any([status is EPodStatus.Failed for status in d_status.values()]):
-                self.detectors_gauge.SetBackgroundColour(ERROR_RED)
-            elif any([status is EPodStatus.Pending for status in d_status.values()]):
-                self.detectors_gauge.SetBackgroundColour(WARN_AMBER)
-            elif any([status is EPodStatus.Stalled for status in d_status.values()]):
-                self.detectors_gauge.SetBackgroundColour(WARN_AMBER)
-            elif all([status.is_ok() for status in d_status.values()]):
-                self.detectors_gauge.SetBackgroundColour(BRIGHT_GREEN)
-            else:
-                self.detectors_gauge.SetBackgroundColour(ERROR_RED)
+            self.detectors_gauge.SetBackgroundColour(FLAT_GRAY)
 
         is_busy = {h: 0 for h in self.hosts}
         current_task = {}
