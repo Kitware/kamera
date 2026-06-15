@@ -223,7 +223,18 @@ class MainFrame(form_builder_output.MainFrame):
             "flight_summary": "Flight Summary",
         }
 
-        self.hosts = sorted(SYS_CFG["arch"]["hosts"].keys())
+        all_hosts = sorted(SYS_CFG["arch"]["hosts"].keys())
+        # Only manage hosts belonging to the current system. Redis (/sys) can
+        # accumulate host entries from other systems (cas, nayak, ...); host
+        # names are suffixed with the system name, e.g. "center-0-taiga".
+        system_name = os.environ.get("SYSTEM_NAME")
+        if system_name:
+            self.hosts = [h for h in all_hosts if h.endswith("-" + system_name)]
+        else:
+            self.hosts = []
+        if not self.hosts:
+            # Fall back to every host if the naming convention doesn't match.
+            self.hosts = all_hosts
         print("HOSTS: ")
         print(self.hosts)
         self.last_busy = {h: False for h in self.hosts}
@@ -547,105 +558,126 @@ class MainFrame(form_builder_output.MainFrame):
         # Add in pause before displaying imagery
 
     def system_sanity_check(self):
-        fails = 0
-        unmounts = []
-        nas_unmounts = []
-        for host in self.hosts:
-            try:
-                diskinfo = requests.post(
-                    "http://{}:8987/diskinfo".format(host),
-                    data=SYS_CFG["local_ssd_mnt"],
-                    timeout=0.1,
-                )
-            except requests.exceptions.ConnectionError:
-                rospy.logwarn("Could not access disk info from system %s." % host)
-                continue
-            diskinfo = json.loads(diskinfo.text)
-            mounted = diskinfo["ismount"]
-            try:
-                if not mounted:
-                    unmounts.append(host)
-                else:
-                    if 0 == int(host[-1]):
-                        self.center_sys_space_static_text.SetLabel(
-                            "Disk Space: %0.2f GB"
-                            % (float(diskinfo["bytes_free"]) / 1e9)
-                        )
-                        self.center_sys_space_static_text.SetForegroundColour(
-                            COLLECT_GREEN
-                        )
-                    elif 1 == int(host[-1]):
-                        self.left_sys_space_static_text.SetLabel(
-                            "Disk Space: %0.2f GB"
-                            % (float(diskinfo["bytes_free"]) / 1e9)
-                        )
-                        self.left_sys_space_static_text.SetForegroundColour(
-                            COLLECT_GREEN
-                        )
-                    else:
-                        self.right_sys_space_static_text.SetLabel(
-                            "Disk Space: %0.2f GB"
-                            % (float(diskinfo["bytes_free"]) / 1e9)
-                        )
-                        self.right_sys_space_static_text.SetForegroundColour(
-                            COLLECT_GREEN
-                        )
-            except Exception as e:
-                rospy.logerr("Failed to connect to host {}: {}".format(host, e))
-                return
-            try:
-                diskinfo = requests.post(
-                    "http://{}:8987/diskinfo".format(host),
-                    SYS_CFG["nas_mnt"],
-                    timeout=0.1,
-                )
-                diskinfo = json.loads(diskinfo.text)
-                # rospy.loginfo("{}: {}".format(host, diskinfo))
-                mounted = diskinfo["ismount"]
-                if not mounted:
-                    nas_unmounts.append(host)
-                else:
-                    if 0 == int(host[-1]):
-                        self.nas_disk_space.SetLabel(
-                            "NAS Disk Space: %0.2f GB"
-                            % (float(diskinfo["bytes_free"]) / 1e9)
-                        )
-                        self.nas_disk_space.SetForegroundColour(COLLECT_GREEN)
-            except Exception as exc:
-                # rospy.logerr("unable to connect to host {}: {}".format(host, exc))
-                fails += 1
-        for host in unmounts:
-            if 0 == int(host[-1]):
-                self.center_sys_space_static_text.SetLabel("Disk Space: Err")
-                self.center_sys_space_static_text.SetForegroundColour(ERROR_RED)
-            elif 1 == int(host[-1]):
-                self.left_sys_space_static_text.SetLabel("Disk Space: Err")
-                self.left_sys_space_static_text.SetForegroundColour(ERROR_RED)
-            else:
-                self.right_sys_space_static_text.SetLabel("Disk Space: Err")
-                self.right_sys_space_static_text.SetForegroundColour(ERROR_RED)
-        if len(unmounts) > 0:
-            errmsg = "ERROR: One or more hosts has an sdd mount issue: {}\n".format(
-                unmounts
-            )
-            rospy.logerr(errmsg)
-            for host in unmounts:
-                res = requests.post(
-                    "http://{}:8987/mountall".format(host), data="/mnt/data"
-                )
+        # Run the disk / NAS checks off the UI thread so unreachable hosts
+        # can't freeze the GUI. Skip if the previous check is still in flight.
+        if getattr(self, "_sanity_check_running", False):
+            return
+        self._sanity_check_running = True
+        worker = threading.Thread(
+            target=self._system_sanity_worker, args=(list(self.hosts),)
+        )
+        worker.daemon = True
+        worker.start()
 
-        if len(nas_unmounts) > 0:
-            err_host_str = "NAS Err: " + "".join(nas_unmounts)
-            self.nas_disk_space.SetLabel(err_host_str)
-            self.nas_disk_space.SetForegroundColour(ERROR_RED)
-            errmsg = "ERROR: One or more hosts has an NAS mount issue: {}\n".format(
-                nas_unmounts
-            )
-            rospy.logerr(errmsg)
-            for host in nas_unmounts:
-                res = requests.post(
-                    "http://{}:8987/mountall".format(host), data=SYS_CFG["nas_mnt"]
+    def _system_sanity_worker(self, hosts):
+        """Background-thread network I/O for system_sanity_check.
+
+        Collects results and marshals UI updates back onto the main thread via
+        wx.CallAfter. Every request has a timeout so an offline host can't hang
+        the check.
+        """
+        timeout = 0.5
+        ssd_mnt = SYS_CFG["local_ssd_mnt"]
+        nas_mnt = SYS_CFG["nas_mnt"]
+        try:
+            results = {}
+            unmounts = []
+            nas_unmounts = []
+            for host in hosts:
+                entry = {"ssd_gb": None, "ssd_err": False, "nas_gb": None}
+                try:
+                    resp = requests.post(
+                        "http://{}:8987/diskinfo".format(host),
+                        data=ssd_mnt,
+                        timeout=timeout,
+                    )
+                    info = json.loads(resp.text)
+                    if info["ismount"]:
+                        entry["ssd_gb"] = float(info["bytes_free"]) / 1e9
+                    else:
+                        entry["ssd_err"] = True
+                        unmounts.append(host)
+                except (requests.exceptions.RequestException, ValueError, KeyError):
+                    rospy.logwarn(
+                        "Could not access disk info from system %s." % host
+                    )
+                    results[host] = entry
+                    continue
+                try:
+                    resp = requests.post(
+                        "http://{}:8987/diskinfo".format(host),
+                        data=nas_mnt,
+                        timeout=timeout,
+                    )
+                    info = json.loads(resp.text)
+                    if info["ismount"]:
+                        entry["nas_gb"] = float(info["bytes_free"]) / 1e9
+                    else:
+                        nas_unmounts.append(host)
+                except (requests.exceptions.RequestException, ValueError, KeyError):
+                    pass
+                results[host] = entry
+
+            # Attempt to remount any host that responded but wasn't mounted.
+            if unmounts:
+                rospy.logerr(
+                    "ERROR: One or more hosts has an ssd mount issue: {}".format(
+                        unmounts
+                    )
                 )
+                for host in unmounts:
+                    try:
+                        requests.post(
+                            "http://{}:8987/mountall".format(host),
+                            data="/mnt/data",
+                            timeout=timeout,
+                        )
+                    except requests.exceptions.RequestException:
+                        pass
+            if nas_unmounts:
+                rospy.logerr(
+                    "ERROR: One or more hosts has a NAS mount issue: {}".format(
+                        nas_unmounts
+                    )
+                )
+                for host in nas_unmounts:
+                    try:
+                        requests.post(
+                            "http://{}:8987/mountall".format(host),
+                            data=nas_mnt,
+                            timeout=timeout,
+                        )
+                    except requests.exceptions.RequestException:
+                        pass
+
+            wx.CallAfter(self._apply_system_sanity, results, nas_unmounts)
+        finally:
+            self._sanity_check_running = False
+
+    def _apply_system_sanity(self, results, nas_unmounts):
+        """Apply system_sanity_check results to the UI (main thread only)."""
+        for host, entry in results.items():
+            try:
+                fov = SYS_CFG["arch"]["hosts"][host]["fov"]
+            except KeyError:
+                continue
+            ssd_label = getattr(self, "{}_sys_space_static_text".format(fov), None)
+            if ssd_label is not None:
+                if entry["ssd_err"]:
+                    ssd_label.SetLabel("Disk Space: Err")
+                    ssd_label.SetForegroundColour(ERROR_RED)
+                elif entry["ssd_gb"] is not None:
+                    ssd_label.SetLabel("Disk Space: %0.2f GB" % entry["ssd_gb"])
+                    ssd_label.SetForegroundColour(COLLECT_GREEN)
+            # The NAS is shared, so it's only displayed once (center host).
+            if fov == "center" and entry["nas_gb"] is not None:
+                self.nas_disk_space.SetLabel(
+                    "NAS Disk Space: %0.2f GB" % entry["nas_gb"]
+                )
+                self.nas_disk_space.SetForegroundColour(COLLECT_GREEN)
+        if nas_unmounts:
+            self.nas_disk_space.SetLabel("NAS Err: " + "".join(nas_unmounts))
+            self.nas_disk_space.SetForegroundColour(ERROR_RED)
 
     def on_modal_selection(self, event):
         self.on_camera_setting_subsys_selection(event)
