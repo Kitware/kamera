@@ -5,20 +5,33 @@
 ## provide permissions with xhost, usually `xhost +local:root` (not the safest)
 ## You also have to volume mount `/tmp/.X11-unix`, blank out $DISPLAY, and
 ## disable X11 shared memory `QT_X11_NO_MITSHM=1`
+##
+## Deployment profiles:
+##   follower  -- headless sensor node: core + VIAME + postproc
+##   leader    -- operator workstation: Kinetic GUI + postproc
+##   all       -- everything
+##
+## Individual layer profiles:
+##   core      -- Noetic base images only (no VIAME, no GUI)
+##   viame     -- VIAME detector images only
+##   gui       -- Kinetic GUI images only
+##   gui-noetic -- Noetic GUI images only (parallel chain until cutover)
+##   pf        -- postproc / postflight only
 
-version: '3.7'
 services:
-## ======================= base containers & bases ========================
-  # Docker file for kamerad service
+## ======================= Noetic core chain ========================
+
+  # Lightweight Python service; independent of ROS distro.
   kamerad:
     build:
       context: ./src/core/kamerad
     image: "kitware/kamera:kamerad"
     profiles:
       - core
+      - follower
       - all
 
-  # The core ROS image with CUDA and basic APT packages, no KAMERA code.
+  # CUDA + ROS Noetic base with utility packages. No KAMERA source.
   core-ros:
     build:
       context: .
@@ -26,37 +39,26 @@ services:
     image: "kamera/base/core-ros:${TAG_KAMERA_DEPS:-latest}"
     profiles:
       - core
-      - gui
+      - follower
       - all
+      - gui-noetic
 
-## =========================== main (full dependencies) =======================
-
-  ## This is the main image with all dependendencies required for KAMERA, built on
-  # the basic ROS image.
+  # System dependencies (drivers, C++ libs, ROS packages). No source copy.
   core-deps:
     build:
       context: .
       dockerfile: docker/base/core-deps.dockerfile
     image: "kamera/base/core-deps:${TAG_KAMERA_DEPS:-latest}"
     depends_on:
-        - core-ros
+      - core-ros
     profiles:
       - core
-      - gui
+      - follower
       - all
+      - gui-noetic
 
-  core-gui-deps:
-    build:
-      context: .
-      dockerfile: docker/base/gui-deps.dockerfile
-    image: "kamera/base/core-gui-deps:${TAG_KAMERA_GUI_DEPS:-latest}"
-    depends_on:
-        - core-deps
-    profiles:
-      - gui
-
-  # Just for the catkin rebuild, if we want to save the static image.
-  core-final:
+  # KAMERA source + catkin build on top of core-deps.
+  core:
     build:
       context: .
       dockerfile: docker/core.dockerfile
@@ -64,25 +66,14 @@ services:
     tty: true
     network_mode: host
     depends_on:
-        - core-deps
+      - core-deps
     volumes:
-    - "/tmp/.X11-unix:/tmp/.X11-unix"
-    - "${PWD}/src:/root/kamera/src"
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+      - "${PWD}/src:/root/kamera/src"
     profiles:
       - core
+      - follower
       - all
-
-## =========================== gui =============================
-  gui:
-    container_name: gui
-    build:
-      context: .
-      dockerfile: docker/gui.dockerfile
-    image: "kitware/kamera:gui"
-    depends_on:
-        - core-gui-deps
-    profiles:
-      - gui
 
   postproc:
     build:
@@ -95,12 +86,13 @@ services:
     tty: true
     profiles:
       - core
+      - follower
+      - leader
       - all
       - pf
 
+## ========================== VIAME detector chain =============================
 
-
-## ========================== viame =============================
   viame-base:
     build:
       context: .
@@ -111,6 +103,7 @@ services:
     image: "kamera/base/viame:${VIAME_BRANCH:-latest}"
     profiles:
       - viame
+      - follower
       - all
 
   viame:
@@ -125,10 +118,74 @@ services:
     network_mode: host
     command: ["bash"]
     depends_on:
-        - viame-base
+      - viame-base
     profiles:
       - viame
+      - follower
       - all
+
+## ========================== Kinetic GUI chain ================================
+
+  # Kinetic ROS base for the GUI — independent of the Noetic core chain.
+  core-deps-kinetic:
+    build:
+      context: .
+      dockerfile: docker/base/gui-ros.dockerfile
+    image: "kamera/base/core-deps-kinetic:latest"
+    profiles:
+      - gui
+      - leader
+      - all
+
+  core-gui-deps:
+    build:
+      context: .
+      dockerfile: docker/base/gui-deps.dockerfile
+    image: "kamera/base/core-gui-deps:${TAG_KAMERA_GUI_DEPS:-latest}"
+    depends_on:
+      - core-deps-kinetic
+    profiles:
+      - gui
+      - leader
+      - all
+
+  gui:
+    container_name: gui
+    build:
+      context: .
+      dockerfile: docker/gui.dockerfile
+    image: "kitware/kamera:gui"
+    depends_on:
+      - core-gui-deps
+    profiles:
+      - gui
+      - leader
+      - all
+
+## ========================== Noetic GUI chain (parallel) ======================
+
+  gui-deps-noetic:
+    build:
+      context: .
+      dockerfile: docker/base/gui-deps-noetic.dockerfile
+    image: "kamera/base/gui-deps-noetic:${TAG_KAMERA_GUI_DEPS:-latest}"
+    depends_on:
+      - core-deps
+    profiles:
+      - gui-noetic
+
+  gui-noetic:
+    container_name: gui-noetic
+    build:
+      context: .
+      dockerfile: docker/gui.dockerfile
+      args:
+        GUI_DEPS_IMAGE: "kamera/base/gui-deps-noetic:${TAG_KAMERA_GUI_DEPS:-latest}"
+    image: "kitware/kamera:gui-noetic"
+    depends_on:
+      - gui-deps-noetic
+    profiles:
+      - gui-noetic
 
 ## ====================================================================
 ...
