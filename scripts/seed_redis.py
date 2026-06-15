@@ -15,6 +15,8 @@ Reimplements some logic in roskv to avoid building and importing.
 Example:
     seed_redis.py --redis-host nuvo0 \\
         --config src/cfg/taiga/default_system_state.json
+    seed_redis.py --redis-host nuvo0 \\
+        --prefix /debug --config src/cfg/debug_defaults.json
 """
 from __future__ import print_function
 import argparse
