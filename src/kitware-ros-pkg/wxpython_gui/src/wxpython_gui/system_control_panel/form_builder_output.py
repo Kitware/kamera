@@ -247,16 +247,13 @@ class MainFrame ( wx.Frame ):
         self.camera_setting_rgb_uv_combo.SetSelection( 0 )
         bSizer55.Add( self.camera_setting_rgb_uv_combo, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
-
-        bSizer55.Add( ( 10, 0), 1, wx.EXPAND, 5 )
-
         camera_setting_subsysChoices = [ u"Left", u"Center", u"Right", u"All" ]
         self.camera_setting_subsys = wx.ComboBox( self.camera_panel, wx.ID_ANY, u"Right", wx.DefaultPosition, wx.Size( 90,-1 ), camera_setting_subsysChoices, wx.CB_READONLY )
         self.camera_setting_subsys.SetSelection( 3 )
         bSizer55.Add( self.camera_setting_subsys, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        m_staticText14211.Add( bSizer55, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 10 )
+        m_staticText14211.Add( bSizer55, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
         self.m_staticline5 = wx.StaticLine( self.camera_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         m_staticText14211.Add( self.m_staticline5, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )

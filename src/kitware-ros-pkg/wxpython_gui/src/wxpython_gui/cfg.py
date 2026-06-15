@@ -205,6 +205,7 @@ TEXTCTRL_WHITE = (255, 255, 255)
 TEXTCTRL_DARK = (20, 20, 20)
 APP_GRAY = (220, 218, 213)  # Default application background
 FLAT_GRAY = (200, 200, 200)
+DISABLED_GRAY = (150, 150, 150)  # Darker fill for disabled input fields
 COLLECT_GREEN = (55, 120, 25)
 SHAPE_COLLECT_BLUE = (
     52,
