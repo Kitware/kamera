@@ -43,8 +43,6 @@ from tf.transformations import quaternion_from_euler
 from libnmea_navsat_driver.checksum_utils import check_nmea_checksum
 import libnmea_navsat_driver.parser
 from . import nmea_class
-from vprint import aprint
-
 
 class PashrPub(nmea_class.NMEA):
     def __init__(self, name, queue_size=1):
@@ -208,19 +206,19 @@ class RosNMEADriver(object):
         if not check_nmea_checksum(nmea_string):
             rospy.logwarn("Received a sentence with an invalid checksum. " +
                           "Sentence was: %s" % repr(nmea_string))
-            aprint('invalid checksum')
+            print('invalid checksum')
             return False
 
         parsed_sentence = libnmea_navsat_driver.parser.parse_nmea_sentence(nmea_string)
         if not parsed_sentence:
             rospy.logdebug("Failed to parse NMEA sentence. Sentence was: %s" % nmea_string)
-            aprint('failed to parse: {}'.format(nmea_string))
+            print('failed to parse: {}'.format(nmea_string))
             return False
 
         if frame_id is None:
             frame_id = self.get_frame_id()
 
-        # aprint('\n' + str(parsed_sentence))
+        # print('\n' + str(parsed_sentence))
 
         if timestamp:
             current_time = timestamp
@@ -241,12 +239,12 @@ class RosNMEADriver(object):
 
         # GGA with no RMC
         if not self.use_RMC and 'GGA' in parsed_sentence:
-            aprint('Branch 1')
+            print('Branch 1')
             current_fix.position_covariance_type = \
                 NavSatFix.COVARIANCE_TYPE_APPROXIMATED
 
             data = parsed_sentence['GGA']
-            aprint(data)
+            print(data)
             fix_type = data['fix_type']
             if not (fix_type in self.gps_qualities):
               fix_type = -1
@@ -272,7 +270,7 @@ class RosNMEADriver(object):
 
 
         elif 'RMC' in parsed_sentence:
-            aprint('Branch 2')
+            print('Branch 2')
             data = parsed_sentence['RMC']
 
             # Only publish a fix from RMC if the use_RMC flag is set.
