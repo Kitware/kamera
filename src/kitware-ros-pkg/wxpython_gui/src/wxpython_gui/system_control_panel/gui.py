@@ -709,10 +709,18 @@ class MainFrame(form_builder_output.MainFrame):
     def _set_field_enabled(self, ctrl, enabled):
         """Enable/disable an input field and make the disabled state obvious.
 
-        GTK's default disabled styling is subtle, so also darken the background
-        of disabled fields and restore white when re-enabled.
+        For text fields we use read-only instead of a full Disable() so the
+        frozen value stays fully legible (GTK greys out the text of disabled
+        controls, hiding the value). A darker background plus dark text makes
+        the read-only/frozen state obvious while keeping the value visible.
         """
-        ctrl.Enable(enabled)
+        if isinstance(ctrl, wx.TextCtrl):
+            ctrl.SetEditable(enabled)
+            ctrl.SetForegroundColour(
+                wx.BLACK if enabled else wx.Colour(*TEXTCTRL_DARK)
+            )
+        else:
+            ctrl.Enable(enabled)
         ctrl.SetBackgroundColour(
             wx.WHITE if enabled else wx.Colour(*DISABLED_GRAY)
         )
