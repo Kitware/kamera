@@ -3,7 +3,7 @@
 # Source environment variables for the project.sh entrypoint. No exec.
 
 echo "~~~ ~~~ Project entry point  project_env.sh ~~~ ~~~"
-for VNAME in ROS_DISTRO WS_DIR
+for VNAME in ROS_DISTRO REPO_DIR
 do
   if [[ -z "${!VNAME}" || "${!VNAME}" == 'null' ]]; then
     printf "<project_env.sh!> Unable to determine $VNAME. Check project_env.sh and user-config\n"
@@ -32,16 +32,12 @@ prependToPath () {
 
 # setup ros environment
 source "/opt/ros/$ROS_DISTRO/setup.bash"
-source "${WS_DIR}/scripts/activate_ros.bash"
+source "${REPO_DIR}/scripts/activate_ros.bash"
 export REDIS_HOST=${REDIS_HOST}
 export ARCH_KEY="/sys/arch/"
 # Try turning respawning back to roslaunch
 export NORESPAWN="true"
 
-## alternate path syntax
-#[ "${PATH#*$HOME/.local/bin:}" == "$PATH" ] && export PATH="$HOME/.local/bin:$PATH"
-#[ "${PATH#*$REPO_DIR/src/run_scripts/inpath:}" == "$PATH" ] && export PATH="$REPO_DIR/src/run_scripts/inpath:$PATH"
-#[ "${PATH#*/opt/ros/$ROS_DISTRO/bin:}" == "$PATH" ] && export PATH="/opt/ros/$ROS_DISTRO/bin:$PATH"
 prependToPath $HOME/.local/bin
 prependToPath $REPO_DIR/src/run_scripts/inpath
 prependToPath /opt/ros/$ROS_DISTRO/bin

@@ -12,27 +12,19 @@ RUN useradd -m --uid=1000 user \
 
 # Source code goes into ~/noaa_kamera, live dir goes into ~/kamera_ws
 ENV HOME_DIR=/home/user \
-    REPO_DIR=/home/user/noaa_kamera \
-    WS_DIR=/home/user/kamera_ws \
+    REPO_DIR=/home/user/kamera \
     GUI_CFG_DIR=/home/user/.config/kamera/gui
 
 # trying to speed up chown operation
 RUN mkdir -p /home/user && chown -R user:user /home/user
 
-COPY --chown=user:user  .dir                       $REPO_DIR/repo_dir.bash
-COPY --chown=user:user  src                        $REPO_DIR/src
-COPY --chown=user:user  scripts/activate_ros.bash  $WS_DIR/activate_ros.bash
-RUN ln -sf              $REPO_DIR/src      $WS_DIR/src                  &&\
-    rm -rf /entry                                                       &&\
-    ln -sf $REPO_DIR/src/run_scripts/entry /entry                       &&\
+COPY --chown=user:user  .                        $REPO_DIR
+RUN ln -sf $REPO_DIR/src/run_scripts/entry /entry                       &&\
     printf "\nsource /entry/project.sh\n" >> /home/user/.bashrc         &&\
-    touch $WS_DIR/.catkin_workspace                                     &&\
-    ln -sf $REPO_DIR/src/run_scripts/aliases.sh /aliases.sh             &&\
-    printf "\nsource /aliases.sh\n" >> /root/.bashrc                    &&\
-    ln -sf $REPO_DIR/src/cfg /cfg                                       &&\
-    HOME=/home/user $REPO_DIR/src/run_scripts/setup/install_links.sh
+    touch $REPO_DIR/.catkin_workspace                                     &&\
+    ln -sf $REPO_DIR/src/cfg /cfg
 
-WORKDIR $WS_DIR
+WORKDIR $REPO_DIR
 RUN find /home/user -not -user user -execdir chown user {} \+
 
 # use the exec form of run because we need bash syntax
