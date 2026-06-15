@@ -63,12 +63,13 @@ class MainFrame ( wx.Frame ):
         bSizer181.Add( self.m_staticText181, 0, wx.ALIGN_CENTER_VERTICAL|wx.BOTTOM|wx.RIGHT|wx.LEFT, 5 )
 
         self.lat_txtctrl = wx.TextCtrl( self.ins_control_panel, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, wx.TE_CENTRE|wx.TE_READONLY )
-        self.lat_txtctrl.SetMinSize( wx.Size( 180,-1 ) )
+        self.lat_txtctrl.SetMinSize( wx.Size( 120,-1 ) )
 
         bSizer181.Add( self.lat_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5 )
 
 
-        bSizer191.Add( bSizer181, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.EXPAND, 5 )
+        ins_row_a = wx.BoxSizer( wx.HORIZONTAL )
+        ins_row_a.Add( bSizer181, 1, wx.EXPAND, 5 )
 
         bSizer1811 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -82,7 +83,9 @@ class MainFrame ( wx.Frame ):
         bSizer1811.Add( self.lon_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5 )
 
 
-        bSizer191.Add( bSizer1811, 0, wx.EXPAND, 5 )
+        ins_row_a.Add( bSizer1811, 1, wx.EXPAND, 5 )
+
+        bSizer191.Add( ins_row_a, 0, wx.EXPAND, 5 )
 
         bSizer1812 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -96,7 +99,8 @@ class MainFrame ( wx.Frame ):
         bSizer1812.Add( self.alt_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5 )
 
 
-        bSizer191.Add( bSizer1812, 0, wx.EXPAND, 5 )
+        ins_row_b = wx.BoxSizer( wx.HORIZONTAL )
+        ins_row_b.Add( bSizer1812, 1, wx.EXPAND, 5 )
 
         bSizer18121 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -110,7 +114,9 @@ class MainFrame ( wx.Frame ):
         bSizer18121.Add( self.alt_msl_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5 )
 
 
-        bSizer191.Add( bSizer18121, 1, wx.EXPAND, 5 )
+        ins_row_b.Add( bSizer18121, 1, wx.EXPAND, 5 )
+
+        bSizer191.Add( ins_row_b, 0, wx.EXPAND, 5 )
 
         bSizer18191 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -124,7 +130,8 @@ class MainFrame ( wx.Frame ):
         bSizer18191.Add( self.speed_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5 )
 
 
-        bSizer191.Add( bSizer18191, 1, wx.EXPAND, 5 )
+        ins_row_c = wx.BoxSizer( wx.HORIZONTAL )
+        ins_row_c.Add( bSizer18191, 1, wx.EXPAND, 5 )
 
         bSizer1819 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -138,7 +145,9 @@ class MainFrame ( wx.Frame ):
         bSizer1819.Add( self.heading_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5 )
 
 
-        bSizer191.Add( bSizer1819, 0, wx.EXPAND, 5 )
+        ins_row_c.Add( bSizer1819, 1, wx.EXPAND, 5 )
+
+        bSizer191.Add( ins_row_c, 0, wx.EXPAND, 5 )
 
         bSizer1818 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -152,7 +161,8 @@ class MainFrame ( wx.Frame ):
         bSizer1818.Add( self.pitch_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5 )
 
 
-        bSizer191.Add( bSizer1818, 0, wx.EXPAND, 5 )
+        ins_row_d = wx.BoxSizer( wx.HORIZONTAL )
+        ins_row_d.Add( bSizer1818, 1, wx.EXPAND, 5 )
 
         bSizer1817 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -166,7 +176,9 @@ class MainFrame ( wx.Frame ):
         bSizer1817.Add( self.roll_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5 )
 
 
-        bSizer191.Add( bSizer1817, 0, wx.EXPAND, 5 )
+        ins_row_d.Add( bSizer1817, 1, wx.EXPAND, 5 )
+
+        bSizer191.Add( ins_row_d, 0, wx.EXPAND, 5 )
 
         bSizer1817131 = wx.BoxSizer( wx.HORIZONTAL )
 
