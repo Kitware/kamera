@@ -247,15 +247,17 @@ class MainFrame ( wx.Frame ):
         camera_setting_rgb_uv_comboChoices = [ u"RGB", u"IR", u"UV" ]
         self.camera_setting_rgb_uv_combo = wx.ComboBox( self.camera_panel, wx.ID_ANY, u"RGB", wx.DefaultPosition, wx.DefaultSize, camera_setting_rgb_uv_comboChoices, wx.CB_READONLY )
         self.camera_setting_rgb_uv_combo.SetSelection( 0 )
-        bSizer55.Add( self.camera_setting_rgb_uv_combo, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
+        self.camera_setting_rgb_uv_combo.SetMinSize( wx.Size( 80, -1 ) )
+        bSizer55.Add( self.camera_setting_rgb_uv_combo, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT|wx.EXPAND, 5 )
 
         camera_setting_subsysChoices = [ u"Left", u"Center", u"Right", u"All" ]
         self.camera_setting_subsys = wx.ComboBox( self.camera_panel, wx.ID_ANY, u"Right", wx.DefaultPosition, wx.DefaultSize, camera_setting_subsysChoices, wx.CB_READONLY )
         self.camera_setting_subsys.SetSelection( 3 )
-        bSizer55.Add( self.camera_setting_subsys, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
+        self.camera_setting_subsys.SetMinSize( wx.Size( 100, -1 ) )
+        bSizer55.Add( self.camera_setting_subsys, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT|wx.EXPAND, 5 )
 
 
-        m_staticText14211.Add( bSizer55, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
+        m_staticText14211.Add( bSizer55, 0, wx.EXPAND, 5 )
 
         self.m_staticline5 = wx.StaticLine( self.camera_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         m_staticText14211.Add( self.m_staticline5, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )
