@@ -80,6 +80,7 @@ from wxpython_gui.cfg import (
     COLLECT_GREEN,
     ERROR_RED,
     FLAT_GRAY,
+    DISABLED_GRAY,
     WARN_AMBER,
     BRIGHT_GREEN,
     VERDANT_GREEN,
@@ -705,21 +706,33 @@ class MainFrame(form_builder_output.MainFrame):
             self.nas_disk_space.SetLabel("NAS Err: " + "".join(nas_unmounts))
             self.nas_disk_space.SetForegroundColour(ERROR_RED)
 
+    def _set_field_enabled(self, ctrl, enabled):
+        """Enable/disable an input field and make the disabled state obvious.
+
+        GTK's default disabled styling is subtle, so also darken the background
+        of disabled fields and restore white when re-enabled.
+        """
+        ctrl.Enable(enabled)
+        ctrl.SetBackgroundColour(
+            wx.WHITE if enabled else wx.Colour(*DISABLED_GRAY)
+        )
+        ctrl.Refresh()
+
     def on_modal_selection(self, event):
         self.on_camera_setting_subsys_selection(event)
         mode = self.camera_setting_rgb_uv_combo.GetStringSelection()
         if mode == "IR":
-            self.exposure_max_value_txt_ctrl.Disable()
-            self.exposure_min_value_txt_ctrl.Disable()
-            self.gain_min_value_txt_ctrl.Disable()
-            self.gain_max_value_txt_ctrl.Disable()
-            self.ir_nuc_time.Enable()
+            self._set_field_enabled(self.exposure_max_value_txt_ctrl, False)
+            self._set_field_enabled(self.exposure_min_value_txt_ctrl, False)
+            self._set_field_enabled(self.gain_min_value_txt_ctrl, False)
+            self._set_field_enabled(self.gain_max_value_txt_ctrl, False)
+            self._set_field_enabled(self.ir_nuc_time, True)
         else:
-            self.exposure_max_value_txt_ctrl.Enable()
-            self.exposure_min_value_txt_ctrl.Enable()
-            self.gain_min_value_txt_ctrl.Enable()
-            self.gain_max_value_txt_ctrl.Enable()
-            self.ir_nuc_time.Disable()
+            self._set_field_enabled(self.exposure_max_value_txt_ctrl, True)
+            self._set_field_enabled(self.exposure_min_value_txt_ctrl, True)
+            self._set_field_enabled(self.gain_min_value_txt_ctrl, True)
+            self._set_field_enabled(self.gain_max_value_txt_ctrl, True)
+            self._set_field_enabled(self.ir_nuc_time, False)
 
     def set_camera_parameter(self, hosts, mode, param, val):
         mode = mode.lower()
@@ -2220,7 +2233,10 @@ class MainFrame(form_builder_output.MainFrame):
 
     def _enable_state_controls(self):
         for child in self.flight_data_panel.GetChildren():
-            child.Enable()
+            if isinstance(child, wx.TextCtrl):
+                self._set_field_enabled(child, True)
+            else:
+                child.Enable()
         self.camera_config_combo.Enable()
         self.close_button.Enable()
 
@@ -2238,7 +2254,10 @@ class MainFrame(form_builder_output.MainFrame):
                 continue
             if isinstance(child, wx.ComboBox):  # Effort dropdown element
                 continue
-            child.Disable()
+            if isinstance(child, wx.TextCtrl):
+                self._set_field_enabled(child, False)
+            else:
+                child.Disable()
         self.camera_config_combo.Disable()
         # self.close_button.Disable()
 
