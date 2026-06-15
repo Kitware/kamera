@@ -47,9 +47,9 @@ class LogFrame(form_builder_output_log_panel.MainFrame):
         tstamp = str(datetime.datetime.utcfromtimestamp(time.time()))
         #i = self.list_ctrl.GetItemCount()
         i = 0
-        self.list_ctrl.InsertStringItem(i, tstamp)
-        self.list_ctrl.SetStringItem(i, 1, msg_type)
-        self.list_ctrl.SetStringItem(i, 2, msg)
+        self.list_ctrl.InsertItem(i, tstamp)
+        self.list_ctrl.SetItem(i, 1, msg_type)
+        self.list_ctrl.SetItem(i, 2, msg)
 
     def on_cancel(self, event=None):
         """when the 'cancel' button is selected.

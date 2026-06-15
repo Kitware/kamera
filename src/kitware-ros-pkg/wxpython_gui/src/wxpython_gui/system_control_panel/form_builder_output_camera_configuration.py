@@ -398,7 +398,7 @@ class MainFrame ( wx.Frame ):
 		self.configuration_notes_txt_ctrl = wx.TextCtrl( self.m_panel33, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, wx.TE_MULTILINE )
 		self.configuration_notes_txt_ctrl.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 		
-		bSizer454.Add( self.configuration_notes_txt_ctrl, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL|wx.EXPAND, 5 )
+		bSizer454.Add( self.configuration_notes_txt_ctrl, 1, wx.ALL|wx.EXPAND, 5 )
 		
 		
 		bSizer44.Add( bSizer454, 1, wx.EXPAND|wx.LEFT, 5 )

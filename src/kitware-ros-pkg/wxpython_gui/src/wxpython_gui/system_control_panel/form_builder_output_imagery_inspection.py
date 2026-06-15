@@ -119,7 +119,7 @@ class MainFrame ( wx.Frame ):
 		bSizer20.Add( self.m_panel7, 0, wx.EXPAND|wx.TOP, 5 )
 
 
-		main_size.Add( bSizer20, 5, wx.ALIGN_CENTER_VERTICAL|wx.EXPAND|wx.ALL, 5 )
+		main_size.Add( bSizer20, 5, wx.EXPAND|wx.ALL, 5 )
 
 		bsizer12 = wx.BoxSizer( wx.VERTICAL )
 
