@@ -27,12 +27,10 @@ services:
     volumes:
       - "/mnt:/mnt"
       - "/tmp/.X11-unix:/tmp/.X11-unix"
-      - "/home/user/kw/kamera/scripts:/home/user/kamera_ws/scripts"
-      - "${PWD}/src:/home/user/kamera_ws/src:ro"
-      - "${PWD}/kamera:/home/user/kamera_ws/kamera:ro"
-      - "${PWD}/assets:/home/user/noaa_kamera/assets:ro"
+      - "/home/user/kw/kamera/scripts:/home/user/kamera/scripts"
+      - "${PWD}/src:/home/user/kamera/src:ro"
+      - "${PWD}/assets:/home/user/kamera/assets:ro"
       - "save-gui:/home/user/.config/kamera/gui"
-      - "${HOME}/.ssh:/home/user/.ssh"
     entrypoint: ["/entry/gui.sh"]
     #command: ["bash"]
 
