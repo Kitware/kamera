@@ -3,6 +3,7 @@
 IMAGES=(\
         "kitware/kamera:viame"
         "kitware/kamera:core"
+        "kitware/kamera:gui"
         "kitware/kamera:postproc"
         "kitware/kamera:kamerad"
        )
