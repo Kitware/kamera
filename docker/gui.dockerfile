@@ -1,5 +1,5 @@
 ARG BRANCH=latest
-ARG GUI_DEPS_IMAGE=kamera/base/core-gui-deps:latest
+ARG GUI_DEPS_IMAGE=kamera/base/gui-deps:latest
 FROM ${GUI_DEPS_IMAGE}
 
 
