@@ -40,7 +40,7 @@ import shapefile
 # ROS imports
 import rospy
 import std_msgs.msg
-from custom_msgs.msg import GSOF_INS, Stat
+from custom_msgs.msg import GSOF_INS
 from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 
@@ -56,12 +56,8 @@ from custom_msgs.srv import (
     RequestCompressedImageView,
     RequestImageMetadata,
     RequestImageView,
-    SetArchiving,
     CamSetAttr,
-    CamGetAttr,
-    CamGetAttrResponse,
 )
-import sys
 from wxpython_gui.camera_models import load_from_file
 
 # Relative Imports
@@ -1200,18 +1196,6 @@ class MainFrame(form_builder_output.MainFrame):
         """Add message to the console log displayed in this GUI."""
         if self._log_panel:
             self._log_panel.add_message(msg_type, msg)
-
-    def set_cam_attr(self, fov, chan, param, val):
-        try:
-            set_cam_attr(fov, chan, param, val, log_cb=self._add_to_event_log)
-        except Exception as e:
-            self.exception_window(e, "SetCamAttr Error")
-
-    def set_ir_attr(self, fov, chan, param, val):
-        try:
-            set_ir_attr(fov, chan, param, val, log_cb=self._add_to_event_log)
-        except Exception as e:
-            rospy.logerr(e)  # , 'SetCamAttr Error')
 
     def start_collecting(self, event=None):
         self._disable_state_controls()

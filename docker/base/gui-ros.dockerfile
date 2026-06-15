@@ -1,4 +1,4 @@
-FROM ros:kinetic-robot as kinetic-robot
+FROM ros:kinetic-robot AS kinetic-robot
 ENV PYTHON=python2 \
     ROS_PKG_VERS=1.3.2-0
 
