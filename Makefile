@@ -1,5 +1,9 @@
 ROS_DISTRO ?= noetic
 
+# Disable docker compose 'bake' so build order follows depends_on statements
+COMPOSE_BAKE = false
+export COMPOSE_BAKE
+
 .PHONY: build core viame gui gui-noetic postflight follower leader all clean
 
 build:
