@@ -23,6 +23,7 @@ services:
     dns_search:
       - kamera.systems
     network_mode: host
+    ipc: host # fixes bad X Windows startups
     volumes:
       - "/mnt:/mnt"
       - "/tmp/.X11-unix:/tmp/.X11-unix"
