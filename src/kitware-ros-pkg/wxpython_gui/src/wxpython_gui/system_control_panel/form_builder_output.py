@@ -516,8 +516,11 @@ class MainFrame ( wx.Frame ):
         self.left_scroll_panel.Layout()
         self.left_scroll_panel.SetupScrolling( scroll_x = False, scroll_y = True )
 
-        self.m_panel7 = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
+        self.m_panel7 = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
         bSizer17 = wx.BoxSizer( wx.VERTICAL )
+
+        self.m_staticline_close = wx.StaticLine( self.m_panel7, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
+        bSizer17.Add( self.m_staticline_close, 0, wx.EXPAND, 0 )
 
         self.close_button = wx.Button( self.m_panel7, wx.ID_ANY, u"Close", wx.DefaultPosition, wx.Size( -1,-1 ), 0 )
         bSizer17.Add( self.close_button, 0, wx.ALL|wx.ALIGN_LEFT, 3 )
