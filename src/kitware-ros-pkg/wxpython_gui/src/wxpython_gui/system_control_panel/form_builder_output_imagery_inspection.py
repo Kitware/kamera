@@ -19,8 +19,8 @@ class MainFrame ( wx.Frame ):
 	def __init__( self, parent ):
 		wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = u"System Control Panel", pos = wx.DefaultPosition, size = wx.Size( 1538,900 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
 
-		self.SetSizeHintsSz( wx.Size( 400,400 ), wx.DefaultSize )
-		self.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), 70, 90, 90, False, wx.EmptyString ) )
+		self.SetSizeHints( wx.Size( 400,400 ), wx.DefaultSize )
+		self.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 		self.SetForegroundColour( wx.SystemSettings.GetColour( wx.SYS_COLOUR_WINDOWTEXT ) )
 
 		main_size = wx.BoxSizer( wx.HORIZONTAL )
@@ -32,7 +32,7 @@ class MainFrame ( wx.Frame ):
 
 		self.m_staticText142 = wx.StaticText( self.image_stream_panel, wx.ID_ANY, u"Image Stream", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText142.Wrap( -1 )
-		self.m_staticText142.SetFont( wx.Font( 16, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText142.SetFont( wx.Font( 16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
 		bSizer191.Add( self.m_staticText142, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.ALL, 5 )
 
@@ -52,7 +52,7 @@ class MainFrame ( wx.Frame ):
 
 		self.m_staticText1421 = wx.StaticText( self.m_panel11, wx.ID_ANY, u"Histogram", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText1421.Wrap( -1 )
-		self.m_staticText1421.SetFont( wx.Font( 16, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText1421.SetFont( wx.Font( 16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
 		bSizer11.Add( self.m_staticText1421, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.ALL, 5 )
 
@@ -124,7 +124,7 @@ class MainFrame ( wx.Frame ):
 		bsizer12 = wx.BoxSizer( wx.VERTICAL )
 
 		self.images_panel = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.Size( -1,-1 ), wx.TAB_TRAVERSAL )
-		self.images_panel.SetFont( wx.Font( 9, 70, 90, 90, False, wx.EmptyString ) )
+		self.images_panel.SetFont( wx.Font( 9, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 
 		bSizer16 = wx.BoxSizer( wx.VERTICAL )
 
@@ -133,7 +133,7 @@ class MainFrame ( wx.Frame ):
 
 		self.cueing_left_image_title3 = wx.StaticText( self.m_panel24, wx.ID_ANY, u"Click To Set Zoom Location", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.cueing_left_image_title3.Wrap( -1 )
-		self.cueing_left_image_title3.SetFont( wx.Font( 16, 70, 90, 92, False, wx.EmptyString ) )
+		self.cueing_left_image_title3.SetFont( wx.Font( 16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
 		left_bsizer.Add( self.cueing_left_image_title3, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
@@ -142,7 +142,7 @@ class MainFrame ( wx.Frame ):
 
 		self.status_text = wx.StaticText( self.m_panel24, wx.ID_ANY, u"Empty", wx.DefaultPosition, wx.DefaultSize, wx.ALIGN_CENTRE )
 		self.status_text.Wrap( -1 )
-		self.status_text.SetFont( wx.Font( 9, 70, 90, 90, False, wx.EmptyString ) )
+		self.status_text.SetFont( wx.Font( 9, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 
 		left_bsizer.Add( self.status_text, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
@@ -157,7 +157,7 @@ class MainFrame ( wx.Frame ):
 
 		self.cueing_left_image_title2 = wx.StaticText( self.m_panel37, wx.ID_ANY, u"Zoomed View", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.cueing_left_image_title2.Wrap( -1 )
-		self.cueing_left_image_title2.SetFont( wx.Font( 16, 70, 90, 92, False, wx.EmptyString ) )
+		self.cueing_left_image_title2.SetFont( wx.Font( 16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
 		left_bsizer2.Add( self.cueing_left_image_title2, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 

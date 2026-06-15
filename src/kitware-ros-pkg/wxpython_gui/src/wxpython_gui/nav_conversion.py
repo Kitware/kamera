@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 The MIT License (MIT); this license applies to GeographicLib,
 versions 1.12 and later.

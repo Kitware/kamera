@@ -19,8 +19,8 @@ class MainFrame ( wx.Frame ):
 	def __init__( self, parent ):
 		wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = u"Effort Metadata Entry", pos = wx.DefaultPosition, size = wx.Size( 753,473 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
 
-		self.SetSizeHintsSz( wx.Size( 400,400 ), wx.DefaultSize )
-		self.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), 70, 90, 90, False, wx.EmptyString ) )
+		self.SetSizeHints( wx.Size( 400,400 ), wx.DefaultSize )
+		self.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 		self.SetForegroundColour( wx.SystemSettings.GetColour( wx.SYS_COLOUR_WINDOWTEXT ) )
 
 		main_size = wx.BoxSizer( wx.HORIZONTAL )
@@ -30,7 +30,7 @@ class MainFrame ( wx.Frame ):
 
 		self.m_staticText34 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Collection Effort Metadata", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText34.Wrap( -1 )
-		self.m_staticText34.SetFont( wx.Font( 18, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText34.SetFont( wx.Font( 18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
 		bSizer44.Add( self.m_staticText34, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
@@ -46,12 +46,12 @@ class MainFrame ( wx.Frame ):
 
 		self.m_staticText33 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Effort Name", wx.DefaultPosition, wx.Size( 180,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText33.Wrap( -1 )
-		self.m_staticText33.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText33.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
 		bSizer45.Add( self.m_staticText33, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.effort_nickname_textCtrl = wx.TextCtrl( self.m_panel33, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
-		self.effort_nickname_textCtrl.SetFont( wx.Font( 14, 70, 90, 90, False, wx.EmptyString ) )
+		self.effort_nickname_textCtrl.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 
 		bSizer45.Add( self.effort_nickname_textCtrl, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
@@ -62,12 +62,12 @@ class MainFrame ( wx.Frame ):
 
 		self.m_staticText331 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Project Name", wx.DefaultPosition, wx.Size( 180,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText331.Wrap( -1 )
-		self.m_staticText331.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText331.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
 		bSizer451.Add( self.m_staticText331, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.project_name_textCtrl = wx.TextCtrl( self.m_panel33, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
-		self.project_name_textCtrl.SetFont( wx.Font( 14, 70, 90, 90, False, wx.EmptyString ) )
+		self.project_name_textCtrl.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 
 		bSizer451.Add( self.project_name_textCtrl, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
@@ -78,12 +78,12 @@ class MainFrame ( wx.Frame ):
 
 		self.m_staticText3321 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Aircraft", wx.DefaultPosition, wx.Size( 180,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText3321.Wrap( -1 )
-		self.m_staticText3321.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText3321.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
 		bSizer4521.Add( self.m_staticText3321, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.aircraft_textCtrl = wx.TextCtrl( self.m_panel33, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
-		self.aircraft_textCtrl.SetFont( wx.Font( 14, 70, 90, 90, False, wx.EmptyString ) )
+		self.aircraft_textCtrl.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 
 		bSizer4521.Add( self.aircraft_textCtrl, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
@@ -94,12 +94,12 @@ class MainFrame ( wx.Frame ):
 
 		self.m_staticText334 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Effort\nDescription", wx.DefaultPosition, wx.Size( 180,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText334.Wrap( -1 )
-		self.m_staticText334.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText334.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
 		bSizer454.Add( self.m_staticText334, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.field_notes_textCtrl = wx.TextCtrl( self.m_panel33, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, wx.TE_MULTILINE )
-		self.field_notes_textCtrl.SetFont( wx.Font( 14, 70, 90, 90, False, wx.EmptyString ) )
+		self.field_notes_textCtrl.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 
 		bSizer454.Add( self.field_notes_textCtrl, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL|wx.EXPAND, 5 )
 
@@ -110,34 +110,34 @@ class MainFrame ( wx.Frame ):
 
 		self.m_staticText3341 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Image-Process\nWait Time (s)", wx.DefaultPosition, wx.Size( 180,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText3341.Wrap( -1 )
-		self.m_staticText3341.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText3341.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
 		bSizer4541.Add( self.m_staticText3341, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.wait_time_sec = wx.TextCtrl( self.m_panel33, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
-		self.wait_time_sec.SetFont( wx.Font( 14, 70, 90, 90, False, wx.EmptyString ) )
+		self.wait_time_sec.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 
 		bSizer4541.Add( self.wait_time_sec, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.m_staticText33411 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Delete Old\nImages (s)", wx.DefaultPosition, wx.Size( 120,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText33411.Wrap( -1 )
-		self.m_staticText33411.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText33411.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
 		bSizer4541.Add( self.m_staticText33411, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.delete_old_images_sec = wx.TextCtrl( self.m_panel33, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
-		self.delete_old_images_sec.SetFont( wx.Font( 14, 70, 90, 90, False, wx.EmptyString ) )
+		self.delete_old_images_sec.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 
 		bSizer4541.Add( self.delete_old_images_sec, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.m_staticText33412 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Save every\nNth Image", wx.DefaultPosition, wx.Size( 140,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText33412.Wrap( -1 )
-		self.m_staticText33412.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText33412.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
 		bSizer4541.Add( self.m_staticText33412, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.save_every_x_image = wx.TextCtrl( self.m_panel33, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
-		self.save_every_x_image.SetFont( wx.Font( 14, 70, 90, 90, False, wx.EmptyString ) )
+		self.save_every_x_image.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 
 		bSizer4541.Add( self.save_every_x_image, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 

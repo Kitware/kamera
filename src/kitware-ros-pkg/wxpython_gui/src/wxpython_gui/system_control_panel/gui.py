@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from __future__ import division, print_function
@@ -17,8 +17,7 @@ import copy
 import psutil
 from collections import OrderedDict
 from functools import partial
-from six import StringIO, string_types
-from six.moves import queue
+import queue
 import requests
 
 # import redis

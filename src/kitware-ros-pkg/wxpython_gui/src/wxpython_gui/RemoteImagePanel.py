@@ -185,7 +185,7 @@ class RemoteImagePanel(object):
             wx_image = wx.EmptyImage(self.panel_image_width,
                                      self.panel_image_height)
             try:
-                wx_image.SetData(image.tostring())
+                wx_image.SetData(image.tobytes())
             except ValueError as err:
                 raise ValueError('Shape: {}  Chan {} \n {}'.format(image.shape, self.raw_image.dtype, err))
             self.wx_bitmap = wx_image.ConvertToBitmap()
@@ -277,7 +277,7 @@ class RemoteImagePanel(object):
                                panel_height), interpolation=cv2.INTER_NEAREST)
 
             wx_image = wx.EmptyImage(panel_width, panel_height)
-            wx_image.SetData(image.tostring())
+            wx_image.SetData(image.tobytes())
             wx_histogram_bitmap = wx_image.ConvertToBitmap()
 
             pdc = wx.PaintDC(self.wx_histogram_panel)

@@ -20,7 +20,7 @@ class LogFrame(form_builder_output_log_panel.MainFrame):
                                          wx.ALIGN_CENTRE|wx.ST_NO_AUTORESIZE)
 
         self.static_text.Wrap( -1 )
-        self.static_text.SetFont(wx.Font(14, 70, 90, 92, False,
+        self.static_text.SetFont(wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False,
                                          wx.EmptyString))
         bsizer.Add(self.static_text, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
 

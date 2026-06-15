@@ -331,7 +331,7 @@ def format_status(
     total=None,
     processed=None,
 ):
-    # type: (datetime.datetime, int, int, int, float, float, str) -> unicode
+    # type: (datetime.datetime, int, int, int, float, float, str) -> str
     """
     Render the status message.
     ☒☀⚠⍙

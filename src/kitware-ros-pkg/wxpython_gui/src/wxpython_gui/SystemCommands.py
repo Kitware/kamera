@@ -1,6 +1,6 @@
 from wxpython_gui.cfg import kv, DOCK_KAM_REPO_DIR, REAL_KAM_REPO_DIR
 import time
-import xmlrpclib
+import xmlrpc.client as xmlrpclib
 
 
 class SystemCommandsCall(object):
