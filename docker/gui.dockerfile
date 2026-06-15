@@ -40,7 +40,6 @@ RUN find /home/user -not -user user -execdir chown user {} \+
 USER user
 RUN [ "/bin/bash", "-c", "source /entry/project.sh && catkin build wxpython_gui "]
 RUN [ "/bin/bash", "-c", "source /entry/project.sh && catkin build ins_driver "]
-RUN [ "/bin/bash", "-c", "pip install -e ."]
 USER root
 RUN find /home/user -not -user user -execdir chown user {} \+
 USER user
