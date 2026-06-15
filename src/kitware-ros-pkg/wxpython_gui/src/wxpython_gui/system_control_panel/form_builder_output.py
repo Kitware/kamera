@@ -256,7 +256,7 @@ class MainFrame ( wx.Frame ):
         bSizer55.Add( self.camera_setting_subsys, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        m_staticText14211.Add( bSizer55, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
+        m_staticText14211.Add( bSizer55, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 10 )
 
         self.m_staticline5 = wx.StaticLine( self.camera_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         m_staticText14211.Add( self.m_staticline5, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )
@@ -291,7 +291,7 @@ class MainFrame ( wx.Frame ):
         bSizer442.Add( self.exposure_max_value_txt_ctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        m_staticText14211.Add( bSizer442, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
+        m_staticText14211.Add( bSizer442, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 10 )
 
         self.m_staticline51 = wx.StaticLine( self.camera_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         m_staticText14211.Add( self.m_staticline51, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )
@@ -326,7 +326,7 @@ class MainFrame ( wx.Frame ):
         bSizer4421.Add( self.gain_max_value_txt_ctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        m_staticText14211.Add( bSizer4421, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
+        m_staticText14211.Add( bSizer4421, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 10 )
 
         self.m_staticline52 = wx.StaticLine( self.camera_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         m_staticText14211.Add( self.m_staticline52, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )
@@ -430,8 +430,7 @@ class MainFrame ( wx.Frame ):
         bSizer45.Add( self.flight_number_text_ctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5 )
 
 
-        flight_observer_row = wx.BoxSizer( wx.HORIZONTAL )
-        flight_observer_row.Add( bSizer45, 1, wx.EXPAND, 2 )
+        bSizer42.Add( bSizer45, 1, wx.ALIGN_CENTER_HORIZONTAL|wx.EXPAND, 5 )
 
         bSizer451 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -445,9 +444,7 @@ class MainFrame ( wx.Frame ):
         bSizer451.Add( self.observer_text_ctrl, 1, wx.RIGHT|wx.LEFT|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 
-        flight_observer_row.Add( bSizer451, 1, wx.EXPAND, 2 )
-
-        bSizer42.Add( flight_observer_row, 0, wx.EXPAND, 2 )
+        bSizer42.Add( bSizer451, 1, wx.EXPAND, 5 )
 
 
         bSizer41.Add( bSizer42, 1, wx.EXPAND, 5 )
