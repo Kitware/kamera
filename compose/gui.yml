@@ -5,6 +5,7 @@ services:
   gui:
     container_name: gui
     image: ${KAMERA_GUI_IMAGE}
+    init: true
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"
@@ -22,17 +23,15 @@ services:
     dns_search:
       - kamera.systems
     network_mode: host
+    ipc: host # fixes bad X Windows startups
     volumes:
       - "/mnt:/mnt"
       - "/tmp/.X11-unix:/tmp/.X11-unix"
-      - "/home/user/kw/kamera/scripts:/home/user/kamera_ws/scripts"
-      - "${PWD}/src:/home/user/kamera_ws/src:ro"
-      - "${PWD}/kamera:/home/user/kamera_ws/kamera:ro"
-      - "${PWD}/assets:/home/user/noaa_kamera/assets:ro"
+      - "/home/user/kw/kamera/scripts:/home/user/kamera/scripts"
+      - "${PWD}/src:/home/user/kamera/src:ro"
+      - "${PWD}/assets:/home/user/kamera/assets:ro"
       - "save-gui:/home/user/.config/kamera/gui"
-      - "${HOME}/.ssh:/home/user/.ssh"
-    entrypoint: ["/bin/tini", "--"]
-    command: ["/entry/gui.sh"]
+    entrypoint: ["/entry/gui.sh"]
     #command: ["bash"]
 
 volumes:

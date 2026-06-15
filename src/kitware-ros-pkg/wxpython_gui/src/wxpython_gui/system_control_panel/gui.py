@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from __future__ import division, print_function
@@ -17,14 +17,14 @@ import copy
 import psutil
 from collections import OrderedDict
 from functools import partial
-from six import StringIO, string_types
-from six.moves import queue
+import queue
 import requests
 
 # import redis
 
 # GUI imports
 import wx
+import wx.adv
 from wx.lib.wordwrap import wordwrap
 
 # Vision / math
@@ -41,7 +41,7 @@ import shapefile
 # ROS imports
 import rospy
 import std_msgs.msg
-from custom_msgs.msg import GSOF_INS, Stat
+from custom_msgs.msg import GSOF_INS
 from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 
@@ -57,24 +57,20 @@ from custom_msgs.srv import (
     RequestCompressedImageView,
     RequestImageMetadata,
     RequestImageView,
-    SetArchiving,
     CamSetAttr,
-    CamGetAttr,
-    CamGetAttrResponse,
 )
-import sys
 from wxpython_gui.camera_models import load_from_file
 
-# Relative Imports
-import form_builder_output
-import form_builder_output_effort_metadata
-import form_builder_output_imagery_inspection
-import form_builder_output_event_log_note
-import form_builder_output_hot_key_list
-import form_builder_output_collection_mode
-import form_builder_output_log_panel
-import form_builder_output_system_startup
-import form_builder_output_camera_configuration
+# Sibling modules within the system_control_panel package
+import wxpython_gui.system_control_panel.form_builder_output as form_builder_output
+import wxpython_gui.system_control_panel.form_builder_output_effort_metadata as form_builder_output_effort_metadata
+import wxpython_gui.system_control_panel.form_builder_output_imagery_inspection as form_builder_output_imagery_inspection
+import wxpython_gui.system_control_panel.form_builder_output_event_log_note as form_builder_output_event_log_note
+import wxpython_gui.system_control_panel.form_builder_output_hot_key_list as form_builder_output_hot_key_list
+import wxpython_gui.system_control_panel.form_builder_output_collection_mode as form_builder_output_collection_mode
+import wxpython_gui.system_control_panel.form_builder_output_log_panel as form_builder_output_log_panel
+import wxpython_gui.system_control_panel.form_builder_output_system_startup as form_builder_output_system_startup
+import wxpython_gui.system_control_panel.form_builder_output_camera_configuration as form_builder_output_camera_configuration
 
 # Absolute imports
 from wxpython_gui.cfg import (
@@ -84,6 +80,7 @@ from wxpython_gui.cfg import (
     COLLECT_GREEN,
     ERROR_RED,
     FLAT_GRAY,
+    DISABLED_GRAY,
     WARN_AMBER,
     BRIGHT_GREEN,
     VERDANT_GREEN,
@@ -113,7 +110,7 @@ from wxpython_gui.SystemStartup import SystemStartup
 from wxpython_gui.SystemCommands import SystemCommands
 from wxpython_gui.DetectorState import set_detector_state, detector_state, EPodStatus
 
-import gui_utils
+import wxpython_gui.system_control_panel.gui_utils as gui_utils
 
 
 G_time_note_started = None  # type: datetime.datetime
@@ -204,10 +201,12 @@ class MainFrame(form_builder_output.MainFrame):
         # initialize parent class
         form_builder_output.MainFrame.__init__(self, parent)
         self.SetTitle(window_title)
-        icon = wx.EmptyIcon()
+        # Recompute enlarged title fonts so they are not clipped under Phoenix.
+        wx.CallAfter(gui_utils.unclip_static_text, self)
+        icon = wx.Icon()
         icon.CopyFromBitmap(
             wx.Bitmap(
-                os.path.expanduser("~/noaa_kamera/src/cfg/seal-icon.png"),
+                os.path.expanduser("~/kamera/src/cfg/seal-icon.png"),
                 wx.BITMAP_TYPE_ANY,
             )
         )
@@ -228,7 +227,18 @@ class MainFrame(form_builder_output.MainFrame):
             "flight_summary": "Flight Summary",
         }
 
-        self.hosts = sorted(SYS_CFG["arch"]["hosts"].keys())
+        all_hosts = sorted(SYS_CFG["arch"]["hosts"].keys())
+        # Only manage hosts belonging to the current system. Redis (/sys) can
+        # accumulate host entries from other systems (cas, nayak, ...); host
+        # names are suffixed with the system name, e.g. "center-0-taiga".
+        system_name = os.environ.get("SYSTEM_NAME")
+        if system_name:
+            self.hosts = [h for h in all_hosts if h.endswith("-" + system_name)]
+        else:
+            self.hosts = []
+        if not self.hosts:
+            # Fall back to every host if the naming convention doesn't match.
+            self.hosts = all_hosts
         print("HOSTS: ")
         print(self.hosts)
         self.last_busy = {h: False for h in self.hosts}
@@ -444,62 +454,75 @@ class MainFrame(form_builder_output.MainFrame):
 
         # ----------------------------- Hot Keys -----------------------------
         entries = []
+        # Retain the id refs so their reserved ids aren't recycled (NewIdRef
+        # releases the id once the ref is garbage collected).
+        self._accel_ids = []
 
         # Bind ctrl+s to start/stop recording.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.reverse_collecting_state, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("S"), random_id)
         # Bind ctrl+d to start detectors.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.on_start_detectors, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("D"), random_id)
 
         # Bind ctrl+f to stop detectors.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.on_stop_detectors, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("F"), random_id)
         # Bind ctrl+h to hot key menu.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.on_hot_key_help, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("H"), random_id)
 
         # Bind ctrl+e to set context to exposure entry.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.set_focus_to_exposure, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("E"), random_id)
 
         # Bind ctrl+n to add note to log.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.on_add_to_event_log, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("N"), random_id)
 
         # Bind ctrl+o to next previous camera configuration.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.previous_camera_config, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("O"), random_id)
 
         # Bind ctrl+p to next camera configuration.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.next_camera_config, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("P"), random_id)
 
         # Bind ctrl+i to next previous effort configuration.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.previous_effort_config, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("I"), random_id)
 
         # Bind ctrl+k to next effort configuration.
         entries.append(wx.AcceleratorEntry())
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        self._accel_ids.append(random_id)
         self.Bind(wx.EVT_MENU, self.next_effort_config, id=random_id)
         entries[-1].Set(wx.ACCEL_CTRL, ord("K"), random_id)
 
@@ -529,131 +552,196 @@ class MainFrame(form_builder_output.MainFrame):
         # self.lastCdet = kv.get("/nuvo0/detector/health//frame")
         # self.lastRdet = kv.get("/nuvo2/detector/health//frame")
         self.delay = 0
+        self.detectors_gauge.SetBackgroundColour(FLAT_GRAY)
         self.Show()
         print(self.GetSize())
-        self.SetMinSize((1500, 980))
+        self._fit_to_display()
         # self.detector_gauge.Hide()
 
         if self.collecting:
             self._disable_state_controls()
         # Add in pause before displaying imagery
 
-    def system_sanity_check(self):
-        fails = 0
-        unmounts = []
-        nas_unmounts = []
-        for host in self.hosts:
-            try:
-                diskinfo = requests.post(
-                    "http://{}:8987/diskinfo".format(host),
-                    data=SYS_CFG["local_ssd_mnt"],
-                    timeout=0.1,
-                )
-            except requests.exceptions.ConnectionError:
-                rospy.logwarn("Could not access disk info from system %s." % host)
-                continue
-            diskinfo = json.loads(diskinfo.text)
-            mounted = diskinfo["ismount"]
-            try:
-                if not mounted:
-                    unmounts.append(host)
-                else:
-                    if 0 == int(host[-1]):
-                        self.center_sys_space_static_text.SetLabel(
-                            "Disk Space: %0.2f GB"
-                            % (float(diskinfo["bytes_free"]) / 1e9)
-                        )
-                        self.center_sys_space_static_text.SetForegroundColour(
-                            COLLECT_GREEN
-                        )
-                    elif 1 == int(host[-1]):
-                        self.left_sys_space_static_text.SetLabel(
-                            "Disk Space: %0.2f GB"
-                            % (float(diskinfo["bytes_free"]) / 1e9)
-                        )
-                        self.left_sys_space_static_text.SetForegroundColour(
-                            COLLECT_GREEN
-                        )
-                    else:
-                        self.right_sys_space_static_text.SetLabel(
-                            "Disk Space: %0.2f GB"
-                            % (float(diskinfo["bytes_free"]) / 1e9)
-                        )
-                        self.right_sys_space_static_text.SetForegroundColour(
-                            COLLECT_GREEN
-                        )
-            except Exception as e:
-                rospy.logerr("Failed to connect to host {}: {}".format(host, e))
-                return
-            try:
-                diskinfo = requests.post(
-                    "http://{}:8987/diskinfo".format(host),
-                    SYS_CFG["nas_mnt"],
-                    timeout=0.1,
-                )
-                diskinfo = json.loads(diskinfo.text)
-                # rospy.loginfo("{}: {}".format(host, diskinfo))
-                mounted = diskinfo["ismount"]
-                if not mounted:
-                    nas_unmounts.append(host)
-                else:
-                    if 0 == int(host[-1]):
-                        self.nas_disk_space.SetLabel(
-                            "NAS Disk Space: %0.2f GB"
-                            % (float(diskinfo["bytes_free"]) / 1e9)
-                        )
-                        self.nas_disk_space.SetForegroundColour(COLLECT_GREEN)
-            except Exception as exc:
-                # rospy.logerr("unable to connect to host {}: {}".format(host, exc))
-                fails += 1
-        for host in unmounts:
-            if 0 == int(host[-1]):
-                self.center_sys_space_static_text.SetLabel("Disk Space: Err")
-                self.center_sys_space_static_text.SetForegroundColour(ERROR_RED)
-            elif 1 == int(host[-1]):
-                self.left_sys_space_static_text.SetLabel("Disk Space: Err")
-                self.left_sys_space_static_text.SetForegroundColour(ERROR_RED)
-            else:
-                self.right_sys_space_static_text.SetLabel("Disk Space: Err")
-                self.right_sys_space_static_text.SetForegroundColour(ERROR_RED)
-        if len(unmounts) > 0:
-            errmsg = "ERROR: One or more hosts has an sdd mount issue: {}\n".format(
-                unmounts
-            )
-            rospy.logerr(errmsg)
-            for host in unmounts:
-                res = requests.post(
-                    "http://{}:8987/mountall".format(host), data="/mnt/data"
-                )
+    def _fit_to_display(self):
+        """Keep the window within the usable area of its display.
 
-        if len(nas_unmounts) > 0:
-            err_host_str = "NAS Err: " + "".join(nas_unmounts)
-            self.nas_disk_space.SetLabel(err_host_str)
-            self.nas_disk_space.SetForegroundColour(ERROR_RED)
-            errmsg = "ERROR: One or more hosts has an NAS mount issue: {}\n".format(
-                nas_unmounts
-            )
-            rospy.logerr(errmsg)
-            for host in nas_unmounts:
-                res = requests.post(
-                    "http://{}:8987/mountall".format(host), data=SYS_CFG["nas_mnt"]
+        On smaller monitors (e.g. 1920x1080) the design size is taller than the
+        work area, which pushes the bottom of the side panel (detector /
+        archiving controls, Close button) off-screen. Clamp the window size and
+        position to the display's client area, and cap the minimum size so the
+        window can always be shrunk to fit.
+        """
+        idx = wx.Display.GetFromWindow(self)
+        if idx == wx.NOT_FOUND:
+            idx = 0
+        area = wx.Display(idx).GetClientArea()
+
+        min_w = min(1500, area.width)
+        min_h = min(980, area.height)
+        self.SetMinSize((min_w, min_h))
+
+        w, h = self.GetSize()
+        self.SetSize(min(w, area.width), min(h, area.height))
+        self.SetPosition((area.x, area.y))
+        self.Layout()
+
+    def system_sanity_check(self):
+        # Run the disk / NAS checks off the UI thread so unreachable hosts
+        # can't freeze the GUI. Skip if the previous check is still in flight.
+        if getattr(self, "_sanity_check_running", False):
+            return
+        self._sanity_check_running = True
+        worker = threading.Thread(
+            target=self._system_sanity_worker, args=(list(self.hosts),)
+        )
+        worker.daemon = True
+        worker.start()
+
+    def _system_sanity_worker(self, hosts):
+        """Background-thread network I/O for system_sanity_check.
+
+        Collects results and marshals UI updates back onto the main thread via
+        wx.CallAfter. Every request has a timeout so an offline host can't hang
+        the check.
+        """
+        timeout = 0.5
+        ssd_mnt = SYS_CFG["local_ssd_mnt"]
+        nas_mnt = SYS_CFG["nas_mnt"]
+        try:
+            results = {}
+            unmounts = []
+            nas_unmounts = []
+            for host in hosts:
+                entry = {"ssd_gb": None, "ssd_err": False, "nas_gb": None}
+                try:
+                    resp = requests.post(
+                        "http://{}:8987/diskinfo".format(host),
+                        data=ssd_mnt,
+                        timeout=timeout,
+                    )
+                    info = json.loads(resp.text)
+                    if info["ismount"]:
+                        entry["ssd_gb"] = float(info["bytes_free"]) / 1e9
+                    else:
+                        entry["ssd_err"] = True
+                        unmounts.append(host)
+                except (requests.exceptions.RequestException, ValueError, KeyError):
+                    rospy.logwarn(
+                        "Could not access disk info from system %s." % host
+                    )
+                    results[host] = entry
+                    continue
+                try:
+                    resp = requests.post(
+                        "http://{}:8987/diskinfo".format(host),
+                        data=nas_mnt,
+                        timeout=timeout,
+                    )
+                    info = json.loads(resp.text)
+                    if info["ismount"]:
+                        entry["nas_gb"] = float(info["bytes_free"]) / 1e9
+                    else:
+                        nas_unmounts.append(host)
+                except (requests.exceptions.RequestException, ValueError, KeyError):
+                    pass
+                results[host] = entry
+
+            # Attempt to remount any host that responded but wasn't mounted.
+            if unmounts:
+                rospy.logerr(
+                    "ERROR: One or more hosts has an ssd mount issue: {}".format(
+                        unmounts
+                    )
                 )
+                for host in unmounts:
+                    try:
+                        requests.post(
+                            "http://{}:8987/mountall".format(host),
+                            data="/mnt/data",
+                            timeout=timeout,
+                        )
+                    except requests.exceptions.RequestException:
+                        pass
+            if nas_unmounts:
+                rospy.logerr(
+                    "ERROR: One or more hosts has a NAS mount issue: {}".format(
+                        nas_unmounts
+                    )
+                )
+                for host in nas_unmounts:
+                    try:
+                        requests.post(
+                            "http://{}:8987/mountall".format(host),
+                            data=nas_mnt,
+                            timeout=timeout,
+                        )
+                    except requests.exceptions.RequestException:
+                        pass
+
+            wx.CallAfter(self._apply_system_sanity, results, nas_unmounts)
+        finally:
+            self._sanity_check_running = False
+
+    def _apply_system_sanity(self, results, nas_unmounts):
+        """Apply system_sanity_check results to the UI (main thread only)."""
+        for host, entry in results.items():
+            try:
+                fov = SYS_CFG["arch"]["hosts"][host]["fov"]
+            except KeyError:
+                continue
+            ssd_label = getattr(self, "{}_sys_space_static_text".format(fov), None)
+            if ssd_label is not None:
+                if entry["ssd_err"]:
+                    ssd_label.SetLabel("Disk Space: Err")
+                    ssd_label.SetForegroundColour(ERROR_RED)
+                elif entry["ssd_gb"] is not None:
+                    ssd_label.SetLabel("Disk Space: %0.2f GB" % entry["ssd_gb"])
+                    ssd_label.SetForegroundColour(COLLECT_GREEN)
+            # The NAS is shared, so it's only displayed once (center host).
+            if fov == "center" and entry["nas_gb"] is not None:
+                self.nas_disk_space.SetLabel(
+                    "NAS Disk Space: %0.2f GB" % entry["nas_gb"]
+                )
+                self.nas_disk_space.SetForegroundColour(COLLECT_GREEN)
+        if nas_unmounts:
+            self.nas_disk_space.SetLabel("NAS Err: " + "".join(nas_unmounts))
+            self.nas_disk_space.SetForegroundColour(ERROR_RED)
+
+    def _set_field_enabled(self, ctrl, enabled):
+        """Enable/disable an input field and make the disabled state obvious.
+
+        For text fields we use read-only instead of a full Disable() so the
+        frozen value stays fully legible (GTK greys out the text of disabled
+        controls, hiding the value). A darker background plus dark text makes
+        the read-only/frozen state obvious while keeping the value visible.
+        """
+        if isinstance(ctrl, wx.TextCtrl):
+            ctrl.SetEditable(enabled)
+            ctrl.SetForegroundColour(
+                wx.BLACK if enabled else wx.Colour(*TEXTCTRL_DARK)
+            )
+        else:
+            ctrl.Enable(enabled)
+        ctrl.SetBackgroundColour(
+            wx.WHITE if enabled else wx.Colour(*DISABLED_GRAY)
+        )
+        ctrl.Refresh()
 
     def on_modal_selection(self, event):
         self.on_camera_setting_subsys_selection(event)
         mode = self.camera_setting_rgb_uv_combo.GetStringSelection()
         if mode == "IR":
-            self.exposure_max_value_txt_ctrl.Disable()
-            self.exposure_min_value_txt_ctrl.Disable()
-            self.gain_min_value_txt_ctrl.Disable()
-            self.gain_max_value_txt_ctrl.Disable()
-            self.ir_nuc_time.Enable()
+            self._set_field_enabled(self.exposure_max_value_txt_ctrl, False)
+            self._set_field_enabled(self.exposure_min_value_txt_ctrl, False)
+            self._set_field_enabled(self.gain_min_value_txt_ctrl, False)
+            self._set_field_enabled(self.gain_max_value_txt_ctrl, False)
+            self._set_field_enabled(self.ir_nuc_time, True)
         else:
-            self.exposure_max_value_txt_ctrl.Enable()
-            self.exposure_min_value_txt_ctrl.Enable()
-            self.gain_min_value_txt_ctrl.Enable()
-            self.gain_max_value_txt_ctrl.Enable()
-            self.ir_nuc_time.Disable()
+            self._set_field_enabled(self.exposure_max_value_txt_ctrl, True)
+            self._set_field_enabled(self.exposure_min_value_txt_ctrl, True)
+            self._set_field_enabled(self.gain_min_value_txt_ctrl, True)
+            self._set_field_enabled(self.gain_max_value_txt_ctrl, True)
+            self._set_field_enabled(self.ir_nuc_time, False)
 
     def set_camera_parameter(self, hosts, mode, param, val):
         mode = mode.lower()
@@ -949,19 +1037,22 @@ class MainFrame(form_builder_output.MainFrame):
 
         print(d_status.values())
 
-        if not len(d_desired):
+        active_statuses = [
+            status for status in d_status.values()
+            if status is not EPodStatus.Unknown
+        ]
+        if not d_desired or not active_statuses:
             self.detectors_gauge.SetBackgroundColour(FLAT_GRAY)
+        elif any(status is EPodStatus.Failed for status in active_statuses):
+            self.detectors_gauge.SetBackgroundColour(ERROR_RED)
+        elif any(status is EPodStatus.Pending for status in active_statuses):
+            self.detectors_gauge.SetBackgroundColour(WARN_AMBER)
+        elif any(status is EPodStatus.Stalled for status in active_statuses):
+            self.detectors_gauge.SetBackgroundColour(WARN_AMBER)
+        elif all(status.is_ok() for status in active_statuses):
+            self.detectors_gauge.SetBackgroundColour(BRIGHT_GREEN)
         else:
-            if any([status is EPodStatus.Failed for status in d_status.values()]):
-                self.detectors_gauge.SetBackgroundColour(ERROR_RED)
-            elif any([status is EPodStatus.Pending for status in d_status.values()]):
-                self.detectors_gauge.SetBackgroundColour(WARN_AMBER)
-            elif any([status is EPodStatus.Stalled for status in d_status.values()]):
-                self.detectors_gauge.SetBackgroundColour(WARN_AMBER)
-            elif all([status.is_ok() for status in d_status.values()]):
-                self.detectors_gauge.SetBackgroundColour(BRIGHT_GREEN)
-            else:
-                self.detectors_gauge.SetBackgroundColour(ERROR_RED)
+            self.detectors_gauge.SetBackgroundColour(FLAT_GRAY)
 
         is_busy = {h: 0 for h in self.hosts}
         current_task = {}
@@ -1201,18 +1292,6 @@ class MainFrame(form_builder_output.MainFrame):
         """Add message to the console log displayed in this GUI."""
         if self._log_panel:
             self._log_panel.add_message(msg_type, msg)
-
-    def set_cam_attr(self, fov, chan, param, val):
-        try:
-            set_cam_attr(fov, chan, param, val, log_cb=self._add_to_event_log)
-        except Exception as e:
-            self.exception_window(e, "SetCamAttr Error")
-
-    def set_ir_attr(self, fov, chan, param, val):
-        try:
-            set_ir_attr(fov, chan, param, val, log_cb=self._add_to_event_log)
-        except Exception as e:
-            rospy.logerr(e)  # , 'SetCamAttr Error')
 
     def start_collecting(self, event=None):
         self._disable_state_controls()
@@ -1854,7 +1933,7 @@ class MainFrame(form_builder_output.MainFrame):
     def load_camera_model(self, name, fname):
         wildcard = "Camera model (*.yaml)"
         dialog = wx.FileDialog(
-            None, "Choose a file", os.getcwd(), "", wildcard, wx.OPEN
+            None, "Choose a file", os.getcwd(), "", wildcard, wx.FD_OPEN
         )
         if dialog.ShowModal() == wx.ID_OK:
             print(dialog.GetPath())
@@ -1863,7 +1942,7 @@ class MainFrame(form_builder_output.MainFrame):
 
     def save_flight_summary(self, event=None):
         wildcard = "Camera model (*.yaml)"
-        dialog = wx.FileDialog(None, "Choose a file", "/mnt", "", wildcard, wx.SAVE)
+        dialog = wx.FileDialog(None, "Choose a file", "/mnt", "", wildcard, wx.FD_SAVE)
         if dialog.ShowModal() == wx.ID_OK:
             print(dialog.GetPath())
 
@@ -2148,7 +2227,7 @@ class MainFrame(form_builder_output.MainFrame):
 
     def on_menu_item_about(self, event):
         about_panel = wx.Panel(self, wx.ID_ANY)
-        info = wx.AboutDialogInfo()
+        info = wx.adv.AboutDialogInfo()
         info.Name = "KAMERA System Control Panel"
         info.Version = "2.0.0"
         info.Copyright = "(C) 2023 Kitware"
@@ -2160,14 +2239,16 @@ class MainFrame(form_builder_output.MainFrame):
         info.WebSite = ("http://www.kitware.com", "Kitware")
         info.Developers = ["Matt Brown, Adam Romlein, Mike McDermott"]
         info.License = wordwrap(LICENSE_STR, 500, wx.ClientDC(about_panel))
-        # Show the wx.AboutBox
-        wx.AboutBox(info)
+        wx.adv.AboutBox(info)
 
     # ------------------------------------------------------------------------
 
     def _enable_state_controls(self):
         for child in self.flight_data_panel.GetChildren():
-            child.Enable()
+            if isinstance(child, wx.TextCtrl):
+                self._set_field_enabled(child, True)
+            else:
+                child.Enable()
         self.camera_config_combo.Enable()
         self.close_button.Enable()
 
@@ -2185,7 +2266,10 @@ class MainFrame(form_builder_output.MainFrame):
                 continue
             if isinstance(child, wx.ComboBox):  # Effort dropdown element
                 continue
-            child.Disable()
+            if isinstance(child, wx.TextCtrl):
+                self._set_field_enabled(child, False)
+            else:
+                child.Disable()
         self.camera_config_combo.Disable()
         # self.close_button.Disable()
 

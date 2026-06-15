@@ -7,6 +7,7 @@ services:
   detector:
     container_name: "viame-${CAM_FOV}"
     image: ${KAMERA_VIAME_IMAGE}
+    init: true
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"

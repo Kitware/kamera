@@ -19,8 +19,8 @@ class MainFrame ( wx.Frame ):
 	def __init__( self, parent ):
 		wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = u"Event Log Note", pos = wx.DefaultPosition, size = wx.Size( 700,300 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
 		
-		self.SetSizeHintsSz( wx.Size( 400,300 ), wx.DefaultSize )
-		self.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), 70, 90, 90, False, wx.EmptyString ) )
+		self.SetSizeHints( wx.Size( 400,300 ), wx.DefaultSize )
+		self.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 		self.SetForegroundColour( wx.SystemSettings.GetColour( wx.SYS_COLOUR_WINDOWTEXT ) )
 		
 		main_size = wx.BoxSizer( wx.HORIZONTAL )
@@ -30,7 +30,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText34 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Add Note to Event Log", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText34.Wrap( -1 )
-		self.m_staticText34.SetFont( wx.Font( 18, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText34.SetFont( wx.Font( 18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer44.Add( self.m_staticText34, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
@@ -44,7 +44,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText3 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Event Type:", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText3.Wrap( -1 )
-		self.m_staticText3.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText3.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer5.Add( self.m_staticText3, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -57,9 +57,9 @@ class MainFrame ( wx.Frame ):
 		bSizer454.Add( bSizer5, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
 		self.note_textCtrl = wx.TextCtrl( self.m_panel33, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, wx.TE_MULTILINE )
-		self.note_textCtrl.SetFont( wx.Font( 14, 70, 90, 90, False, wx.EmptyString ) )
+		self.note_textCtrl.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 		
-		bSizer454.Add( self.note_textCtrl, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL|wx.EXPAND, 5 )
+		bSizer454.Add( self.note_textCtrl, 1, wx.ALL|wx.EXPAND, 5 )
 		
 		
 		bSizer44.Add( bSizer454, 1, wx.EXPAND, 5 )

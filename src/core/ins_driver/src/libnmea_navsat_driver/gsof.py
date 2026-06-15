@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import struct
 import datetime
@@ -569,13 +569,12 @@ def separate_nmea(buf):
 
 def run_tests():
     from pprint import pprint
-    from vprint.base256 import b256encode
     nmea_list, data = separate_nmea(TEST_GSOF_PACKET)
 
     dispatch = parse_gsof(data)
     pprint(nmea_list)
     print(len(data))
-    print(b256encode(data))
+    print(data.hex())
     pprint(dispatch.msg)
 
 

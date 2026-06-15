@@ -1,5 +1,6 @@
 import wx
 import wxpython_gui.system_control_panel.form_builder_output_log_panel as form_builder_output_log_panel
+from wxpython_gui.system_control_panel.gui_utils import unclip_static_text
 
 
 class LogFrame(form_builder_output_log_panel.MainFrame):
@@ -20,7 +21,7 @@ class LogFrame(form_builder_output_log_panel.MainFrame):
                                          wx.ALIGN_CENTRE|wx.ST_NO_AUTORESIZE)
 
         self.static_text.Wrap( -1 )
-        self.static_text.SetFont(wx.Font(14, 70, 90, 92, False,
+        self.static_text.SetFont(wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False,
                                          wx.EmptyString))
         bsizer.Add(self.static_text, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5)
 
@@ -42,14 +43,16 @@ class LogFrame(form_builder_output_log_panel.MainFrame):
 
         self.Show()
         self.SetMinSize(self.GetSize())
+        # Recompute enlarged title fonts so they are not clipped under Phoenix.
+        wx.CallAfter(unclip_static_text, self)
 
     def add_message(self, msg_type, msg):
         tstamp = str(datetime.datetime.utcfromtimestamp(time.time()))
         #i = self.list_ctrl.GetItemCount()
         i = 0
-        self.list_ctrl.InsertStringItem(i, tstamp)
-        self.list_ctrl.SetStringItem(i, 1, msg_type)
-        self.list_ctrl.SetStringItem(i, 2, msg)
+        self.list_ctrl.InsertItem(i, tstamp)
+        self.list_ctrl.SetItem(i, 1, msg_type)
+        self.list_ctrl.SetItem(i, 2, msg)
 
     def on_cancel(self, event=None):
         """when the 'cancel' button is selected.

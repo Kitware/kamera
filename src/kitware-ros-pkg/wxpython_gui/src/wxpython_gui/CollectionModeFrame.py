@@ -3,6 +3,7 @@ import shapefile
 import wx
 import wxpython_gui.system_control_panel.form_builder_output_collection_mode as form_builder_output_collection_mode
 from wxpython_gui.cfg import SYS_CFG, redis
+from wxpython_gui.system_control_panel.gui_utils import unclip_static_text
 
 class CollectionModeFrame(form_builder_output_collection_mode.MainFrame):
     """.
@@ -22,6 +23,8 @@ class CollectionModeFrame(form_builder_output_collection_mode.MainFrame):
         :type use_archive_region: Optional[bool]
         """
         form_builder_output_collection_mode.MainFrame.__init__(self, parent)
+        # Recompute enlarged title fonts so they are not clipped under Phoenix.
+        wx.CallAfter(unclip_static_text, self)
         self.parent = parent
         self.shapefile_fname = shapefile_fname
         self.use_archive_region = int(use_archive_region)

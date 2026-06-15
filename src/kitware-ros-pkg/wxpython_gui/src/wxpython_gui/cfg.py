@@ -93,7 +93,10 @@ config_filename = os.path.join(USER_CFG["gui_cfg_dir"], "system_state.json")
 # create from template if it doesn't exist
 if not os.path.isfile(config_filename):
     wxpython_gui.utils.make_path(config_filename, from_file=True)
-    with open(os.path.join(PKG_DIR, "config/default_system_state.json"), "r") as infile:
+    default_system_state_file = os.path.join(
+        REAL_KAM_REPO_DIR, "src/cfg", system_name, "default_system_state.json"
+    )
+    with open(default_system_state_file, "r") as infile:
         with open(config_filename, "w") as outfile:
             outfile.write(infile.read())
             print("Created config from scratch: {}".format(config_filename))
@@ -147,8 +150,13 @@ CAMERA_CFGS["camera_cfgs"] = check_default(CAMERA_CFGS_KV, CAMERA_CFGS_DEFAULT)
 # =================== FINISHED CAMERA CONFIG =======================
 
 
+# Tracks conflict paths already reported so the same divergence isn't logged
+# once per merge pass (merge_two_dicts is called several times below).
+_reported_conflicts = set()
+
+
 def merge_two_dicts(a, b, path=None):
-    "merges b into a"
+    "merges b into a; on a leaf conflict a's value is kept and b's is ignored"
     if path is None:
         path = []
     for key in b:
@@ -158,7 +166,13 @@ def merge_two_dicts(a, b, path=None):
             elif a[key] == b[key]:
                 pass  # same leaf value
             else:
-                print("Warning: conflict at %s" % ".".join(path + [str(key)]))
+                dotted = ".".join(path + [str(key)])
+                if dotted not in _reported_conflicts:
+                    _reported_conflicts.add(dotted)
+                    print(
+                        "Warning: config conflict at %s -> keeping %r, ignoring %r"
+                        % (dotted, a[key], b[key])
+                    )
         else:
             a[key] = b[key]
     return a
@@ -191,6 +205,7 @@ TEXTCTRL_WHITE = (255, 255, 255)
 TEXTCTRL_DARK = (20, 20, 20)
 APP_GRAY = (220, 218, 213)  # Default application background
 FLAT_GRAY = (200, 200, 200)
+DISABLED_GRAY = (150, 150, 150)  # Darker fill for disabled input fields
 COLLECT_GREEN = (55, 120, 25)
 SHAPE_COLLECT_BLUE = (
     52,
@@ -331,7 +346,7 @@ def format_status(
     total=None,
     processed=None,
 ):
-    # type: (datetime.datetime, int, int, int, float, float, str) -> unicode
+    # type: (datetime.datetime, int, int, int, float, float, str) -> str
     """
     Render the status message.
     ☒☀⚠⍙

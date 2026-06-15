@@ -4,6 +4,7 @@ services:
   shapefile_monitor:
     container_name: shapefile_monitor
     image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"

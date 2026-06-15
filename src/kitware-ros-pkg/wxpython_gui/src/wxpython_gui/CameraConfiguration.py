@@ -7,6 +7,7 @@ import sys
 from wxpython_gui.camera_models import load_from_file
 import wxpython_gui.system_control_panel.form_builder_output_camera_configuration as fbocc
 from wxpython_gui.cfg import SYS_CFG, save_camera_config
+from wxpython_gui.system_control_panel.gui_utils import unclip_static_text
 
 class CameraConfiguration(fbocc.MainFrame):
     """Defines how the cameras are layed out.
@@ -22,6 +23,8 @@ class CameraConfiguration(fbocc.MainFrame):
         """
         # Initialize parent class
         fbocc.MainFrame.__init__(self, parent)
+        # Recompute enlarged title fonts so they are not clipped under Phoenix.
+        wx.CallAfter(unclip_static_text, self)
         self.parent = parent
         self.curr_cfg = sel_camera_config
 
@@ -56,7 +59,7 @@ class CameraConfiguration(fbocc.MainFrame):
             select_str - select this str after updating.
         """
         # First cache which camera configuration is currently selected.
-        if select_str is "":
+        if select_str == "":
             select_str = self.camera_config_combo.GetStringSelection()
 
         self.camera_config_combo.SetEditable(True)
@@ -300,7 +303,7 @@ class CameraConfiguration(fbocc.MainFrame):
 
     def file_picker(self, wildcard='*'):
         dialog = wx.FileDialog(None, "Choose a file", SYS_CFG["nas_mnt"], '',
-                               wildcard, wx.OPEN)
+                               wildcard, wx.FD_OPEN)
         if dialog.ShowModal() == wx.ID_OK:
             file_path = dialog.GetPath()
         else:
