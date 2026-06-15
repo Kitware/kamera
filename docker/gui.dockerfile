@@ -19,10 +19,9 @@ ENV HOME_DIR=/home/user \
 # trying to speed up chown operation
 RUN mkdir -p /home/user && chown -R user:user /home/user
 
-COPY --chown=user:user  src/kitware-ros-pkg/wxpython_gui/config $GUI_CFG_DIR/config
-COPY --chown=user:user  repo_dir.bash      $REPO_DIR/repo_dir.bash
-COPY --chown=user:user  src                $REPO_DIR/src
-COPY --chown=user:user  activate_ros.bash  $WS_DIR/activate_ros.bash
+COPY --chown=user:user  .dir                       $REPO_DIR/repo_dir.bash
+COPY --chown=user:user  src                        $REPO_DIR/src
+COPY --chown=user:user  scripts/activate_ros.bash  $WS_DIR/activate_ros.bash
 RUN ln -sf              $REPO_DIR/src      $WS_DIR/src                  &&\
     rm -rf /entry                                                       &&\
     ln -sf $REPO_DIR/src/run_scripts/entry /entry                       &&\
