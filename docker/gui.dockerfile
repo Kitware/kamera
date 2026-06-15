@@ -10,7 +10,7 @@ RUN useradd -m --uid=1000 user \
     && useradd --uid=7777 share \
     && usermod -aG share user
 
-# Source code goes into ~/noaa_kamera, live dir goes into ~/kamera_ws
+# Source code goes into ~/kamera
 ENV HOME_DIR=/home/user \
     REPO_DIR=/home/user/kamera \
     GUI_CFG_DIR=/home/user/.config/kamera/gui
@@ -18,13 +18,22 @@ ENV HOME_DIR=/home/user \
 # trying to speed up chown operation
 RUN mkdir -p /home/user && chown -R user:user /home/user
 
-COPY --chown=user:user  .                        $REPO_DIR
-RUN ln -sf $REPO_DIR/src/run_scripts/entry /entry                       &&\
-    printf "\nsource /entry/project.sh\n" >> /home/user/.bashrc         &&\
-    touch $REPO_DIR/.catkin_workspace                                     &&\
-    ln -sf $REPO_DIR/src/cfg /cfg
-
 WORKDIR $REPO_DIR
+COPY --chown=user:user  .  $REPO_DIR
+
+RUN rm -rf /entry \
+    && ln -sf $REPO_DIR/src/run_scripts/entry /entry \
+    && printf "\nsource /entry/project.sh\n" >> /home/user/.bashrc \
+    && touch $REPO_DIR/.catkin_workspace \
+    && ln -sf $REPO_DIR/src/run_scripts/aliases.sh /aliases.sh \
+    && printf "\nsource /aliases.sh\n" >> /home/user/.bashrc
+
+RUN ln -sf $REPO_DIR/scripts/activate_ros.bash $REPO_DIR/activate_ros.bash
+RUN ln -sf $REPO_DIR/src/cfg /cfg
+RUN mkdir -p /home/user/.config/kamera && \
+    ln -sf $REPO_DIR/.dir /home/user/.config/kamera/repo_dir.bash
+
+RUN ln -sv /usr/bin/python3 /usr/bin/python || true
 RUN find /home/user -not -user user -execdir chown user {} \+
 
 # use the exec form of run because we need bash syntax
