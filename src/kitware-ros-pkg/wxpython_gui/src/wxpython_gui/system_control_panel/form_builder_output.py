@@ -34,12 +34,10 @@ class MainFrame ( wx.Frame ):
 
         main_size = wx.BoxSizer( wx.HORIZONTAL )
 
+        left_column = wx.BoxSizer( wx.VERTICAL )
         bSizer20 = wx.BoxSizer( wx.VERTICAL )
 
-        # The left control column can be taller than the work area on smaller
-        # (e.g. 1920x1080) displays. Host it in a scrolled panel so the controls
-        # keep their natural size and a vertical scrollbar appears only when the
-        # column does not fully fit, instead of squishing the bottom rows.
+        # Scrollable region for the left control panels; Close stays pinned below.
         self.left_scroll_panel = scrolledpanel.ScrolledPanel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
 
         self.ins_control_panel = wx.Panel( self.left_scroll_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
@@ -47,7 +45,7 @@ class MainFrame ( wx.Frame ):
 
         self.m_staticText142 = wx.StaticText( self.ins_control_panel, wx.ID_ANY, u"Navigation Data", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText142.Wrap( -1 )
-        self.m_staticText142.SetFont( wx.Font( 16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
+        self.m_staticText142.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
         bSizer191.Add( self.m_staticText142, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.RIGHT|wx.LEFT, 5 )
 
@@ -182,82 +180,83 @@ class MainFrame ( wx.Frame ):
 
         bSizer1817131 = wx.BoxSizer( wx.HORIZONTAL )
 
-        self.m_staticText1817131 = wx.StaticText( self.ins_control_panel, wx.ID_ANY, u"Time (s)", wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.m_staticText1817131 = wx.StaticText( self.ins_control_panel, wx.ID_ANY, u"Time", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText1817131.Wrap( -1 )
         self.m_staticText1817131.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
-        bSizer1817131.Add( self.m_staticText1817131, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
+        bSizer1817131.Add( self.m_staticText1817131, 0, wx.ALIGN_CENTER_VERTICAL|wx.LEFT, 2 )
 
         self.ins_time_txtctrl = wx.TextCtrl( self.ins_control_panel, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, wx.TE_CENTRE|wx.TE_READONLY )
-        bSizer1817131.Add( self.ins_time_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5 )
+        bSizer1817131.Add( self.ins_time_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 2 )
 
-
-        bSizer191.Add( bSizer1817131, 0, wx.EXPAND, 5 )
 
         bSizer18171313 = wx.BoxSizer( wx.HORIZONTAL )
 
-        bSizer511 = wx.BoxSizer( wx.VERTICAL )
+        bSizer18171313.Add( bSizer1817131, 1, wx.EXPAND, 2 )
 
-        self.m_staticText181713131 = wx.StaticText( self.ins_control_panel, wx.ID_ANY, u"GNSS Status", wx.DefaultPosition, wx.DefaultSize, 0 )
+        bSizer511 = wx.BoxSizer( wx.HORIZONTAL )
+
+        self.m_staticText181713131 = wx.StaticText( self.ins_control_panel, wx.ID_ANY, u"GNSS", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText181713131.Wrap( -1 )
         self.m_staticText181713131.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
-        bSizer511.Add( self.m_staticText181713131, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL|wx.TOP|wx.RIGHT|wx.LEFT, 5 )
+        bSizer511.Add( self.m_staticText181713131, 0, wx.ALIGN_CENTER_VERTICAL|wx.LEFT, 2 )
 
         self.gnss_status_flag_txtctrl = wx.TextCtrl( self.ins_control_panel, wx.ID_ANY, u"not available", wx.DefaultPosition, wx.Size( -1,-1 ), wx.TE_CENTRE|wx.TE_READONLY )
-        bSizer511.Add( self.gnss_status_flag_txtctrl, 0, wx.EXPAND|wx.BOTTOM|wx.RIGHT|wx.LEFT, 5 )
+        bSizer511.Add( self.gnss_status_flag_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 2 )
 
 
-        bSizer18171313.Add( bSizer511, 1, wx.EXPAND, 5 )
+        bSizer18171313.Add( bSizer511, 1, wx.EXPAND, 2 )
 
-        bSizer51 = wx.BoxSizer( wx.VERTICAL )
+        bSizer51 = wx.BoxSizer( wx.HORIZONTAL )
 
-        self.m_staticText18171313 = wx.StaticText( self.ins_control_panel, wx.ID_ANY, u"Align Status", wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.m_staticText18171313 = wx.StaticText( self.ins_control_panel, wx.ID_ANY, u"Align", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText18171313.Wrap( -1 )
         self.m_staticText18171313.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
-        bSizer51.Add( self.m_staticText18171313, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL|wx.TOP|wx.RIGHT|wx.LEFT, 5 )
+        bSizer51.Add( self.m_staticText18171313, 0, wx.ALIGN_CENTER_VERTICAL|wx.LEFT, 2 )
 
         self.ins_status_flag_txtctrl = wx.TextCtrl( self.ins_control_panel, wx.ID_ANY, u"unknown", wx.DefaultPosition, wx.Size( 120,-1 ), wx.TE_CENTRE|wx.TE_READONLY )
-        bSizer51.Add( self.ins_status_flag_txtctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL|wx.BOTTOM|wx.RIGHT|wx.LEFT, 5 )
+        bSizer51.Add( self.ins_status_flag_txtctrl, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 2 )
 
 
-        bSizer18171313.Add( bSizer51, 0, wx.EXPAND, 5 )
+        bSizer18171313.Add( bSizer51, 1, wx.EXPAND, 2 )
 
 
-        bSizer191.Add( bSizer18171313, 0, wx.EXPAND|wx.TOP|wx.BOTTOM, 5 )
+        bSizer191.Add( bSizer18171313, 0, wx.EXPAND|wx.TOP|wx.BOTTOM, 2 )
 
 
         self.ins_control_panel.SetSizer( bSizer191 )
         self.ins_control_panel.Layout()
         bSizer191.Fit( self.ins_control_panel )
-        bSizer20.Add( self.ins_control_panel, 0, wx.EXPAND|wx.BOTTOM, 5 )
+        bSizer20.Add( self.ins_control_panel, 0, wx.EXPAND|wx.BOTTOM, 3 )
 
         self.camera_panel = wx.Panel( self.left_scroll_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
         m_staticText14211 = wx.BoxSizer( wx.VERTICAL )
 
         self.m_staticText142111 = wx.StaticText( self.camera_panel, wx.ID_ANY, u"Camera Settings", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText142111.Wrap( -1 )
-        self.m_staticText142111.SetFont( wx.Font( 16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
+        self.m_staticText142111.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
         m_staticText14211.Add( self.m_staticText142111, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.RIGHT|wx.LEFT, 5 )
 
         bSizer55 = wx.BoxSizer( wx.HORIZONTAL )
 
         camera_setting_rgb_uv_comboChoices = [ u"RGB", u"IR", u"UV" ]
-        self.camera_setting_rgb_uv_combo = wx.ComboBox( self.camera_panel, wx.ID_ANY, u"RGB", wx.DefaultPosition, wx.DefaultSize, camera_setting_rgb_uv_comboChoices, wx.CB_READONLY )
+        self.camera_setting_rgb_uv_combo = wx.ComboBox( self.camera_panel, wx.ID_ANY, u"RGB", wx.DefaultPosition, wx.Size( 70,-1 ), camera_setting_rgb_uv_comboChoices, wx.CB_READONLY )
         self.camera_setting_rgb_uv_combo.SetSelection( 0 )
-        self.camera_setting_rgb_uv_combo.SetMinSize( wx.Size( 80, -1 ) )
-        bSizer55.Add( self.camera_setting_rgb_uv_combo, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT|wx.EXPAND, 5 )
+        bSizer55.Add( self.camera_setting_rgb_uv_combo, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
+
+
+        bSizer55.Add( ( 10, 0), 1, wx.EXPAND, 5 )
 
         camera_setting_subsysChoices = [ u"Left", u"Center", u"Right", u"All" ]
-        self.camera_setting_subsys = wx.ComboBox( self.camera_panel, wx.ID_ANY, u"Right", wx.DefaultPosition, wx.DefaultSize, camera_setting_subsysChoices, wx.CB_READONLY )
+        self.camera_setting_subsys = wx.ComboBox( self.camera_panel, wx.ID_ANY, u"Right", wx.DefaultPosition, wx.Size( 70,-1 ), camera_setting_subsysChoices, wx.CB_READONLY )
         self.camera_setting_subsys.SetSelection( 3 )
-        self.camera_setting_subsys.SetMinSize( wx.Size( 100, -1 ) )
-        bSizer55.Add( self.camera_setting_subsys, 1, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT|wx.EXPAND, 5 )
+        bSizer55.Add( self.camera_setting_subsys, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        m_staticText14211.Add( bSizer55, 0, wx.EXPAND, 5 )
+        m_staticText14211.Add( bSizer55, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
 
         self.m_staticline5 = wx.StaticLine( self.camera_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         m_staticText14211.Add( self.m_staticline5, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )
@@ -351,28 +350,33 @@ class MainFrame ( wx.Frame ):
 
         m_staticText14211.Add( bSizer442111, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.BOTTOM, 5 )
 
+        camera_buttons_row = wx.BoxSizer( wx.HORIZONTAL )
+
         self.m_button10 = wx.Button( self.camera_panel, wx.ID_ANY, u"Set Camera Parameter", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_button10.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
-        m_staticText14211.Add( self.m_button10, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.TOP|wx.RIGHT|wx.LEFT, 5 )
+        camera_buttons_row.Add( self.m_button10, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 3 )
 
         self.m_manual_ir_nuc = wx.Button( self.camera_panel, wx.ID_ANY, u"Manual IR NUC", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_manual_ir_nuc.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
-        m_staticText14211.Add( self.m_manual_ir_nuc, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.RIGHT|wx.LEFT, 5 )
+        camera_buttons_row.Add( self.m_manual_ir_nuc, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 3 )
+
+
+        m_staticText14211.Add( camera_buttons_row, 0, wx.ALIGN_CENTER_HORIZONTAL, 3 )
 
 
         self.camera_panel.SetSizer( m_staticText14211 )
         self.camera_panel.Layout()
         m_staticText14211.Fit( self.camera_panel )
-        bSizer20.Add( self.camera_panel, 0, wx.EXPAND|wx.BOTTOM, 5 )
+        bSizer20.Add( self.camera_panel, 0, wx.EXPAND|wx.BOTTOM, 3 )
 
         self.flight_data_panel = wx.Panel( self.left_scroll_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
         bSizer391 = wx.BoxSizer( wx.VERTICAL )
 
         self.m_staticText14211 = wx.StaticText( self.flight_data_panel, wx.ID_ANY, u"Data Collection", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText14211.Wrap( -1 )
-        self.m_staticText14211.SetFont( wx.Font( 16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
+        self.m_staticText14211.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
         bSizer391.Add( self.m_staticText14211, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.RIGHT|wx.LEFT, 5 )
 
@@ -431,7 +435,8 @@ class MainFrame ( wx.Frame ):
         bSizer45.Add( self.flight_number_text_ctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5 )
 
 
-        bSizer42.Add( bSizer45, 1, wx.ALIGN_CENTER_HORIZONTAL|wx.EXPAND, 5 )
+        flight_observer_row = wx.BoxSizer( wx.HORIZONTAL )
+        flight_observer_row.Add( bSizer45, 1, wx.EXPAND, 2 )
 
         bSizer451 = wx.BoxSizer( wx.HORIZONTAL )
 
@@ -445,18 +450,15 @@ class MainFrame ( wx.Frame ):
         bSizer451.Add( self.observer_text_ctrl, 1, wx.RIGHT|wx.LEFT|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 
-        bSizer42.Add( bSizer451, 1, wx.EXPAND, 5 )
+        flight_observer_row.Add( bSizer451, 1, wx.EXPAND, 2 )
+
+        bSizer42.Add( flight_observer_row, 0, wx.EXPAND, 2 )
 
 
         bSizer41.Add( bSizer42, 1, wx.EXPAND, 5 )
 
 
-        bSizer391.Add( bSizer41, 0, wx.EXPAND, 5 )
-
-        bSizer401 = wx.BoxSizer( wx.HORIZONTAL )
-
-
-        bSizer391.Add( bSizer401, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
+        bSizer391.Add( bSizer41, 0, wx.EXPAND, 3 )
 
         self.m_staticline3 = wx.StaticLine( self.flight_data_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         bSizer391.Add( self.m_staticline3, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )
@@ -512,35 +514,34 @@ class MainFrame ( wx.Frame ):
         self.nas_disk_space.Wrap( -1 )
         self.nas_disk_space.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
-        bSizer391.Add( self.nas_disk_space, 0, wx.TOP|wx.RIGHT|wx.LEFT, 5 )
-
-
-        bSizer391.Add( ( 0, 0), 1, wx.EXPAND, 5 )
+        bSizer391.Add( self.nas_disk_space, 0, wx.TOP|wx.RIGHT|wx.LEFT, 3 )
 
 
         self.flight_data_panel.SetSizer( bSizer391 )
         self.flight_data_panel.Layout()
         bSizer391.Fit( self.flight_data_panel )
-        bSizer20.Add( self.flight_data_panel, 1, wx.EXPAND, 5 )
-
-        self.m_panel7 = wx.Panel( self.left_scroll_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
-        bSizer17 = wx.BoxSizer( wx.VERTICAL )
-
-        self.close_button = wx.Button( self.m_panel7, wx.ID_ANY, u"Close", wx.DefaultPosition, wx.Size( -1,-1 ), 0 )
-        bSizer17.Add( self.close_button, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
-
-
-        self.m_panel7.SetSizer( bSizer17 )
-        self.m_panel7.Layout()
-        bSizer17.Fit( self.m_panel7 )
-        bSizer20.Add( self.m_panel7, 0, wx.EXPAND|wx.TOP, 5 )
+        bSizer20.Add( self.flight_data_panel, 0, wx.EXPAND, 3 )
 
 
         self.left_scroll_panel.SetSizer( bSizer20 )
         self.left_scroll_panel.Layout()
         self.left_scroll_panel.SetupScrolling( scroll_x = False, scroll_y = True )
 
-        main_size.Add( self.left_scroll_panel, 0, wx.EXPAND|wx.ALL, 5 )
+        self.m_panel7 = wx.Panel( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
+        bSizer17 = wx.BoxSizer( wx.VERTICAL )
+
+        self.close_button = wx.Button( self.m_panel7, wx.ID_ANY, u"Close", wx.DefaultPosition, wx.Size( -1,-1 ), 0 )
+        bSizer17.Add( self.close_button, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 3 )
+
+
+        self.m_panel7.SetSizer( bSizer17 )
+        self.m_panel7.Layout()
+        bSizer17.Fit( self.m_panel7 )
+
+        left_column.Add( self.left_scroll_panel, 1, wx.EXPAND, 0 )
+        left_column.Add( self.m_panel7, 0, wx.EXPAND|wx.TOP, 3 )
+
+        main_size.Add( left_column, 0, wx.EXPAND|wx.ALL, 5 )
 
         bsizer12 = wx.BoxSizer( wx.VERTICAL )
 
