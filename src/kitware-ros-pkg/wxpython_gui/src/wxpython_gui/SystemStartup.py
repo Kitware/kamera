@@ -10,8 +10,6 @@ class SystemStartup(form_builder_output_system_startup.MainFrame):
         """
         # Initialize parent class
         form_builder_output_system_startup.MainFrame.__init__(self, parent)
-        # Recompute enlarged title fonts so they are not clipped under Phoenix.
-        wx.CallAfter(unclip_static_text, self)
 
         # Store the function that allow us to send logging requests.
         self.add_to_event_log = parent.add_to_event_log
@@ -19,6 +17,13 @@ class SystemStartup(form_builder_output_system_startup.MainFrame):
         self.hosts = system.scc.hosts
 
         self.Show()
+        # Unclip enlarged fonts (Phoenix), then grow the frame to fit all
+        # controls so the buttons don't overlap.
+        wx.CallAfter(self._finalize_layout)
+
+    def _finalize_layout(self):
+        unclip_static_text(self)
+        self.Fit()
         self.SetMinSize(self.GetSize())
 
     # -------------------------- All self.systems Commands ------------------------
