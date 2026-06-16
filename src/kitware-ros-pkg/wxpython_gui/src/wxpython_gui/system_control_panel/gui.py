@@ -525,16 +525,20 @@ class MainFrame(form_builder_output.MainFrame):
         self.system = SystemCommands(self.hosts)
 
         self.Bind(wx.EVT_CLOSE, self.when_closed)
+        self._did_initial_unclip = False
         self.Bind(wx.EVT_SIZE, self.on_resize)
 
-        # So that we can check that the node is still alive.
-        self.timer = wx.Timer(self)
+        # Distinct ids so the two EVT_TIMER bindings don't collide; keep the
+        # refs alive so the ids aren't recycled.
+        self._fast_timer_id = wx.NewIdRef()
+        self._slow_timer_id = wx.NewIdRef()
+        self.timer = wx.Timer(self, id=self._fast_timer_id)
         self.Bind(wx.EVT_TIMER, self.on_timer, self.timer)
         FAST_TIMER_MS = 200
         self.timer.Start(FAST_TIMER_MS)
 
         # So that we can check that the node is still alive.
-        self.slow_timer = wx.Timer(self)
+        self.slow_timer = wx.Timer(self, id=self._slow_timer_id)
         self.Bind(wx.EVT_TIMER, self.on_slow_timer, self.slow_timer)
         self.slow_timer.Start(1000)
         # TODO
@@ -687,15 +691,18 @@ class MainFrame(form_builder_output.MainFrame):
                 elif entry["ssd_gb"] is not None:
                     ssd_label.SetLabel("Disk Space: %0.2f GB" % entry["ssd_gb"])
                     ssd_label.SetForegroundColour(COLLECT_GREEN)
+                gui_utils.refit_label(ssd_label)
             # The NAS is shared, so it's only displayed once (center host).
             if fov == "center" and entry["nas_gb"] is not None:
                 self.nas_disk_space.SetLabel(
                     "NAS Disk Space: %0.2f GB" % entry["nas_gb"]
                 )
                 self.nas_disk_space.SetForegroundColour(COLLECT_GREEN)
+                gui_utils.refit_label(self.nas_disk_space)
         if nas_unmounts:
             self.nas_disk_space.SetLabel("NAS Err: " + "".join(nas_unmounts))
             self.nas_disk_space.SetForegroundColour(ERROR_RED)
+            gui_utils.refit_label(self.nas_disk_space)
 
     def _set_field_enabled(self, ctrl, enabled):
         """Enable/disable an input field and make the disabled state obvious.
@@ -1116,6 +1123,13 @@ class MainFrame(form_builder_output.MainFrame):
         if rospy.is_shutdown():
             self.on_close_button(None)
 
+        # The startup unclip runs before GTK finalizes panel sizes, so labels
+        # center against stale widths. Re-run once, after the window is fully
+        # realized (the first timer tick is guaranteed to be late enough).
+        if not self._did_initial_unclip:
+            self._did_initial_unclip = True
+            gui_utils.unclip_static_text(self)
+
         self.update_collect_colors()
 
         # Check to see if imagery has been received recently.
@@ -1126,11 +1140,13 @@ class MainFrame(form_builder_output.MainFrame):
             if panel.last_update is None:
                 panel.status_static_text.SetLabel(format_status())
                 panel.status_static_text.SetForegroundColour(BRIGHT_RED)
+                gui_utils.refit_label(panel.status_static_text)
             else:
                 dt = time.time() - panel.last_update
                 if dt > 10:
                     panel.status_static_text.SetLabel(format_status(dt=dt))
                     panel.status_static_text.SetForegroundColour(BRIGHT_RED)
+                    gui_utils.refit_label(panel.status_static_text)
 
         # Check to see if imagery has been received recently.
         if self._image_inspection_frame:
@@ -1652,7 +1668,7 @@ class MainFrame(form_builder_output.MainFrame):
 
         """
         if self._spoof_gps:
-            spoofed = kv.get_dict("/spoof/ins")
+            spoofed = kv.get_dict("/debug", {}).get("spoof", {}).get("ins", {})
             apply_ins_spoof(msg, spoofed)
         t = msg.time
         lat = msg.latitude
@@ -1855,6 +1871,8 @@ class MainFrame(form_builder_output.MainFrame):
             self.sys2_detector_frames.Hide()
             self.sys2_disk_usage_panel.Hide()
         self.Layout()
+        # Titles get a stale best size while hidden; re-fit them once shown.
+        wx.CallAfter(gui_utils.unclip_static_text, self)
 
     # ------------------------------------------------------------------------
     # ---------------------------- Detection Menu ----------------------------

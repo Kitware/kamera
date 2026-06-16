@@ -214,6 +214,11 @@ class UpdateImageThread(threading.Thread):
         try:
             homography, output_height, output_width = self.get_homography()
 
+            # py3 rospy is strict: int fields reject floats (incl. numpy).
+            output_height = int(output_height)
+            output_width = int(output_width)
+            contrast_strength = int(SYS_CFG["ir_contrast_strength"])
+
             # Invert and flatten
             homography_ = tuple(np.linalg.inv(homography).ravel())
             frame = "%s_%s_%s" % (self._fov, self._chan, self._id)
@@ -239,7 +244,7 @@ class UpdateImageThread(threading.Thread):
                     release=release,
                     frame=frame,
                     apply_clahe=self.apply_clahe,
-                    contrast_strength=SYS_CFG["ir_contrast_strength"],
+                    contrast_strength=contrast_strength,
                     show_saturated_pixels=SYS_CFG["show_saturated_pixels"],
                 )
             if not resp.success:
@@ -291,11 +296,16 @@ class UpdateImageThread(threading.Thread):
         t = img_header.stamp.to_sec()
         t = datetime.datetime.utcfromtimestamp(t)
         # string = format_status(timeval=t, num_dropped=0)
-        string = channel_format_status(
-            self._fov,
-            self._chan,
-            timeval=t,
-        )
+        # Don't let a missing redis key block imagery dispatch.
+        try:
+            string = channel_format_status(
+                self._fov,
+                self._chan,
+                timeval=t,
+            )
+        except Exception as e:
+            rospy.logwarn_throttle(10, "Could not format status: {}".format(e))
+            return None
         wx.CallAfter(self._parent.update_status_msg, string)
         return string
 

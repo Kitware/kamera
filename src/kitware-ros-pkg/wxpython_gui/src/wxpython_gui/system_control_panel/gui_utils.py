@@ -26,9 +26,27 @@ def unclip_static_text(window):
                 child.InvalidateBestSize()
                 child.SetMinSize(child.GetBestSize())
             _walk(child)
+        # Re-layout each container (not just the top window) so labels are
+        # repositioned (e.g. recentered) to the current container size.
+        if parent.GetSizer() is not None:
+            parent.Layout()
 
     _walk(window)
-    window.Layout()
+
+
+def refit_label(static_text):
+    """Resize a StaticText to its current text and re-center it.
+
+    A variable-length label keeps a min size pinned to an earlier value, which
+    mis-centers the control once the text changes. Reset it to the current text
+    and relayout the parent.
+    """
+    static_text.InvalidateBestSize()
+    static_text.SetMinSize(static_text.GetBestSize())
+    parent = static_text.GetParent()
+    if parent is not None:
+        parent.Layout()
+
 
 def make_path(path, from_file=False, verbose=False):
     """

@@ -89,8 +89,8 @@ class ImageInspectionFrame(form_builder_output_imagery_inspection.MainFrame):
 
     def on_ir_contrast_strength(self, event=None):
         try:
-            SYS_CFG["ir_contrast_strength"] = float(
-                    self.ir_contrast_strength_txt_ctrl.GetValue())
+            SYS_CFG["ir_contrast_strength"] = int(float(
+                    self.ir_contrast_strength_txt_ctrl.GetValue()))
         except ValueError:
             pass
 
