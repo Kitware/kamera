@@ -28,6 +28,7 @@ services:
     profiles:
       - core
       - follower
+      - leader
       - all
 
   # CUDA + ROS Noetic base with utility packages. No KAMERA source.
