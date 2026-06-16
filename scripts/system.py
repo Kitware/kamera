@@ -5,7 +5,7 @@ from xmlrpc.client import ServerProxy, Fault
 with open("/home/user/kw/SYSTEM_NAME") as f:
     SYSTEM_NAME = f.read().strip()
 
-hosts = [ f"center0{SYSTEM_NAME}", "left1{SYSTEM_NAME}", "right2{SYSTEM_NAME}"]
+hosts = [ f"center0{SYSTEM_NAME}", f"left1{SYSTEM_NAME}", f"right2{SYSTEM_NAME}"]
 group = SYSTEM_NAME
 pod = [
     "image_manager",
