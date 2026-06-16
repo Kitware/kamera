@@ -695,7 +695,7 @@ class MainFrame(form_builder_output.MainFrame):
             # The NAS is shared, so it's only displayed once (center host).
             if fov == "center" and entry["nas_gb"] is not None:
                 self.nas_disk_space.SetLabel(
-                    "NAS Disk Space: %0.2f GB" % entry["nas_gb"]
+                    "NAS Space: %0.2f GB" % entry["nas_gb"]
                 )
                 self.nas_disk_space.SetForegroundColour(COLLECT_GREEN)
                 gui_utils.refit_label(self.nas_disk_space)

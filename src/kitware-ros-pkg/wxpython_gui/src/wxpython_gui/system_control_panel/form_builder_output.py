@@ -438,13 +438,11 @@ class MainFrame ( wx.Frame ):
         bSizer451.Add( self.m_staticText331, 0, wx.RIGHT|wx.LEFT|wx.ALIGN_CENTER_VERTICAL, 5 )
 
         self.observer_text_ctrl = wx.TextCtrl( self.flight_data_panel, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
-        observer_box = wx.BoxSizer(wx.HORIZONTAL)
-        observer_box.Add(self.observer_text_ctrl, 1, wx.EXPAND)
-        bSizer451.Add(observer_box, 1, wx.EXPAND, 5)
-        bSizer451.AddStretchSpacer(2)
+        self.observer_text_ctrl.SetMinSize(self.flight_number_text_ctrl.GetBestSize())
+        bSizer451.Add( self.observer_text_ctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5 )
 
 
-        bSizer42.Add( bSizer451, 1, wx.EXPAND, 5 )
+        bSizer42.Add( bSizer451, 1, wx.ALIGN_CENTER_HORIZONTAL|wx.EXPAND, 5 )
 
 
         bSizer41.Add( bSizer42, 1, wx.EXPAND, 5 )
@@ -499,16 +497,6 @@ class MainFrame ( wx.Frame ):
 
         bSizer391.Add( bSizer443, 0, wx.EXPAND, 5 )
 
-        self.m_staticline13 = wx.StaticLine( self.flight_data_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
-        bSizer391.Add( self.m_staticline13, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )
-
-        self.nas_disk_space = wx.StaticText( self.flight_data_panel, wx.ID_ANY, u"NAS Disk Space: ?", wx.DefaultPosition, wx.DefaultSize, 0 )
-        self.nas_disk_space.Wrap( -1 )
-        self.nas_disk_space.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
-
-        bSizer391.Add( self.nas_disk_space, 0, wx.TOP|wx.RIGHT|wx.LEFT|wx.ALIGN_CENTER_HORIZONTAL, 3 )
-
-
         self.flight_data_panel.SetSizer( bSizer391 )
         self.flight_data_panel.Layout()
         bSizer391.Fit( self.flight_data_panel )
@@ -525,8 +513,21 @@ class MainFrame ( wx.Frame ):
         self.m_staticline_close = wx.StaticLine( self.m_panel7, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         bSizer17.Add( self.m_staticline_close, 0, wx.EXPAND, 0 )
 
+        bSizer17_footer = wx.BoxSizer( wx.HORIZONTAL )
+
         self.close_button = wx.Button( self.m_panel7, wx.ID_ANY, u"Close", wx.DefaultPosition, wx.Size( -1,-1 ), 0 )
-        bSizer17.Add( self.close_button, 0, wx.ALL|wx.ALIGN_LEFT, 3 )
+        bSizer17_footer.Add( self.close_button, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 3 )
+
+        self.nas_close_divider = wx.StaticLine( self.m_panel7, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_VERTICAL )
+        bSizer17_footer.Add( self.nas_close_divider, 0, wx.EXPAND|wx.TOP|wx.BOTTOM|wx.LEFT|wx.RIGHT, 8 )
+
+        self.nas_disk_space = wx.StaticText( self.m_panel7, wx.ID_ANY, u"NAS Space: ?", wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.nas_disk_space.Wrap( -1 )
+        self.nas_disk_space.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
+
+        bSizer17_footer.Add( self.nas_disk_space, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 3 )
+
+        bSizer17.Add( bSizer17_footer, 0, wx.EXPAND, 0 )
 
 
         self.m_panel7.SetSizer( bSizer17 )
