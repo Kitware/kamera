@@ -23,7 +23,7 @@ arch:
   min_frame_rate: 0.1
   base_template: "{base}/{project}/fl{flight}/{sys_cfg}/"
   template: "{base}/{project}/fl{flight}/{sys_cfg}/{cam_fov}_view/{project}_fl{flight}_{cf}_{time}_{mode}.{ext}"
-  max_exposure_ms: 100
+  max_exposure_ms: 125
   ext_rgb: jpg
   ext_uv: jpg
   ext_ir: tif

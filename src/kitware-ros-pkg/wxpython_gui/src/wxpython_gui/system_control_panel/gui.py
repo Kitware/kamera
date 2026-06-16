@@ -1876,7 +1876,16 @@ class MainFrame(form_builder_output.MainFrame):
 
     def do_start_a_detector(self, event=None, host="unset", log=True):
         cmdpipef = SYS_CFG[host]["detector"]["pipefile"]
-        cmdpipef = SYS_CFG[host]["detector"]["pipefile"]
+        if not cmdpipef:
+            msg = (
+                "No detector pipefile configured for %s; "
+                "select a camera configuration with a detector model."
+                % host
+            )
+            dlg = wx.MessageDialog(self, msg, "Error", wx.OK | wx.ICON_ERROR)
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
         if not os.path.exists(cmdpipef):
             msg = (
                 "Pipefile for detector %s does not exist, not starting detector." % host
