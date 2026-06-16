@@ -34,6 +34,7 @@
                     'ubuntu-drivers-common', # For hardware drivers
                     'python3-pip', # Pip goodness
                     'python3-redis',
+                    'ansible', # ansible-playbook for on-target provisioning
                     ]
 
   pre_tasks:
