@@ -258,6 +258,8 @@ class MainFrame ( wx.Frame ):
         self.m_staticline5 = wx.StaticLine( self.camera_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         m_staticText14211.Add( self.m_staticline5, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )
 
+        m_staticText14211.Add( ( 0, 3 ), 0, 0, 0 )
+
         self.m_staticText42 = wx.StaticText( self.camera_panel, wx.ID_ANY, u"Auto Exposure (ms)", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText42.Wrap( -1 )
         self.m_staticText42.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
@@ -288,7 +290,7 @@ class MainFrame ( wx.Frame ):
         bSizer442.Add( self.exposure_max_value_txt_ctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        m_staticText14211.Add( bSizer442, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
+        m_staticText14211.Add( bSizer442, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.BOTTOM, 3 )
 
         self.m_staticline51 = wx.StaticLine( self.camera_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         m_staticText14211.Add( self.m_staticline51, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )
@@ -323,7 +325,7 @@ class MainFrame ( wx.Frame ):
         bSizer4421.Add( self.gain_max_value_txt_ctrl, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.LEFT, 5 )
 
 
-        m_staticText14211.Add( bSizer4421, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
+        m_staticText14211.Add( bSizer4421, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.BOTTOM, 3 )
 
         self.m_staticline52 = wx.StaticLine( self.camera_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
         m_staticText14211.Add( self.m_staticline52, 0, wx.EXPAND|wx.RIGHT|wx.LEFT, 5 )
@@ -350,12 +352,12 @@ class MainFrame ( wx.Frame ):
         self.m_button10 = wx.Button( self.camera_panel, wx.ID_ANY, u"Set Camera Parameter", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_button10.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
-        m_staticText14211.Add( self.m_button10, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.TOP|wx.RIGHT|wx.LEFT, 3 )
+        m_staticText14211.Add( self.m_button10, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.TOP|wx.RIGHT|wx.LEFT, 6 )
 
         self.m_manual_ir_nuc = wx.Button( self.camera_panel, wx.ID_ANY, u"Manual IR NUC", wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_manual_ir_nuc.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
-        m_staticText14211.Add( self.m_manual_ir_nuc, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.RIGHT|wx.LEFT, 3 )
+        m_staticText14211.Add( self.m_manual_ir_nuc, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.TOP|wx.RIGHT|wx.LEFT|wx.BOTTOM, 6 )
 
 
         self.camera_panel.SetSizer( m_staticText14211 )
