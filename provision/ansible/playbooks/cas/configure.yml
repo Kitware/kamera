@@ -173,6 +173,10 @@
           dest: /etc/docker/daemon.json
           owner: root
 
+      - name: Docker restart
+        become: true
+        service: name=docker state=restarted enabled=yes
+
       - name: Place tmux config.
         become: True
         when: leader or follower or gui
