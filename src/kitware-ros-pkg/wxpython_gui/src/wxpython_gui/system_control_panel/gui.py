@@ -1020,7 +1020,6 @@ class MainFrame(form_builder_output.MainFrame):
             status = detector_state.decide_status(host, desired)
             d_desired[host] = desired
             d_status[host] = status
-            print(status)
             if status is EPodStatus.Unknown:
                 text_attr.SetForegroundColour(WTF_PURPLE)
             elif status is EPodStatus.Pending:
@@ -1031,8 +1030,6 @@ class MainFrame(form_builder_output.MainFrame):
                 text_attr.SetForegroundColour(VERDANT_GREEN)
             else:
                 text_attr.SetForegroundColour(ERROR_RED)
-
-        print(d_status.values())
 
         active_statuses = [
             status for status in d_status.values()
