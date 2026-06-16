@@ -30,4 +30,3 @@ ff02::3 ip6-allhosts
 # Set ros master url here - typically nuvo0
 192.168.88.10 kameramaster
 192.168.88.99 ins
-

@@ -111,7 +111,7 @@
       - name: Add mappings to /etc/hosts
         become: True
         copy:
-          src: "{{ kamera_dir }}/src/cfg/hosts"
+          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/{{ inventory_hostname }}/hosts"
           remote_src: true
           dest: /etc/hosts
           owner: root
