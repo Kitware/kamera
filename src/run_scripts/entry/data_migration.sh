@@ -45,7 +45,7 @@ do
         # cap max argument length for rsync
         head -n 1000 | \
         # copy all files removing source files on success
-        rsync -a --recursive --files-from=- --chmod=777 $source_dir $dest_dir
+        rsync -a --recursive --no-owner --no-group --files-from=- --chmod=777 $source_dir $dest_dir
     echo "Finished copying."
 
     # STAGE 2
@@ -59,7 +59,7 @@ do
         # cap max argument length for rsync
         head -n 1000 | \
         # copy all files removing source files on success
-        rsync -a --recursive --remove-source-files --files-from=- --chmod=777 $source_dir $dest_dir
+        rsync -a --recursive --no-owner --no-group --remove-source-files --files-from=- --chmod=777 $source_dir $dest_dir
     echo "Finished copying and removing image files."
 
     # STAGE 3
@@ -72,7 +72,7 @@ do
         # cap max argument length for rsync
         head -n 1000 | \
         # copy all files removing source files on success
-        rsync -a --recursive --remove-source-files --files-from=- --chmod=777 $source_dir $dest_dir
+        rsync -a --recursive --no-owner --no-group --remove-source-files --files-from=- --chmod=777 $source_dir $dest_dir
     echo "Finished removing text files."
 
     sleep 1
