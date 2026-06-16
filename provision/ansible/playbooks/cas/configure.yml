@@ -132,13 +132,6 @@
           state: directory
           mode: '0777'
 
-      - name: Make NAS mount directory "{{ nas_mnt }}"
-        become: True
-        file:
-          path: "{{ nas_mnt }}"
-          state: directory
-          mode: '0777'
-
       - name: Edit fstab to mount NAS to "{{ data_dir }}"
         become: True
         lineinfile:
