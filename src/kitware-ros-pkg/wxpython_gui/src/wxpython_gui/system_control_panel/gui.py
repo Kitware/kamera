@@ -1874,8 +1874,48 @@ class MainFrame(form_builder_output.MainFrame):
     # ------------------------------------------------------------------------
     # ---------------------------- Detection Menu ----------------------------
 
+    def _valid_detector_pipe(self, pipe):
+        return pipe and pipe != "null"
+
+    def apply_detector_pipefiles(self, sys_cfg_name=None):
+        """Sync per-host detector pipefiles from the active camera configuration."""
+        if sys_cfg_name is None:
+            sys_cfg_name = self.get_sys_cfg()
+        try:
+            cc = SYS_CFG["camera_cfgs"][sys_cfg_name]
+        except KeyError:
+            return
+        fov_pipes = {
+            "center": cc.get("center_sys_pipe"),
+            "left": cc.get("left_sys_pipe"),
+            "right": cc.get("right_sys_pipe"),
+        }
+        for host in self.hosts:
+            fov = SYS_CFG["arch"]["hosts"][host]["fov"]
+            pipe = fov_pipes.get(fov)
+            if self._valid_detector_pipe(pipe):
+                SYS_CFG[host]["detector"]["pipefile"] = pipe
+            else:
+                SYS_CFG[host]["detector"]["pipefile"] = None
+
+    def resolve_detector_pipefile(self, host):
+        """Return the detector pipefile for a host, using camera config if needed."""
+        pipe = SYS_CFG[host]["detector"].get("pipefile")
+        if self._valid_detector_pipe(pipe):
+            return pipe
+        try:
+            cc = SYS_CFG["camera_cfgs"][self.get_sys_cfg()]
+            fov = SYS_CFG["arch"]["hosts"][host]["fov"]
+            pipe = cc.get("{}_sys_pipe".format(fov))
+        except KeyError:
+            return None
+        if self._valid_detector_pipe(pipe):
+            SYS_CFG[host]["detector"]["pipefile"] = pipe
+            return pipe
+        return None
+
     def do_start_a_detector(self, event=None, host="unset", log=True):
-        cmdpipef = SYS_CFG[host]["detector"]["pipefile"]
+        cmdpipef = self.resolve_detector_pipefile(host)
         if not cmdpipef:
             msg = (
                 "No detector pipefile configured for %s; "
@@ -2165,6 +2205,8 @@ class MainFrame(form_builder_output.MainFrame):
             self.camera_config_combo.SetSelection(0)
             SYS_CFG["arch"]["sys_cfg"] = self.camera_config_combo.GetStringSelection()
 
+        self.apply_detector_pipefiles()
+
     def next_camera_config(self, event=None):
         ind = self.camera_config_combo.GetSelection()
         if ind == wx.NOT_FOUND:
@@ -2176,6 +2218,7 @@ class MainFrame(form_builder_output.MainFrame):
             ind = 0
 
         self.camera_config_combo.SetSelection(ind)
+        self.apply_detector_pipefiles()
 
     def previous_camera_config(self, event=None):
         ind = self.camera_config_combo.GetSelection()
@@ -2188,6 +2231,7 @@ class MainFrame(form_builder_output.MainFrame):
             ind = self.camera_config_combo.GetCount() - 1
 
         self.camera_config_combo.SetSelection(ind)
+        self.apply_detector_pipefiles()
 
     def on_camera_config_combo(self, event=None):
         """ """
@@ -2200,13 +2244,7 @@ class MainFrame(form_builder_output.MainFrame):
         SYS_CFG["rgb_vfov"] = vfov
         save_camera_config(curr_str)
         self.update_project_flight_params()
-
-        if cc["center_sys_pipe"] != "null":
-            SYS_CFG[self.hosts[0]]["detector"]["pipefile"] = cc["center_sys_pipe"]
-        if cc["left_sys_pipe"] != "null":
-            SYS_CFG[self.hosts[1]]["detector"]["pipefile"] = cc["left_sys_pipe"]
-        if cc["right_sys_pipe"] != "null":
-            SYS_CFG[self.hosts[2]]["detector"]["pipefile"] = cc["right_sys_pipe"]
+        self.apply_detector_pipefiles(curr_str)
 
     # ------------------------- END Camera Configuration -------------------------
 
