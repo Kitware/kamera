@@ -371,7 +371,7 @@ def format_status(
         drop_str = "{} dropped".format(num_dropped)
     else:
         drop_str = "{:.0e} dropped".format(num_dropped)
-    gain_str = "Gain:?" if gain is None else "Gain:{}".format(gain)
+    gain_str = "Gain: ?" if gain is None else "Gain: {}".format(gain)
     fps_str = "? fps" if fps is None else "{:4.2f} fps".format(fps)
     if total is not None and processed is not None:
         # display N/N, even if internally it's N-1/N
