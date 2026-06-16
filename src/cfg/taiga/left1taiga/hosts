@@ -1,0 +1,32 @@
+127.0.0.1	localhost.localdomain	localhost
+::1		localhost6.localdomain6	localhost6
+
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+ff02::3 ip6-allhosts
+
+# Inserted from KAMERA
+192.168.88.1 mikrotik
+
+192.168.88.10 center0taiga
+192.168.88.11 left1taiga
+192.168.88.12 right2taiga
+
+192.168.88.100 center0nayak
+192.168.88.101 left1nayak
+192.168.88.102 right2nayak
+192.168.88.103 center1nayak
+
+# Fallback static connections
+192.168.88.210 nuvo0bak
+192.168.88.211 nuvo1bak
+192.168.88.212 nuvo2bak
+
+192.168.198.11 kamera_nas
+
+# Set ros master url here - typically nuvo0
+192.168.88.10 kameramaster
+192.168.88.99 ins
