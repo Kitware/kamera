@@ -5,4 +5,4 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 cd ${DIR}/../ansible/
 source ${DIR}/../ansible/functions.sh
-kamera_shutdown nuvo2
+kamera_reboot $(kamera_host_for_position center)

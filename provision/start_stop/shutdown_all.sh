@@ -6,4 +6,4 @@ SYSTEM_NAME=$(cat /home/user/kw/SYSTEM_NAME)
 
 cd ${DIR}/../ansible/
 source ${DIR}/../ansible/functions.sh
-kamera_shutdown SYSTEM_NAME
+kamera_shutdown ${SYSTEM_NAME}
