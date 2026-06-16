@@ -38,6 +38,11 @@ class ImageInspectionFrame(form_builder_output_imagery_inspection.MainFrame):
 
         ir_contrast_strength = SYS_CFG["ir_contrast_strength"]
         self.ir_contrast_strength_txt_ctrl.SetValue(str(ir_contrast_strength))
+        # The server applies a fixed detector-matching IR stretch and ignores
+        # contrast_strength, so grey out this control to avoid misleading.
+        self.ir_contrast_strength_txt_ctrl.Disable()
+        self.m_staticText71.Disable()
+        self.m_staticText71.SetLabel("IR Contrast Stretch Strength (n/a)")
 
         for i in range(self.image_stream_combo_box.GetCount()):
             if stream == self.image_stream_combo_box.GetString(i):
