@@ -194,6 +194,10 @@
           remote_src: true
           dest: /home/user/.bash_aliases
 
+      - name: Install start/stop desktop shortcuts
+        when: leader | default(false)
+        command: bash {{ kamera_dir }}/provision/start_stop/install_desktop_shortcuts.sh
+
       - name: Disable sleep state on subsystems.
         become: True
         when: follower or leader or gui
