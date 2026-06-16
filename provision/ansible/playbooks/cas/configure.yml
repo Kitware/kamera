@@ -132,11 +132,18 @@
           state: directory
           mode: '0777'
 
+      - name: Make NAS mount directory "{{ nas_mnt }}"
+        become: True
+        file:
+          path: "{{ nas_mnt }}"
+          state: directory
+          mode: '0777'
+
       - name: Edit fstab to mount NAS to "{{ data_dir }}"
         become: True
         lineinfile:
           path: /etc/fstab
-          line: kamera_nas:/volume1/kamera/flight_data {{ data_dir }} nfs auto,nofail,noatime,nolock,intr,tcp,actimeo=1800   0   0
+          line: kamera_nas:/volume1/kamera/flight_data {{ data_dir }} nfs vers=3,auto,nofail,noatime,nolock,intr,tcp,actimeo=1800   0   0
           state: present
           insertbefore: EOF
 
