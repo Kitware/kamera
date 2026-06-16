@@ -1,35 +1,21 @@
 import sys
 
-# import xmlrpclib # Python2
 from xmlrpc.client import ServerProxy, Fault
 
 with open("/home/user/kw/SYSTEM_NAME") as f:
     SYSTEM_NAME = f.read().strip()
 
-if SYSTEM_NAME == "taiga":
-    group = "taiga"
-    hosts = ["nuvo0", "nuvo1", "nuvo2"]
-    pod = [
-        "image_manager",
-        "kamerad",
-        f"{group}:fps_monitor",
-        f"{group}:imageview",
-        f"{group}:cam_rgb",
-        f"{group}:cam_ir",
-        f"{group}:cam_uv",
-    ]
-else:
-    group = "nayak"
-    hosts = ["cas0", "cas1", "cas2"]
-    pod = [
-        "image_manager",
-        "kamerad",
-        f"{group}:fps_monitor",
-        f"{group}:imageview",
-        f"{group}:cam_rgb",
-        f"{group}:cam_ir",
-        f"{group}:cam_uv",
-    ]
+hosts = [ f"center0{SYSTEM_NAME}", "left1{SYSTEM_NAME}", "right2{SYSTEM_NAME}"]
+group = SYSTEM_NAME
+pod = [
+    "image_manager",
+    "kamerad",
+    f"{group}:fps_monitor",
+    f"{group}:imageview",
+    f"{group}:cam_rgb",
+    f"{group}:cam_ir",
+    f"{group}:cam_uv",
+]
 
 host = sys.argv[1].strip()
 if host not in hosts:
