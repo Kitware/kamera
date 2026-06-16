@@ -377,7 +377,9 @@ class ImageManager(object):
             print("Number of files to copy: %s" % len(imgs_to_copy))
             csz = 10000
             for chunk in chunker(list(imgs_to_copy), csz):
-                rsync_bash = ["rsync", "-a"]
+                # -a implies -o/-g (preserve owner/group), which require root to
+                # chown; the NAS mount rejects that, so skip owner/group.
+                rsync_bash = ["rsync", "-a", "--no-owner", "--no-group"]
                 rsync_bash += chunk
                 rsync_bash += [secondary_image_dir]
                 print("Running rsync on chunk...")
