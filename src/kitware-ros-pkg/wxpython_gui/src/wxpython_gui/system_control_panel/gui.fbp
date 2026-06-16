@@ -5447,9 +5447,18 @@
                                                             </object>
                                                             <object class="sizeritem" expanded="1">
                                                                 <property name="border">5</property>
-                                                                <property name="flag">wxRIGHT|wxLEFT|wxALIGN_CENTER_VERTICAL</property>
+                                                                <property name="flag">wxEXPAND</property>
                                                                 <property name="proportion">1</property>
-                                                                <object class="wxTextCtrl" expanded="1">
+                                                                <object class="wxBoxSizer" expanded="1">
+                                                                    <property name="minimum_size"></property>
+                                                                    <property name="name">bSizer_observer_box</property>
+                                                                    <property name="orient">wxHORIZONTAL</property>
+                                                                    <property name="permission">none</property>
+                                                                    <object class="sizeritem" expanded="1">
+                                                                        <property name="border">0</property>
+                                                                        <property name="flag">wxEXPAND</property>
+                                                                        <property name="proportion">1</property>
+                                                                        <object class="wxTextCtrl" expanded="1">
                                                                     <property name="BottomDockable">1</property>
                                                                     <property name="LeftDockable">1</property>
                                                                     <property name="RightDockable">1</property>
@@ -5538,6 +5547,16 @@
                                                             </object>
                                                         </object>
                                                     </object>
+                                                            <object class="sizeritem" expanded="1">
+                                                                <property name="border">0</property>
+                                                                <property name="flag">wxEXPAND</property>
+                                                                <property name="proportion">2</property>
+                                                                <object class="spacer" expanded="1">
+                                                                    <property name="height">0</property>
+                                                                    <property name="permission">protected</property>
+                                                                    <property name="width">0</property>
+                                                                </object>
+                                                            </object>
                                                 </object>
                                             </object>
                                         </object>

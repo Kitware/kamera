@@ -438,7 +438,10 @@ class MainFrame ( wx.Frame ):
         bSizer451.Add( self.m_staticText331, 0, wx.RIGHT|wx.LEFT|wx.ALIGN_CENTER_VERTICAL, 5 )
 
         self.observer_text_ctrl = wx.TextCtrl( self.flight_data_panel, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
-        bSizer451.Add( self.observer_text_ctrl, 1, wx.RIGHT|wx.LEFT|wx.ALIGN_CENTER_VERTICAL, 5 )
+        observer_box = wx.BoxSizer(wx.HORIZONTAL)
+        observer_box.Add(self.observer_text_ctrl, 1, wx.EXPAND)
+        bSizer451.Add(observer_box, 1, wx.EXPAND, 5)
+        bSizer451.AddStretchSpacer(2)
 
 
         bSizer42.Add( bSizer451, 1, wx.EXPAND, 5 )
