@@ -131,6 +131,7 @@
         "trigger_freq": 1.0,
         "turn_off_nuc_in_shapefile": 1,
         "use_archive_region": 0,
+        "use_nvjpeg": 1,
         "use_p1jpeg": 0
     },
     "base": "/mnt/data",
@@ -651,7 +652,6 @@
             }
         }
     },
-    "load_shapefile": 0,
     "local_ssd_mnt": "/mnt/data",
     "locations": {
         "center": {
