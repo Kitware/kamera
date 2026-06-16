@@ -33,7 +33,7 @@
             "quality": 95
         },
         "load_shapefile": 0,
-        "max_exposure_ms": 120,
+        "max_exposure_ms": 125,
         "max_fps": 2.5,
         "max_frame_rate": 2.0,
         "min_fps": 0.1,
