@@ -164,6 +164,15 @@
           dest: /etc/chrony/chrony.conf
           owner: root
 
+      - name: Place docker daemon config.
+        become: True
+        when: leader or follower or gui
+        copy:
+          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/docker-daemon.json"
+          remote_src: true
+          dest: /etc/docker/daemon.json
+          owner: root
+
       - name: Place tmux config.
         become: True
         when: leader or follower or gui
