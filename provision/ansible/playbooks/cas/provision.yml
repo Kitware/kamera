@@ -126,17 +126,6 @@
         name: nvidia-container-toolkit
         state: present
 
-    - name: Configure Docker runtime
-      become: True
-      command:
-        cmd: nvidia-ctk runtime configure --runtime=docker
-
-    - name: Restart Docker Service
-      become: True
-      service:
-        name: docker
-        state: restarted
-
     - name: Ensure group "docker" exists
       become: True
       group:
