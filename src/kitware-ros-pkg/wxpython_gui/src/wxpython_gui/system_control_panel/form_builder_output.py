@@ -503,7 +503,7 @@ class MainFrame ( wx.Frame ):
         self.nas_disk_space.Wrap( -1 )
         self.nas_disk_space.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 
-        bSizer391.Add( self.nas_disk_space, 0, wx.TOP|wx.RIGHT|wx.LEFT, 3 )
+        bSizer391.Add( self.nas_disk_space, 0, wx.TOP|wx.RIGHT|wx.LEFT|wx.ALIGN_CENTER_HORIZONTAL, 3 )
 
 
         self.flight_data_panel.SetSizer( bSizer391 )
@@ -932,7 +932,7 @@ class MainFrame ( wx.Frame ):
         self.sys1_disk_usage_panel.SetSizer( bsizer213 )
         self.sys1_disk_usage_panel.Layout()
         bsizer213.Fit( self.sys1_disk_usage_panel )
-        disk_space_row_bSizer1.Add( self.sys1_disk_usage_panel, 1, 0, 5 )
+        disk_space_row_bSizer1.Add( self.sys1_disk_usage_panel, 1, wx.EXPAND, 5 )
 
         self.sys0_disk_usage_panel = wx.Panel( self.images_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
         bsizer2122 = wx.BoxSizer( wx.VERTICAL )
@@ -947,7 +947,7 @@ class MainFrame ( wx.Frame ):
         self.sys0_disk_usage_panel.SetSizer( bsizer2122 )
         self.sys0_disk_usage_panel.Layout()
         bsizer2122.Fit( self.sys0_disk_usage_panel )
-        disk_space_row_bSizer1.Add( self.sys0_disk_usage_panel, 1, 0, 5 )
+        disk_space_row_bSizer1.Add( self.sys0_disk_usage_panel, 1, wx.EXPAND, 5 )
 
         self.sys2_disk_usage_panel = wx.Panel( self.images_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.RAISED_BORDER|wx.TAB_TRAVERSAL )
         bsizer212 = wx.BoxSizer( wx.VERTICAL )
@@ -962,7 +962,7 @@ class MainFrame ( wx.Frame ):
         self.sys2_disk_usage_panel.SetSizer( bsizer212 )
         self.sys2_disk_usage_panel.Layout()
         bsizer212.Fit( self.sys2_disk_usage_panel )
-        disk_space_row_bSizer1.Add( self.sys2_disk_usage_panel, 1, 0, 5 )
+        disk_space_row_bSizer1.Add( self.sys2_disk_usage_panel, 1, wx.EXPAND, 5 )
 
 
         bSizer16.Add( disk_space_row_bSizer1, 0, wx.EXPAND, 5 )

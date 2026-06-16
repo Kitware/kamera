@@ -13,6 +13,7 @@ import rospy
 from cv_bridge import CvBridge, CvBridgeError
 
 from roskv.impl.redis_envoy import RedisEnvoy as ImplEnvoy
+from roskv.util import filter_hosts_by_system
 import wxpython_gui
 from wxpython_gui.utils import check_default
 
@@ -337,11 +338,11 @@ def save_camera_config(curr_cfg=None):
 
 def format_status(
     timeval=None,
-    num_dropped=0,
+    num_dropped=None,
     exposure_us=None,
     gain=None,
     dt=0,
-    fps=0.0,
+    fps=None,
     chan=None,
     total=None,
     processed=None,
@@ -364,17 +365,18 @@ def format_status(
         return "☒ No image stream\n" + extra
     time_str = str(timeval.time())[3:11]
 
-    drop_str = (
-        "{} dropped".format(num_dropped)
-        if num_dropped < 10000
-        else "{:.0e} dropped".format(num_dropped)
-    )
+    if num_dropped is None:
+        drop_str = "? dropped"
+    elif num_dropped < 10000:
+        drop_str = "{} dropped".format(num_dropped)
+    else:
+        drop_str = "{:.0e} dropped".format(num_dropped)
     gain_str = "Gain:?" if gain is None else "Gain:{}".format(gain)
-    # display N/N, even if internally it's N-1/N
-    # make sure processed isn't above total
-    if processed < total:
-        total = total - 1 if total > 0 else total
+    fps_str = "? fps" if fps is None else "{:4.2f} fps".format(fps)
     if total is not None and processed is not None:
+        # display N/N, even if internally it's N-1/N
+        if processed < total:
+            total = total - 1 if total > 0 else total
         drop_str += " | DB: {}/{}".format(processed, total)
     processed_str = "" if processed is None else "{}".format(processed)
     expo_str = (
@@ -383,12 +385,12 @@ def format_status(
         else "Exp: {:0.2f} ms".format(float(exposure_us) * 1e-3)
     )
     if chan == "ir":
-        fmt = "{fps: 4.2f} fps\n{drop}"
-        out = fmt.format(fps=fps, drop=drop_str)
+        fmt = "{fps}\n{drop}"
+        out = fmt.format(fps=fps_str, drop=drop_str)
     else:
-        fmt = "{gain} | {fps: 4.2f} fps\n{expo}\n{drop}"
+        fmt = "{gain} | {fps} | {expo}\n{drop}"
         out = fmt.format(
-            time=time_str, gain=gain_str, fps=fps, expo=expo_str, drop=drop_str
+            time=time_str, gain=gain_str, fps=fps_str, expo=expo_str, drop=drop_str
         )
     return out
 
@@ -400,9 +402,11 @@ def channel_format_status(fov, chan, timeval=None, dt=0):
     a = "actual_geni_params"
     param_ns = "/".join(["", "sys", a, host, chan])
     drop_ns = "/".join(["", "sys", "arch", host, chan, "dropped"])
-    num_dropped = int(kv.get(drop_ns))
+    dropped_val = kv.get(drop_ns, None)
+    num_dropped = int(dropped_val) if dropped_val is not None else None
     fps_ns = "/".join(["", "sys", "arch", host, chan, "fps"])
-    fps = float(kv.get(fps_ns))
+    fps_val = kv.get(fps_ns, None)
+    fps = float(fps_val) if fps_val is not None else None
     exposure_us = None
     gain = None
     total = None
@@ -411,11 +415,17 @@ def channel_format_status(fov, chan, timeval=None, dt=0):
         gain = kv.get(param_ns + "/GainValue", None)
         exposure_us = kv.get(param_ns + "/ExposureValue", None)
     elif chan == "rgb":
-        gain = int(float(kv.get(param_ns + "/ISO", None)) / 50.0)
-        # convert float point seconds to us
-        exposure_us = float(kv.get(param_ns + "/Shutter_Speed", None)) * 1e6
-        total = int(kv.get("/sys/" + host + "/p1debayerq/total"))
-        processed = int(kv.get("/sys/" + host + "/p1debayerq/processed"))
+        iso = kv.get(param_ns + "/ISO", None)
+        if iso is not None:
+            gain = int(float(iso) / 50.0)
+        shutter = kv.get(param_ns + "/Shutter_Speed", None)
+        if shutter is not None:
+            # convert float point seconds to us
+            exposure_us = float(shutter) * 1e6
+        total = kv.get("/sys/" + host + "/p1debayerq/total", None)
+        total = int(total) if total is not None else None
+        processed = kv.get("/sys/" + host + "/p1debayerq/processed", None)
+        processed = int(processed) if processed is not None else None
     try:
         dt = float(kv.get(param_ns + "/last_msg_time", None))
     except:
@@ -436,7 +446,8 @@ def channel_format_status(fov, chan, timeval=None, dt=0):
 def host_from_fov(fov):
     # type: (str) -> str
     hosts = SYS_CFG["arch"]["hosts"]
-    for host, attrs in hosts.items():
-        if fov == attrs["fov"]:
+    # Skip stale hosts left in redis from other systems.
+    for host in filter_hosts_by_system(hosts.keys()):
+        if fov == hosts[host]["fov"]:
             return host
     raise KeyError("FOV not found: '{}'".format(fov))
