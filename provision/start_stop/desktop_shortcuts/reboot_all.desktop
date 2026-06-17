@@ -1,5 +1,5 @@
 [Desktop Entry]
-Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/reboot_all.sh'
+Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/kamera_power.sh reboot all'
 Name=reboot_all
 Terminal=true
 Type=Application

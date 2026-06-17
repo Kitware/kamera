@@ -1,5 +1,5 @@
 [Desktop Entry]
-Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/reboot_center.sh'
+Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/kamera_power.sh reboot center'
 Name=reboot_center
 Terminal=true
 Type=Application

@@ -1,5 +1,5 @@
 [Desktop Entry]
-Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/shutdown_left.sh'
+Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/kamera_power.sh shutdown left'
 Name=shutdown_left
 Terminal=true
 Type=Application
