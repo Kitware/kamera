@@ -2282,7 +2282,7 @@ class MainFrame(form_builder_output.MainFrame):
         info = wx.adv.AboutDialogInfo()
         info.Name = "KAMERA System Control Panel"
         info.Version = "2.0.0"
-        info.Copyright = "(C) 2023 Kitware"
+        info.Copyright = "(C) 2026 Kitware"
         info.Description = wordwrap(
             "This GUI allows control of the KAMERA system.",
             350,
