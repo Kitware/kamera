@@ -3,4 +3,5 @@ Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/kamera_power.s
 Name=shutdown_all
 Terminal=true
 Type=Application
-Name[en_US]=shutdown_all
+Icon=system-shutdown
+Name[en_US]=Shutdown\nBoth Systems
