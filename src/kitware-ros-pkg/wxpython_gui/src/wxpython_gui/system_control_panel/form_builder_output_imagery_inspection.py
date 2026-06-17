@@ -36,8 +36,8 @@ class MainFrame ( wx.Frame ):
 
 		bSizer191.Add( self.m_staticText142, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.ALL, 5 )
 
-		image_stream_combo_boxChoices = [ u"Left RGB", u"Center RGB", u"Right RGB", u"Left IR", u"Center IR", u"Right IR", u"Left UV", u"Center UV", u"Right UV" ]
-		self.image_stream_combo_box = wx.ComboBox( self.image_stream_panel, wx.ID_ANY, u"Left RGB", wx.DefaultPosition, wx.DefaultSize, image_stream_combo_boxChoices, wx.CB_READONLY )
+		image_stream_combo_boxChoices = [ u"Left View RGB", u"Center View RGB", u"Right View RGB", u"Left View IR", u"Center View IR", u"Right View IR", u"Left View UV", u"Center View UV", u"Right View UV" ]
+		self.image_stream_combo_box = wx.ComboBox( self.image_stream_panel, wx.ID_ANY, u"Left View RGB", wx.DefaultPosition, wx.DefaultSize, image_stream_combo_boxChoices, wx.CB_READONLY )
 		self.image_stream_combo_box.SetSelection( 0 )
 		bSizer191.Add( self.image_stream_combo_box, 0, wx.ALL|wx.EXPAND, 5 )
 

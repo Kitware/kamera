@@ -91,6 +91,7 @@ from wxpython_gui.cfg import (
     save_config_settings,
     save_camera_config,
     get_arch_path,
+    get_detector_pipefile,
     host_from_fov,
     pull_gui_state,
     format_status,
@@ -130,49 +131,81 @@ P1_GAIN_MIN_PARAM = "ISO_Min"
 P1_GAIN_MAX_PARAM = "ISO_Max"
 P1_EXPOSURE_MAX_PARAM = "Shutter_Speed_Min"
 P1_EXPOSURE_MIN_PARAM = "Shutter_Speed_Max"
-P1_EXPOSURE_STOPS = [
-    0.0625,
-    0.125,
-    0.2,
-    0.25,
-    0.3125,
-    0.4,
-    0.5,
-    0.625,
-    0.8,
-    1.0,
-    1.25,
-    1.5625,
-    2.0,
-    2.5,
-    3.125,
-    4.0,
-    5.0,
-    6.25,
-    8.0,
-    10,
-    12.5,
-    16.7,
-    20,
-    25,
-    33.3,
-    40,
-    66.7,
-    76.9,
-    100,
+P1_SHUTTER_MODE_PARAM = "Shutter_Mode"
+P1_APERTURE_MIN_PARAM = "Aperture_Min"
+P1_APERTURE_MAX_PARAM = "Aperture_Max"
+P1_EXPOSURE_COMP_PARAM = "Exposure_Comp."
+P1_SHUTTER_MODE_LS = "1"
+P1_SHUTTER_MODE_ES = "2"
+# Shutter Mode (LS/ES) label + dropdown hidden for now; exposure bias stays visible.
+_SHOW_RGB_SHUTTER_MODE_CONTROLS = False
+P1_LS_SHUTTER_DENOMS = [16000, 13000, 10000, 8000, 6500, 5000]
+P1_ES_SHUTTER_DENOMS = [
+    4000,
+    3200,
+    2500,
+    2000,
+    1600,
+    1250,
+    1000,
+    800,
+    640,
+    500,
+    400,
+    320,
+    250,
+    200,
+    160,
     125,
-    166.7,
+    100,
+    80,
+    60,
+    50,
+    40,
+    30,
+    25,
+    20,
+    15,
+    13,
+    10,
+]
+P1_ISO_STOPS = [
     200,
     250,
-    333.3,
+    320,
     400,
     500,
-    600,
+    640,
     800,
     1000,
+    1250,
+    1600,
+    2000,
+    2500,
+    3200,
+    4000,
+    5000,
+    6400,
+]
+P1_APERTURE_STOPS = [
+    4.0,
+    4.5,
+    5.0,
+    5.6,
+    6.3,
+    7.1,
+    8.0,
+    9.0,
+    10,
+    11,
+    12,
+    14,
+    16,
+    18,
+    20,
+    22,
 ]
 P1_GAIN_MIN = 0
-# P1_GAIN_MAX = 1600
 P1_EXPOSURE_MIN = (1 / 16000.0) * 1e3
 
 
@@ -203,14 +236,6 @@ class MainFrame(form_builder_output.MainFrame):
         self.SetTitle(window_title)
         # Recompute enlarged title fonts so they are not clipped under Phoenix.
         wx.CallAfter(gui_utils.unclip_static_text, self)
-        icon = wx.Icon()
-        icon.CopyFromBitmap(
-            wx.Bitmap(
-                os.path.expanduser("~/kamera/src/cfg/seal-icon.png"),
-                wx.BITMAP_TYPE_ANY,
-            )
-        )
-        self.SetIcon(icon)
 
         # self.rc = redis.Redis()
 
@@ -433,7 +458,9 @@ class MainFrame(form_builder_output.MainFrame):
         # --------------------------------------------------------------------
 
         # ------------------------- Missed Frame --------------------------
+        self._setup_rgb_controls()
         self.camera_setting_rgb_uv_combo.Bind(wx.EVT_COMBOBOX, self.on_modal_selection)
+        self.rgb_shutter_mode_combo.Bind(wx.EVT_COMBOBOX, self.on_rgb_shutter_mode)
         # Call once to hide/show proper options
         self.on_modal_selection(None)
 
@@ -724,49 +751,266 @@ class MainFrame(form_builder_output.MainFrame):
         )
         ctrl.Refresh()
 
+    @staticmethod
+    def _format_aperture_stop(stop):
+        if stop == int(stop):
+            return str(int(stop))
+        return "%g" % stop
+
+    @staticmethod
+    def _shutter_denom_label(denom):
+        return "1/%d" % denom
+
+    @staticmethod
+    def _shutter_denom_seconds(denom):
+        return 1.0 / denom
+
+    @staticmethod
+    def _p1_shutter_denoms_for_mode(mode):
+        if mode == P1_SHUTTER_MODE_LS:
+            return P1_LS_SHUTTER_DENOMS
+        return P1_ES_SHUTTER_DENOMS
+
+    @staticmethod
+    def _p1_shutter_mode_from_value(raw):
+        if raw in (None, ""):
+            return P1_SHUTTER_MODE_ES
+        return str(int(float(raw)))
+
+    @staticmethod
+    def _p1_shutter_mode_label(mode):
+        return "LS" if mode == P1_SHUTTER_MODE_LS else "ES"
+
+    @staticmethod
+    def _p1_iso_from_param(raw):
+        if raw in (None, ""):
+            return None
+        return nearest(P1_ISO_STOPS, int(float(raw)))
+
+    @staticmethod
+    def _set_stop_combo(combo, stops, value):
+        if value in (None, ""):
+            combo.SetSelection(wx.NOT_FOUND)
+            return
+        stop = nearest(stops, float(value))
+        combo.SetSelection(stops.index(stop))
+
+    @staticmethod
+    def _get_stop_combo(combo, stops):
+        sel = combo.GetSelection()
+        if sel == wx.NOT_FOUND:
+            return None
+        return stops[sel]
+
+    def _exposure_input_sizer(self):
+        return self.exposure_min_value_txt_ctrl.GetContainingSizer()
+
+    def _camera_panel_sizer(self):
+        return self.exposure_min_value_txt_ctrl.GetParent().GetSizer()
+
+    def _get_p1_shutter_mode(self):
+        return (
+            P1_SHUTTER_MODE_LS
+            if self.rgb_shutter_mode_combo.GetStringSelection() == "LS"
+            else P1_SHUTTER_MODE_ES
+        )
+
+    def _p1_shutter_stops(self):
+        denoms = self._p1_shutter_denoms_for_mode(self._get_p1_shutter_mode())
+        return [self._shutter_denom_seconds(d) for d in denoms]
+
+    def _populate_p1_shutter_combos(self, preserve=True):
+        denoms = self._p1_shutter_denoms_for_mode(self._get_p1_shutter_mode())
+        labels = [self._shutter_denom_label(d) for d in denoms]
+        old_min = (
+            self._get_stop_combo(self.exposure_min_combo, self._p1_exposure_stops)
+            if preserve and hasattr(self, "_p1_exposure_stops")
+            else None
+        )
+        old_max = (
+            self._get_stop_combo(self.exposure_max_combo, self._p1_exposure_stops)
+            if preserve and hasattr(self, "_p1_exposure_stops")
+            else None
+        )
+        self._p1_exposure_stops = [self._shutter_denom_seconds(d) for d in denoms]
+        for combo in (self.exposure_min_combo, self.exposure_max_combo):
+            combo.Clear()
+            for label in labels:
+                combo.Append(label)
+        if old_min is not None:
+            self._set_stop_combo(self.exposure_min_combo, self._p1_exposure_stops, old_min)
+        if old_max is not None:
+            self._set_stop_combo(self.exposure_max_combo, self._p1_exposure_stops, old_max)
+
+    def _setup_rgb_controls(self):
+        self._suppress_rgb_shutter_mode_confirm = False
+        self._rgb_shutter_mode_confirmed = self.rgb_shutter_mode_combo.GetStringSelection()
+        self._p1_exposure_stops = []
+        self._populate_p1_shutter_combos(preserve=False)
+        for combo in (self.gain_min_combo, self.gain_max_combo):
+            combo.Clear()
+            for stop in P1_ISO_STOPS:
+                combo.Append(str(stop))
+            combo.SetSelection(wx.NOT_FOUND)
+        for combo in (self.aperture_min_combo, self.aperture_max_combo):
+            combo.Clear()
+            for stop in P1_APERTURE_STOPS:
+                combo.Append(self._format_aperture_stop(stop))
+            combo.SetSelection(wx.NOT_FOUND)
+
+    def _update_camera_setting_widgets(self, mode):
+        use_rgb = mode == "RGB"
+        exposure_sizer = self._exposure_input_sizer()
+        gain_sizer = self.gain_min_value_txt_ctrl.GetContainingSizer()
+        panel_sizer = self._camera_panel_sizer()
+
+        exposure_sizer.Show(self.exposure_min_value_txt_ctrl, not use_rgb)
+        exposure_sizer.Show(self.exposure_max_value_txt_ctrl, not use_rgb)
+        exposure_sizer.Show(self.exposure_min_combo, use_rgb)
+        exposure_sizer.Show(self.exposure_max_combo, use_rgb)
+
+        gain_sizer.Show(self.gain_min_value_txt_ctrl, not use_rgb)
+        gain_sizer.Show(self.gain_max_value_txt_ctrl, not use_rgb)
+        gain_sizer.Show(self.gain_min_combo, use_rgb)
+        gain_sizer.Show(self.gain_max_combo, use_rgb)
+
+        panel_sizer.Show(self.rgb_shutter_mode_row, use_rgb)
+        self.rgb_shutter_mode_row.Show(
+            self.rgb_shutter_section, _SHOW_RGB_SHUTTER_MODE_CONTROLS
+        )
+        panel_sizer.Show(self.rgb_aperture_label, use_rgb)
+        panel_sizer.Show(self.rgb_aperture_row, use_rgb)
+
+        if use_rgb:
+            self.m_staticText42.SetLabel("Shutter Speed")
+            self.m_staticText422.SetLabel("ISO (Gain)")
+        else:
+            self.m_staticText42.SetLabel("Auto Exposure (ms)")
+            self.m_staticText422.SetLabel("Auto Gain (0-32)")
+
+        self.camera_panel.Layout()
+
+    def _set_exposure_min_value(self, value):
+        mode = self.camera_setting_rgb_uv_combo.GetStringSelection()
+        if mode == "RGB":
+            self._set_stop_combo(
+                self.exposure_min_combo, self._p1_shutter_stops(), value
+            )
+        else:
+            self.exposure_min_value_txt_ctrl.SetValue(
+                "" if value in (None, "") else str(value)
+            )
+
+    def _set_exposure_max_value(self, value):
+        mode = self.camera_setting_rgb_uv_combo.GetStringSelection()
+        if mode == "RGB":
+            self._set_stop_combo(
+                self.exposure_max_combo, self._p1_shutter_stops(), value
+            )
+        else:
+            self.exposure_max_value_txt_ctrl.SetValue(
+                "" if value in (None, "") else str(value)
+            )
+
+    def _set_gain_min_value(self, value):
+        mode = self.camera_setting_rgb_uv_combo.GetStringSelection()
+        if mode == "RGB":
+            self._set_stop_combo(self.gain_min_combo, P1_ISO_STOPS, value)
+        else:
+            self.gain_min_value_txt_ctrl.SetValue(
+                "" if value in (None, "") else str(value)
+            )
+
+    def _set_gain_max_value(self, value):
+        mode = self.camera_setting_rgb_uv_combo.GetStringSelection()
+        if mode == "RGB":
+            self._set_stop_combo(self.gain_max_combo, P1_ISO_STOPS, value)
+        else:
+            self.gain_max_value_txt_ctrl.SetValue(
+                "" if value in (None, "") else str(value)
+            )
+
+    def _set_aperture_min_value(self, value):
+        self._set_stop_combo(self.aperture_min_combo, P1_APERTURE_STOPS, value)
+
+    def _set_aperture_max_value(self, value):
+        self._set_stop_combo(self.aperture_max_combo, P1_APERTURE_STOPS, value)
+
+    def _set_rgb_shutter_mode_selection(self, label):
+        self._suppress_rgb_shutter_mode_confirm = True
+        self.rgb_shutter_mode_combo.SetStringSelection(label)
+        self._rgb_shutter_mode_confirmed = label
+        self._suppress_rgb_shutter_mode_confirm = False
+
+    def on_rgb_shutter_mode(self, event):
+        selection = self.rgb_shutter_mode_combo.GetStringSelection()
+        if (
+            not self._suppress_rgb_shutter_mode_confirm
+            and selection == "LS"
+            and self._rgb_shutter_mode_confirmed != "LS"
+        ):
+            dlg = wx.MessageDialog(
+                self,
+                "Enabling the physical shutter greatly increases wear and tear on the camera, are you sure?",
+                "Confirm Shutter Mode",
+                wx.YES_NO | wx.ICON_WARNING,
+            )
+            if dlg.ShowModal() != wx.ID_YES:
+                dlg.Destroy()
+                self._set_rgb_shutter_mode_selection(self._rgb_shutter_mode_confirmed)
+                return
+            dlg.Destroy()
+        self._rgb_shutter_mode_confirmed = selection
+        self._populate_p1_shutter_combos(preserve=True)
+        if event is not None:
+            event.Skip()
+
     def on_modal_selection(self, event):
         self.on_camera_setting_subsys_selection(event)
         mode = self.camera_setting_rgb_uv_combo.GetStringSelection()
+        self._update_camera_setting_widgets(mode)
+        rgb_fields = (
+            self.exposure_min_combo,
+            self.exposure_max_combo,
+            self.gain_min_combo,
+            self.gain_max_combo,
+            self.rgb_shutter_mode_combo,
+            self.aperture_min_combo,
+            self.aperture_max_combo,
+        )
         if mode == "IR":
             self._set_field_enabled(self.exposure_max_value_txt_ctrl, False)
             self._set_field_enabled(self.exposure_min_value_txt_ctrl, False)
+            for ctrl in rgb_fields:
+                self._set_field_enabled(ctrl, False)
             self._set_field_enabled(self.gain_min_value_txt_ctrl, False)
             self._set_field_enabled(self.gain_max_value_txt_ctrl, False)
+            self._set_field_enabled(self.rgb_exposure_comp_txt_ctrl, False)
             self._set_field_enabled(self.ir_nuc_time, True)
         else:
             self._set_field_enabled(self.exposure_max_value_txt_ctrl, True)
             self._set_field_enabled(self.exposure_min_value_txt_ctrl, True)
+            for ctrl in rgb_fields:
+                self._set_field_enabled(ctrl, mode == "RGB")
             self._set_field_enabled(self.gain_min_value_txt_ctrl, True)
             self._set_field_enabled(self.gain_max_value_txt_ctrl, True)
+            self._set_field_enabled(self.rgb_exposure_comp_txt_ctrl, mode == "RGB")
             self._set_field_enabled(self.ir_nuc_time, False)
 
     def set_camera_parameter(self, hosts, mode, param, val):
         mode = mode.lower()
         if "ISO" in param:
-            # Scaling for Phase One
-            val = int(val * 50)
-        if mode == "rgb" and "Shutter" in param:
-            print("Casting exposure to phase one stop.")
-            # Set exposure to stop for Phase One
-            val = float(val) * 1e3
-            if val not in P1_EXPOSURE_STOPS:
-                newval = nearest(P1_EXPOSURE_STOPS, val)
-                msg = (
-                    "Exposure value is not valid for Phase One, rounding %0.4fms to %0.4fms."
-                    % (val, newval)
-                )
-                dlg = wx.MessageDialog(self, msg, "Error", wx.OK | wx.ICON_ERROR)
-                dlg.ShowModal()
-                dlg.Destroy()
-                p1val = newval * 1e-3
-                print(val, newval)
-                val = str(p1val)
+            val = int(val)
+        if mode == "rgb" and "Shutter" in param and "Mode" not in param:
+            val_sec = float(val)
+            stops = self._p1_shutter_stops()
+            if val_sec not in stops:
+                val_sec = nearest(stops, val_sec)
                 if "Max" in param:
-                    self.exposure_min_value_txt_ctrl.SetValue(str(newval))
+                    self._set_exposure_min_value(val_sec)
                 elif "Min" in param:
-                    self.exposure_max_value_txt_ctrl.SetValue(str(newval))
-            else:
-                val = str(val * 1e-3)
+                    self._set_exposure_max_value(val_sec)
+            val = str(val_sec)
 
         for host in hosts:
             SYS_CFG["requested_geni_params"][host][mode][param] = val
@@ -787,24 +1031,69 @@ class MainFrame(form_builder_output.MainFrame):
             return None
         return val
 
+    @staticmethod
+    def _param_values_equal(a, b):
+        if a in (None, "") and b in (None, ""):
+            return True
+        if a in (None, "") or b in (None, ""):
+            return False
+        try:
+            return abs(float(a) - float(b)) < 1e-9
+        except (TypeError, ValueError):
+            return str(a) == str(b)
+
+    def _camera_setting_hosts(self, fov):
+        if fov == "all":
+            return self.hosts
+        return [host_from_fov(fov)]
+
+    def _kv_param_unified(self, hosts, mode, param):
+        values = []
+        for host in hosts:
+            topic_base = "/".join(["", "sys", "actual_geni_params", host, mode, ""])
+            values.append(kv.get(topic_base + param, None))
+        if not values:
+            return None
+        first = values[0]
+        for val in values[1:]:
+            if not self._param_values_equal(first, val):
+                return None
+        return first
+
+    def _clear_rgb_shutter_mode_selection(self):
+        self._suppress_rgb_shutter_mode_confirm = True
+        self.rgb_shutter_mode_combo.SetSelection(wx.NOT_FOUND)
+        self._rgb_shutter_mode_confirmed = ""
+        self._suppress_rgb_shutter_mode_confirm = False
+
     def on_camera_setting_subsys_selection(self, event):
         mode = self.camera_setting_rgb_uv_combo.GetStringSelection().lower()
         fov = self.camera_setting_subsys.GetString(
             self.camera_setting_subsys.GetCurrentSelection()
         ).lower()
-        if fov == "all":
-            host = "null"
-        else:
-            host = host_from_fov(fov)
-        topic_base = "/".join(["", "sys", "actual_geni_params", host, mode, ""])
+        hosts = self._camera_setting_hosts(fov)
         if mode == "ir":
-            nuc_time = kv.get(topic_base + "CorrectionAutoDeltaTime", None)
-            nuc_time = nuc_time if nuc_time is not None else 0
-            self.ir_nuc_time.SetValue(str(nuc_time))
+            nuc_time = self._kv_param_unified(
+                hosts, mode, "CorrectionAutoDeltaTime"
+            )
+            if nuc_time in (None, ""):
+                self.ir_nuc_time.SetValue("")
+            else:
+                self.ir_nuc_time.SetValue(str(nuc_time))
         elif mode == "rgb" or mode == "uv":
             if mode == "rgb":
-                exp_factor = float(1e-3)
-                gain_factor = 1 / 50.0
+                shutter_mode_raw = self._kv_param_unified(
+                    hosts, mode, P1_SHUTTER_MODE_PARAM
+                )
+                if shutter_mode_raw not in (None, ""):
+                    self._set_rgb_shutter_mode_selection(
+                        self._p1_shutter_mode_label(
+                            self._p1_shutter_mode_from_value(shutter_mode_raw)
+                        )
+                    )
+                else:
+                    self._clear_rgb_shutter_mode_selection()
+                self._populate_p1_shutter_combos(preserve=False)
                 GAIN_MAX_PARAM = P1_GAIN_MAX_PARAM
                 GAIN_MIN_PARAM = P1_GAIN_MIN_PARAM
                 EXPOSURE_MAX_PARAM = P1_EXPOSURE_MAX_PARAM
@@ -816,22 +1105,57 @@ class MainFrame(form_builder_output.MainFrame):
                 GAIN_MIN_PARAM = PR_GAIN_MIN_PARAM
                 EXPOSURE_MAX_PARAM = PR_EXPOSURE_MAX_PARAM
                 EXPOSURE_MIN_PARAM = PR_EXPOSURE_MIN_PARAM
-            gain_min = kv.get(topic_base + GAIN_MIN_PARAM, None)
-            gain_max = kv.get(topic_base + GAIN_MAX_PARAM, None)
-            exp_min = kv.get(topic_base + EXPOSURE_MIN_PARAM, None)
-            exp_max = kv.get(topic_base + EXPOSURE_MAX_PARAM, None)
-            gain_min = (
-                int(float(gain_min) * gain_factor) if gain_min is not None else ""
-            )
-            gain_max = (
-                int(float(gain_max) * gain_factor) if gain_max is not None else ""
-            )
-            exp_max = float(exp_max) / exp_factor if exp_max is not None else ""
-            exp_min = float(exp_min) / exp_factor if exp_min is not None else ""
-            self.exposure_min_value_txt_ctrl.SetValue(str(exp_min))
-            self.exposure_max_value_txt_ctrl.SetValue(str(exp_max))
-            self.gain_min_value_txt_ctrl.SetValue(str(gain_min))
-            self.gain_max_value_txt_ctrl.SetValue(str(gain_max))
+            gain_min = self._kv_param_unified(hosts, mode, GAIN_MIN_PARAM)
+            gain_max = self._kv_param_unified(hosts, mode, GAIN_MAX_PARAM)
+            exp_min = self._kv_param_unified(hosts, mode, EXPOSURE_MIN_PARAM)
+            exp_max = self._kv_param_unified(hosts, mode, EXPOSURE_MAX_PARAM)
+            if mode == "rgb":
+                gain_min = self._p1_iso_from_param(gain_min)
+                gain_max = self._p1_iso_from_param(gain_max)
+                exp_min = float(exp_min) if exp_min not in (None, "") else ""
+                exp_max = float(exp_max) if exp_max not in (None, "") else ""
+                self._set_exposure_min_value(exp_min)
+                self._set_exposure_max_value(exp_max)
+                self._set_gain_min_value(gain_min)
+                self._set_gain_max_value(gain_max)
+                aperture_min = self._kv_param_unified(
+                    hosts, mode, P1_APERTURE_MIN_PARAM
+                )
+                aperture_max = self._kv_param_unified(
+                    hosts, mode, P1_APERTURE_MAX_PARAM
+                )
+                aperture_min = (
+                    float(aperture_min) if aperture_min not in (None, "") else ""
+                )
+                aperture_max = (
+                    float(aperture_max) if aperture_max not in (None, "") else ""
+                )
+                self._set_aperture_min_value(aperture_min)
+                self._set_aperture_max_value(aperture_max)
+                exposure_comp = self._kv_param_unified(
+                    hosts, mode, P1_EXPOSURE_COMP_PARAM
+                )
+                if exposure_comp in (None, ""):
+                    self.rgb_exposure_comp_txt_ctrl.SetValue("")
+                else:
+                    self.rgb_exposure_comp_txt_ctrl.SetValue(str(float(exposure_comp)))
+            else:
+                gain_min = (
+                    int(float(gain_min) * gain_factor)
+                    if gain_min not in (None, "")
+                    else ""
+                )
+                gain_max = (
+                    int(float(gain_max) * gain_factor)
+                    if gain_max not in (None, "")
+                    else ""
+                )
+                exp_max = float(exp_max) / exp_factor if exp_max not in (None, "") else ""
+                exp_min = float(exp_min) / exp_factor if exp_min not in (None, "") else ""
+                self._set_exposure_min_value(exp_min)
+                self._set_exposure_max_value(exp_max)
+                self.gain_min_value_txt_ctrl.SetValue(str(gain_min))
+                self.gain_max_value_txt_ctrl.SetValue(str(gain_max))
 
     def on_set_camera_parameter(self, event):
         mode = self.camera_setting_rgb_uv_combo.GetStringSelection()
@@ -876,12 +1200,28 @@ class MainFrame(form_builder_output.MainFrame):
                 self.set_camera_parameter(hosts, mode, param, val=nuc_time)
         elif mode == "RGB" or mode == "UV":
             if mode == "RGB":
-                factor = float(1e-3)
                 GAIN_MAX_PARAM = P1_GAIN_MAX_PARAM
                 GAIN_MIN_PARAM = P1_GAIN_MIN_PARAM
                 EXPOSURE_MAX_PARAM = P1_EXPOSURE_MAX_PARAM
                 EXPOSURE_MIN_PARAM = P1_EXPOSURE_MIN_PARAM
-                EXPOSURE_MIN = P1_EXPOSURE_MIN
+                shutter_mode = self._get_p1_shutter_mode()
+                self.set_camera_parameter(
+                    hosts, mode, P1_SHUTTER_MODE_PARAM, val=shutter_mode
+                )
+                exp_min = self._get_stop_combo(
+                    self.exposure_min_combo, self._p1_shutter_stops()
+                )
+                exp_max = self._get_stop_combo(
+                    self.exposure_max_combo, self._p1_shutter_stops()
+                )
+                gain_min = self._get_stop_combo(self.gain_min_combo, P1_ISO_STOPS)
+                gain_max = self._get_stop_combo(self.gain_max_combo, P1_ISO_STOPS)
+                aperture_min = self._get_stop_combo(
+                    self.aperture_min_combo, P1_APERTURE_STOPS
+                )
+                aperture_max = self._get_stop_combo(
+                    self.aperture_max_combo, P1_APERTURE_STOPS
+                )
             else:
                 factor = 1e3
                 GAIN_MAX_PARAM = PR_GAIN_MAX_PARAM
@@ -889,13 +1229,16 @@ class MainFrame(form_builder_output.MainFrame):
                 EXPOSURE_MAX_PARAM = PR_EXPOSURE_MAX_PARAM
                 EXPOSURE_MIN_PARAM = PR_EXPOSURE_MIN_PARAM
                 EXPOSURE_MIN = PR_EXPOSURE_MIN
-            # factor = 1e3 Prosilica
-            exp_min = self.check_box_val(
-                self.exposure_min_value_txt_ctrl.GetValue(), float
-            )
-            exp_max = self.check_box_val(
-                self.exposure_max_value_txt_ctrl.GetValue(), float
-            )
+                exp_min = self.check_box_val(
+                    self.exposure_min_value_txt_ctrl.GetValue(), float
+                )
+                exp_max = self.check_box_val(
+                    self.exposure_max_value_txt_ctrl.GetValue(), float
+                )
+                gain_min = self.check_box_val(self.gain_min_value_txt_ctrl.GetValue())
+                gain_max = self.check_box_val(self.gain_max_value_txt_ctrl.GetValue())
+                aperture_min = None
+                aperture_max = None
             if exp_min is None and exp_max is None:
                 pass
             elif (exp_min is None and exp_max is not None) or (
@@ -906,6 +1249,22 @@ class MainFrame(form_builder_output.MainFrame):
                 dlg.ShowModal()
                 dlg.Destroy()
                 pass
+            elif mode == "RGB":
+                if exp_max < exp_min:
+                    msg = (
+                        "Shutter speed maximum must allow equal or longer exposure "
+                        "than the minimum."
+                    )
+                    dlg = wx.MessageDialog(self, msg, "Error", wx.OK | wx.ICON_ERROR)
+                    dlg.ShowModal()
+                    dlg.Destroy()
+                    return
+                self.set_camera_parameter(
+                    hosts, mode, EXPOSURE_MIN_PARAM, val=exp_min
+                )
+                self.set_camera_parameter(
+                    hosts, mode, EXPOSURE_MAX_PARAM, val=exp_max
+                )
             elif exp_min < EXPOSURE_MIN or exp_min > SYS_CFG["arch"]["max_exposure_ms"]:
                 msg = "Exposure minimum value must be >= %s and <= %sms." % (
                     EXPOSURE_MIN,
@@ -938,8 +1297,6 @@ class MainFrame(form_builder_output.MainFrame):
                     param = EXPOSURE_MAX_PARAM
                     self.set_camera_parameter(hosts, mode, param, val=exp_max_ms)
 
-            gain_min = self.check_box_val(self.gain_min_value_txt_ctrl.GetValue())
-            gain_max = self.check_box_val(self.gain_max_value_txt_ctrl.GetValue())
             if gain_min is None and gain_max is None:
                 pass
             elif (gain_min is None and gain_max is not None) or (
@@ -950,6 +1307,15 @@ class MainFrame(form_builder_output.MainFrame):
                 dlg.ShowModal()
                 dlg.Destroy()
                 pass
+            elif mode == "RGB":
+                if gain_max < gain_min:
+                    msg = "ISO maximum must be >= ISO minimum."
+                    dlg = wx.MessageDialog(self, msg, "Error", wx.OK | wx.ICON_ERROR)
+                    dlg.ShowModal()
+                    dlg.Destroy()
+                    return
+                self.set_camera_parameter(hosts, mode, GAIN_MIN_PARAM, val=gain_min)
+                self.set_camera_parameter(hosts, mode, GAIN_MAX_PARAM, val=gain_max)
             elif gain_min < 0 or gain_min > GAIN_MAX:
                 msg = "Gain minimum value must be >= 0 and <= %s." % GAIN_MAX
                 dlg = wx.MessageDialog(self, msg, "Error", wx.OK | wx.ICON_ERROR)
@@ -973,6 +1339,38 @@ class MainFrame(form_builder_output.MainFrame):
                 else:
                     param = GAIN_MAX_PARAM
                     self.set_camera_parameter(hosts, mode, param, val=gain_max)
+
+            if mode == "RGB":
+                if (aperture_min is None and aperture_max is not None) or (
+                    aperture_max is None and aperture_min is not None
+                ):
+                    msg = "Both aperture min/max value must be set."
+                    dlg = wx.MessageDialog(self, msg, "Error", wx.OK | wx.ICON_ERROR)
+                    dlg.ShowModal()
+                    dlg.Destroy()
+                    return
+                if aperture_min is not None and aperture_max is not None:
+                    if aperture_max < aperture_min:
+                        msg = "Aperture maximum must be >= aperture minimum."
+                        dlg = wx.MessageDialog(
+                            self, msg, "Error", wx.OK | wx.ICON_ERROR
+                        )
+                        dlg.ShowModal()
+                        dlg.Destroy()
+                        return
+                    self.set_camera_parameter(
+                        hosts, mode, P1_APERTURE_MIN_PARAM, val=aperture_min
+                    )
+                    self.set_camera_parameter(
+                        hosts, mode, P1_APERTURE_MAX_PARAM, val=aperture_max
+                    )
+                exposure_comp = self.check_box_val(
+                    self.rgb_exposure_comp_txt_ctrl.GetValue(), float
+                )
+                if exposure_comp is not None:
+                    self.set_camera_parameter(
+                        hosts, mode, P1_EXPOSURE_COMP_PARAM, val=exposure_comp
+                    )
         else:
             msg = "Invalid mode selected, must be IR, UV, or RGB."
             dlg = wx.MessageDialog(self, msg, "Error", wx.OK | wx.ICON_ERROR)
@@ -1595,31 +1993,31 @@ class MainFrame(form_builder_output.MainFrame):
 
     # -------------------- Launch Image Inspection Frame ---------------------
     def on_dclick_left_rgb(self, event):
-        self.open_image_inspection_panel("Left RGB")
+        self.open_image_inspection_panel("Left View RGB")
 
     def on_dclick_center_rgb(self, event):
-        self.open_image_inspection_panel("Center RGB")
+        self.open_image_inspection_panel("Center View RGB")
 
     def on_dclick_right_rgb(self, event):
-        self.open_image_inspection_panel("Right RGB")
+        self.open_image_inspection_panel("Right View RGB")
 
     def on_dclick_left_ir(self, event):
-        self.open_image_inspection_panel("Left IR")
+        self.open_image_inspection_panel("Left View IR")
 
     def on_dclick_center_ir(self, event):
-        self.open_image_inspection_panel("Center IR")
+        self.open_image_inspection_panel("Center View IR")
 
     def on_dclick_right_ir(self, event):
-        self.open_image_inspection_panel("Right IR")
+        self.open_image_inspection_panel("Right View IR")
 
     def on_dclick_left_uv(self, event):
-        self.open_image_inspection_panel("Left UV")
+        self.open_image_inspection_panel("Left View UV")
 
     def on_dclick_center_uv(self, event):
-        self.open_image_inspection_panel("Center UV")
+        self.open_image_inspection_panel("Center View UV")
 
     def on_dclick_right_uv(self, event):
-        self.open_image_inspection_panel("Right UV")
+        self.open_image_inspection_panel("Right View UV")
 
     # ------------------------------------------------------------------------
 
@@ -1874,45 +2272,9 @@ class MainFrame(form_builder_output.MainFrame):
     # ------------------------------------------------------------------------
     # ---------------------------- Detection Menu ----------------------------
 
-    def _valid_detector_pipe(self, pipe):
-        return pipe and pipe != "null"
-
-    def apply_detector_pipefiles(self, sys_cfg_name=None):
-        """Sync per-host detector pipefiles from the active camera configuration."""
-        if sys_cfg_name is None:
-            sys_cfg_name = self.get_sys_cfg()
-        try:
-            cc = SYS_CFG["camera_cfgs"][sys_cfg_name]
-        except KeyError:
-            return
-        fov_pipes = {
-            "center": cc.get("center_sys_pipe"),
-            "left": cc.get("left_sys_pipe"),
-            "right": cc.get("right_sys_pipe"),
-        }
-        for host in self.hosts:
-            fov = SYS_CFG["arch"]["hosts"][host]["fov"]
-            pipe = fov_pipes.get(fov)
-            if self._valid_detector_pipe(pipe):
-                SYS_CFG[host]["detector"]["pipefile"] = pipe
-            else:
-                SYS_CFG[host]["detector"]["pipefile"] = None
-
     def resolve_detector_pipefile(self, host):
-        """Return the detector pipefile for a host, using camera config if needed."""
-        pipe = SYS_CFG[host]["detector"].get("pipefile")
-        if self._valid_detector_pipe(pipe):
-            return pipe
-        try:
-            cc = SYS_CFG["camera_cfgs"][self.get_sys_cfg()]
-            fov = SYS_CFG["arch"]["hosts"][host]["fov"]
-            pipe = cc.get("{}_sys_pipe".format(fov))
-        except KeyError:
-            return None
-        if self._valid_detector_pipe(pipe):
-            SYS_CFG[host]["detector"]["pipefile"] = pipe
-            return pipe
-        return None
+        """Return the detector pipefile for a host from the active camera config."""
+        return get_detector_pipefile(host, self.get_sys_cfg())
 
     def do_start_a_detector(self, event=None, host="unset", log=True):
         cmdpipef = self.resolve_detector_pipefile(host)
@@ -2205,8 +2567,6 @@ class MainFrame(form_builder_output.MainFrame):
             self.camera_config_combo.SetSelection(0)
             SYS_CFG["arch"]["sys_cfg"] = self.camera_config_combo.GetStringSelection()
 
-        self.apply_detector_pipefiles()
-
     def next_camera_config(self, event=None):
         ind = self.camera_config_combo.GetSelection()
         if ind == wx.NOT_FOUND:
@@ -2218,7 +2578,7 @@ class MainFrame(form_builder_output.MainFrame):
             ind = 0
 
         self.camera_config_combo.SetSelection(ind)
-        self.apply_detector_pipefiles()
+        SYS_CFG["arch"]["sys_cfg"] = self.get_sys_cfg()
 
     def previous_camera_config(self, event=None):
         ind = self.camera_config_combo.GetSelection()
@@ -2231,7 +2591,7 @@ class MainFrame(form_builder_output.MainFrame):
             ind = self.camera_config_combo.GetCount() - 1
 
         self.camera_config_combo.SetSelection(ind)
-        self.apply_detector_pipefiles()
+        SYS_CFG["arch"]["sys_cfg"] = self.get_sys_cfg()
 
     def on_camera_config_combo(self, event=None):
         """ """
@@ -2242,9 +2602,9 @@ class MainFrame(form_builder_output.MainFrame):
         syscfg_dir = SYS_CFG["syscfg_dir"]
         vfov = load_from_file(cc["center_rgb_yaml_path"]).fov()[1]
         SYS_CFG["rgb_vfov"] = vfov
+        SYS_CFG["arch"]["sys_cfg"] = curr_str
         save_camera_config(curr_str)
         self.update_project_flight_params()
-        self.apply_detector_pipefiles(curr_str)
 
     # ------------------------- END Camera Configuration -------------------------
 
