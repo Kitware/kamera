@@ -66,12 +66,16 @@ class Cfg(dict):
     #        kv
 
     def __setitem__(self, key, val):
-        # tic = time.time()
-        kv.put("%s/%s" % (self.ns, key), val)
-        # toc = time.time()
-        # print("Time to access was %s" % (toc - tic))
+        ns_key = "%s/%s" % (self.ns, key)
         if isinstance(val, dict):
-            val = Cfg(val, ns="%s/%s" % (self.ns, key))
+            # An empty dict has no leaves to flatten; kv.put would fall back to
+            # SET-ing a raw dict, which Redis rejects. Skip the write and keep
+            # the empty namespace in memory only.
+            if val:
+                kv.put(ns_key, val)
+            val = Cfg(val, ns=ns_key)
+        else:
+            kv.put(ns_key, val)
         super(Cfg, self).__setitem__(key, val)
 
     def __repr__(self):
@@ -137,9 +141,22 @@ except Exception as e:
 REDIS_LIVE.pop("camera_cfgs", None)  # presets come from the file below
 
 # --- Camera presets (camera_configurations.json is authoritative) ------------
+# Mirrors the system_state cache: seed the runtime file from the in-repo default
+# the first time the GUI runs, then load it.
 camera_config_filename = os.path.join(
     USER_CFG["gui_cfg_dir"], "camera_configurations.json"
 )
+default_camera_config_file = os.path.join(
+    REAL_KAM_REPO_DIR, "src/cfg", system_name, "default_camera_configurations.json"
+)
+if not os.path.isfile(camera_config_filename):
+    try:
+        wxpython_gui.utils.make_path(camera_config_filename, from_file=True)
+        with open(default_camera_config_file, "r") as infile:
+            with open(camera_config_filename, "w") as outfile:
+                outfile.write(infile.read())
+    except Exception as e:
+        print(e)
 try:
     with open(camera_config_filename, "r") as input_file:
         CAMERA_PRESETS = json.load(input_file)
@@ -156,10 +173,32 @@ SYS_ARCH = {}
 deep_merge(SYS_ARCH, DEFAULT_STATE)  # 1. factory defaults
 deep_merge(SYS_ARCH, CACHE_STATE)    # 2. operator's last session
 deep_merge(SYS_ARCH, REDIS_LIVE)     # 3. live runtime values
-deep_merge(SYS_ARCH, USER_CFG)       # 4. static YAML truth always wins
+# 4. config.yaml OWNS the static keys it declares: replace rather than merge, so
+#    a key removed from the yaml (e.g. a dropped channel) can't survive from a
+#    lower tier. "arch" mixes static + mutable session subkeys, so only its
+#    static subkeys are replaced.
+for key, val in USER_CFG.items():
+    if key != "arch":
+        SYS_ARCH[key] = val
+SYS_ARCH.setdefault("arch", {})
+for sub, val in USER_CFG.get("arch", {}).items():
+    SYS_ARCH["arch"][sub] = val
 SYS_ARCH["camera_cfgs"] = CAMERA_PRESETS
 
-# Publish to Redis under /sys and expose as SYS_CFG.
+# Publish to Redis under /sys. First drop the static subtrees so keys removed
+# from config.yaml don't linger (put only sets keys, never deletes); the update
+# then republishes the authoritative values. arch.hosts is the only static dict
+# under "arch" -- the rest of /sys/arch holds mutable state we must not wipe.
+for key, val in USER_CFG.items():
+    if key != "arch" and isinstance(val, dict):
+        try:
+            kv.delete_dict("/sys/%s" % key)
+        except Exception:
+            pass
+try:
+    kv.delete_dict("/sys/arch/hosts")
+except Exception:
+    pass
 SYS_CFG = Cfg(ns="/sys")
 SYS_CFG.update(SYS_ARCH)
 
@@ -342,7 +381,13 @@ def format_status(
         drop_str = "{} dropped".format(num_dropped)
     else:
         drop_str = "{:.0e} dropped".format(num_dropped)
-    gain_str = "Gain: ?" if gain is None else "Gain: {}".format(gain)
+    gain_str = (
+        "ISO: ?"
+        if chan == "rgb" and gain is None
+        else "Gain: ?"
+        if gain is None
+        else ("ISO: {}" if chan == "rgb" else "Gain: {}").format(gain)
+    )
     fps_str = "? fps" if fps is None else "{:4.2f} fps".format(fps)
     if total is not None and processed is not None:
         # display N/N, even if internally it's N-1/N
@@ -388,7 +433,7 @@ def channel_format_status(fov, chan, timeval=None, dt=0):
     elif chan == "rgb":
         iso = kv.get(param_ns + "/ISO", None)
         if iso is not None:
-            gain = int(float(iso) / 50.0)
+            gain = int(float(iso))
         shutter = kv.get(param_ns + "/Shutter_Speed", None)
         if shutter is not None:
             # convert float point seconds to us
@@ -422,3 +467,21 @@ def host_from_fov(fov):
         if fov == hosts[host]["fov"]:
             return host
     raise KeyError("FOV not found: '{}'".format(fov))
+
+
+def get_detector_pipefile(host, sys_cfg=None):
+    # type: (str, Optional[str]) -> Optional[str]
+    """Resolve a host's detector pipefile from the active camera config.
+
+    The pipefile is defined per-FOV in camera_cfgs as "<fov>_sys_pipe"; it is
+    read from there directly rather than duplicated into per-host state.
+    Returns None when unset or invalid.
+    """
+    if sys_cfg is None:
+        sys_cfg = SYS_CFG["arch"].get("sys_cfg")
+    try:
+        fov = SYS_CFG["arch"]["hosts"][host]["fov"]
+        pipe = SYS_CFG["camera_cfgs"][sys_cfg]["{}_sys_pipe".format(fov)]
+    except KeyError:
+        return None
+    return pipe if (pipe and pipe != "null") else None

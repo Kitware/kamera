@@ -18,27 +18,25 @@ def main():
     name_space = rospy.get_namespace()
 
     envoy = RedisEnvoy(os.environ["REDIS_HOST"], client_name=node_name)
-    channels = envoy.get("/sys/channels").keys()
+    enabled = envoy.get("/sys/enabled")
     all_hosts = envoy.get("/sys/arch/hosts")
     hosts = {h: all_hosts[h] for h in filter_hosts_by_system(all_hosts.keys())}
 
     topic_names = {}
 
-    # From the camera driver itself
+    # From the camera driver itself (RGB) and view_server sync node (IR/UV).
+    # Topic keys must match gui.MainFrame, which gates panels on /sys/enabled,
+    # not /sys/channels (channels drives driver launch, not GUI visibility).
     for host, d in hosts.items():
-        channel = "rgb"
         fov = d["fov"]
-        topic_names["_".join([fov, channel, "srv", "topic"])] = "/".join(
-            ["", host, channel, "%s_view_service" % channel, "get_image_view"]
-        )
-
-    # From the view_server sync node
-    for host, d in hosts.items():
-        channel = "rgb"
-        for channel in channels:
-            if channel == "rgb":
+        fov_enabled = enabled.get(fov, {})
+        if fov_enabled.get("rgb"):
+            topic_names["_".join([fov, "rgb", "srv", "topic"])] = "/".join(
+                ["", host, "rgb", "rgb_view_service", "get_image_view"]
+            )
+        for channel in ("ir", "uv"):
+            if not fov_enabled.get(channel):
                 continue
-            fov = d["fov"]
             topic_names["_".join([fov, channel, "srv", "topic"])] = "/".join(
                 ["", host, "synched", "%s_view_service" % channel]
             )

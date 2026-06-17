@@ -953,7 +953,7 @@ class StandardCamera(Camera):
 
     @dist.setter
     def dist(self, value):
-        if value is None or value is 0:
+        if value is None or (np.isscalar(value) and value == 0):
             value = np.zeros(4)
 
         self._dist = np.atleast_1d(value)
