@@ -448,6 +448,12 @@
         "p1debayerq": {
             "processed": 0,
             "total": 0
+        },
+        "power": {
+            "actual": "idle",
+            "desired": "idle",
+            "status": "ready",
+            "updated_at": 0
         }
     },
     "left1taiga": {
@@ -459,6 +465,12 @@
             },
             "last_change_desired": 0.0,
             "pipefile": null
+        },
+        "power": {
+            "actual": "idle",
+            "desired": "idle",
+            "status": "ready",
+            "updated_at": 0
         }
     },
     "right2taiga": {
@@ -470,6 +482,12 @@
             },
             "last_change_desired": 0.0,
             "pipefile": null
+        },
+        "power": {
+            "actual": "idle",
+            "desired": "idle",
+            "status": "ready",
+            "updated_at": 0
         }
     },
     "observer": "",
