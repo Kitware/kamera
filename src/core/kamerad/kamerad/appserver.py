@@ -2,6 +2,7 @@
 import json
 import os
 import subprocess
+import time
 from collections import deque
 from pathlib import Path
 from xmlrpc.client import ServerProxy
@@ -37,8 +38,6 @@ def loop_arp_scan(iface, period=10):
         dd = arpj.run_arp_scan(iface)
         print(dd)
         arp_scan_deque.append(dd)
-        import time
-
         time.sleep(period)
 
 
@@ -129,8 +128,8 @@ def mountall_p():
     return json.dumps({"code": code, "out": out, "err": err})
 
 
-@app.route("/power/status", methods=["GET"])
-def power_status():
+@app.route("/powerinfo", methods=["POST"])
+def powerinfo_p():
     if power_manager is None:
         return json.dumps({"ok": False, "error": "power manager unavailable"}), 503
     return json.dumps(power_manager.get_status())
@@ -158,10 +157,7 @@ def power_reboot():
 
 def entry(args: ServerArgs):
     global power_manager
-    redis_host = os.environ.get("REDIS_HOST")
-    power_manager = PowerManager(server, redis_host=redis_host)
-    power_manager.publish_diagnostics()
-    power_manager.start_diagnostics()
+    power_manager = PowerManager(server)
     app.run(host=args.host, port=args.port, debug=args.debug)
 
 
