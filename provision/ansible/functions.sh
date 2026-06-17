@@ -52,11 +52,3 @@ function kamera_host_for_position() {
 			;;
 	esac
 }
-
-function kamera_shutdown() {
-	ansible-playbook playbooks/cas/stopstart.yml -i hosts.yml --become-password-file ".password" --tags "shutdown" --limit $1
-}
-
-function kamera_reboot() {
-	ansible-playbook playbooks/cas/stopstart.yml -i hosts.yml --become-password-file ".password" --tags "reboot" --limit $1
-}

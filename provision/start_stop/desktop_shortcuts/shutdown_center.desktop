@@ -1,5 +1,5 @@
 [Desktop Entry]
-Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/shutdown_center.sh'
+Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/kamera_power.sh shutdown center'
 Name=shutdown_center
 Terminal=true
 Type=Application
