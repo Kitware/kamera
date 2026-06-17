@@ -208,8 +208,16 @@
           dest: /home/user/.bash_aliases
 
       - name: Install start/stop desktop shortcuts
-        when: leader | default(false)
+        when: leader
         command: bash {{ kamera_dir }}/provision/start_stop/install_desktop_shortcuts.sh
+
+      - name: Symlink NAS mount to Desktop
+        when: leader
+        file:
+          src: "{{ data_dir }}"
+          dest: "/home/{{ ansible_user }}/Desktop/NAS"
+          state: link
+          force: true
 
       - name: Disable sleep state on subsystems.
         become: True
