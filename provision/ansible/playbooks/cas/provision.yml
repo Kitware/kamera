@@ -78,14 +78,14 @@
     - name: Add Tailscale apt key
       become: True
       get_url:
-        url: "https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_lsb.codename }}.noarmor.gpg"
+        url: "https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_facts['lsb']['codename'] }}.noarmor.gpg"
         dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
         mode: '0644'
 
     - name: Add Tailscale apt repository
       become: True
       get_url:
-        url: "https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_lsb.codename }}.tailscale-keyring.list"
+        url: "https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_facts['lsb']['codename'] }}.tailscale-keyring.list"
         dest: /etc/apt/sources.list.d/tailscale.list
         mode: '0644'
 
