@@ -15,7 +15,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from roskv.impl.redis_envoy import RedisEnvoy as ImplEnvoy
 from roskv.util import filter_hosts_by_system
 import wxpython_gui
-from wxpython_gui.utils import check_default
+import wxpython_gui.utils  # bind the submodule for wxpython_gui.utils.make_path()
 
 
 # Figure out relative positions
@@ -86,113 +86,119 @@ class Cfg(dict):
             self[key] = other[key]
 
 
-# =================== LOADING GUI CONFIG =======================
-# This will attempt to load from redis first, and backfill from disk
-# Values are placed under "/sys/gui", with sys params under "/sys/gui/arch"
-# Location of the system configuration file dictionary.
+# =================== CONFIG RESOLUTION =======================
+# SYS_CFG is built by deep_merge-ing tiers low precedence to high; last wins:
+#   1. default_system_state.json        factory defaults
+#   2. <gui_cfg_dir>/system_state.json  last session (the only thing saved back)
+#   3. Redis /sys/*                      live runtime values
+#   4. config.yaml (USER_CFG)            static truth; ALWAYS WINS for its keys
+# camera_configurations.json owns SYS_CFG["camera_cfgs"].
+
+
+def deep_merge(base, override):
+    """Recursively merge ``override`` into ``base`` (later wins) and return it."""
+    for key, val in override.items():
+        if key in base and isinstance(base[key], dict) and isinstance(val, dict):
+            deep_merge(base[key], val)
+        else:
+            base[key] = val
+    return base
+
+
+# --- Tiers 1 & 2: factory defaults, then the cache (seeded from default) -----
 config_filename = os.path.join(USER_CFG["gui_cfg_dir"], "system_state.json")
-# create from template if it doesn't exist
+default_system_state_file = os.path.join(
+    REAL_KAM_REPO_DIR, "src/cfg", system_name, "default_system_state.json"
+)
+try:
+    with open(default_system_state_file, "r") as infile:
+        DEFAULT_STATE = json.load(infile)
+except Exception as e:
+    print(e)
+    DEFAULT_STATE = {}
 if not os.path.isfile(config_filename):
     wxpython_gui.utils.make_path(config_filename, from_file=True)
-    default_system_state_file = os.path.join(
-        REAL_KAM_REPO_DIR, "src/cfg", system_name, "default_system_state.json"
-    )
-    with open(default_system_state_file, "r") as infile:
-        with open(config_filename, "w") as outfile:
-            outfile.write(infile.read())
-            print("Created config from scratch: {}".format(config_filename))
+    with open(config_filename, "w") as outfile:
+        json.dump(DEFAULT_STATE, outfile, indent=4, sort_keys=True)
+        print("Created config from scratch: {}".format(config_filename))
 try:
-    GUI_ARCH_KV = kv.get_dict("/sys")
+    with open(config_filename, "r") as input_file:
+        CACHE_STATE = json.load(input_file)
 except Exception as e:
-    GUI_ARCH_KV = {}
-with open(config_filename, "r") as input_file:
-    GUI_ARCH_DEFAULT = json.load(input_file)
+    print(e)
+    CACHE_STATE = {}
 
-# Since we're grabbing everything, trim out camera configs for insert
+# --- Tier 3: live Redis state ------------------------------------------------
 try:
-    kv.delete_dict("/sys/camera_cfgs")
-except:
-    pass
-# Fill in any missing value in redis from disk
-GUI_ARCH = check_default(GUI_ARCH_KV, GUI_ARCH_DEFAULT)
+    REDIS_LIVE = kv.get_dict("/sys")
+except Exception as e:
+    print(e)
+    REDIS_LIVE = {}
+REDIS_LIVE.pop("camera_cfgs", None)  # presets come from the file below
 
-
-def save_config_settings():
-    print("Saving config settings.")
-    with open(config_filename, "w") as output_file:
-        json.dump(SYS_CFG, output_file, indent=4, sort_keys=True)
-
-
-# Fill in values that will change more frequently, not ones that are hardcoded
-# in the user-config.yml.
-# kv.put("/sys", GUI_ARCH)
-# =================== FINISHED GUI CONFIG =======================
-
-# =================== LOADING CAMERA CONFIG =======================
-# This will attempt to load from redis first, and backfill from disk
-# Location of the camera configuration file dictionary.
+# --- Camera presets (camera_configurations.json is authoritative) ------------
 camera_config_filename = os.path.join(
     USER_CFG["gui_cfg_dir"], "camera_configurations.json"
 )
 try:
-    CAMERA_CFGS_KV = kv.get_dict("/sys/camera_cfgs")
-except:
-    CAMERA_CFGS_KV = {}
-try:
     with open(camera_config_filename, "r") as input_file:
-        CAMERA_CFGS_DEFAULT = json.load(input_file)
+        CAMERA_PRESETS = json.load(input_file)
 except Exception as e:
     print(e)
-    CAMERA_CFGS_DEFAULT = {}
-# Fill in any missing value in redis from disk
-CAMERA_CFGS = {}
-CAMERA_CFGS["camera_cfgs"] = check_default(CAMERA_CFGS_KV, CAMERA_CFGS_DEFAULT)
-# kv.put("/sys/camera_cfgs", CAMERA_CFGS)
-# =================== FINISHED CAMERA CONFIG =======================
+    CAMERA_PRESETS = {}
+try:
+    kv.delete_dict("/sys/camera_cfgs")  # clear stale presets from Redis
+except Exception:
+    pass
 
-
-# Tracks conflict paths already reported so the same divergence isn't logged
-# once per merge pass (merge_two_dicts is called several times below).
-_reported_conflicts = set()
-
-
-def merge_two_dicts(a, b, path=None):
-    "merges b into a; on a leaf conflict a's value is kept and b's is ignored"
-    if path is None:
-        path = []
-    for key in b:
-        if key in a:
-            if isinstance(a[key], dict) and isinstance(b[key], dict):
-                merge_two_dicts(a[key], b[key], path + [str(key)])
-            elif a[key] == b[key]:
-                pass  # same leaf value
-            else:
-                dotted = ".".join(path + [str(key)])
-                if dotted not in _reported_conflicts:
-                    _reported_conflicts.add(dotted)
-                    print(
-                        "Warning: config conflict at %s -> keeping %r, ignoring %r"
-                        % (dotted, a[key], b[key])
-                    )
-        else:
-            a[key] = b[key]
-    return a
-
-
-# Combine entries from user-config.yml, camera_configurations.json, and system_state.json
+# --- Resolve, lowest precedence first ----------------------------------------
 SYS_ARCH = {}
-SYS_ARCH = merge_two_dicts(SYS_ARCH, CAMERA_CFGS)
-SYS_ARCH = merge_two_dicts(SYS_ARCH, GUI_ARCH)
-# This is required since both files contain "arch" keys and otherwise
-# update won't merge properly
-USER_CFG["arch"] = merge_two_dicts(USER_CFG["arch"], GUI_ARCH["arch"])
-USER_CFG = merge_two_dicts(USER_CFG, GUI_ARCH)
-SYS_ARCH = merge_two_dicts(SYS_ARCH, USER_CFG)
-# kv.put("/sys", SYS_ARCH)
+deep_merge(SYS_ARCH, DEFAULT_STATE)  # 1. factory defaults
+deep_merge(SYS_ARCH, CACHE_STATE)    # 2. operator's last session
+deep_merge(SYS_ARCH, REDIS_LIVE)     # 3. live runtime values
+deep_merge(SYS_ARCH, USER_CFG)       # 4. static YAML truth always wins
+SYS_ARCH["camera_cfgs"] = CAMERA_PRESETS
 
-# Get the global configuration combining all 3 configurations above
+# Publish to Redis under /sys and expose as SYS_CFG.
 SYS_CFG = Cfg(ns="/sys")
 SYS_CFG.update(SYS_ARCH)
+
+
+# Keys excluded from the saved session state: YAML-owned (static), camera
+# presets, and live per-host / camera Redis echoes.
+_STATIC_TOP_KEYS = set(USER_CFG.keys())
+_STATIC_ARCH_KEYS = set(USER_CFG.get("arch", {}).keys())
+_HOST_KEYS = set(USER_CFG.get("arch", {}).get("hosts", {}).keys())
+_RUNTIME_ONLY_KEYS = {"actual_geni_params", "camera_cfgs"}
+
+
+def extract_state(cfg):
+    """Return only the operator-mutable session state from ``cfg``."""
+    state = {}
+    for key, val in cfg.items():
+        # arch is YAML-owned but mixes static and mutable subkeys, so split it.
+        if key == "arch" and isinstance(val, dict):
+            arch_state = {k: v for k, v in val.items() if k not in _STATIC_ARCH_KEYS}
+            if arch_state:
+                state["arch"] = arch_state
+            continue
+        if key in _STATIC_TOP_KEYS or key in _HOST_KEYS or key in _RUNTIME_ONLY_KEYS:
+            continue
+        state[key] = val
+    return state
+
+
+def save_config_settings():
+    """Snapshot the mutable session state to the on-disk cache.
+
+    Live values already stream into Redis via ``Cfg.__setitem__``; this just
+    persists the subset so it survives a reboot or Redis flush.
+    """
+    state = extract_state(SYS_CFG)
+    print("Saving config settings (session state).")
+    with open(config_filename, "w") as output_file:
+        json.dump(state, output_file, indent=4, sort_keys=True)
+# =================== FINISHED CONFIG RESOLUTION =======================
 
 
 # =================== DEFINE GLOBALS ===============================
@@ -285,25 +291,15 @@ def get_arch_path():
     return tmpl.format(**fmt_dict)
 
 
-def sync_dicts(truth, sync):
-    assert len(truth.keys()) == len(sync.keys())
-    for k, v in truth.items():
-        if isinstance(v, dict):
-            sync_dicts(truth[k], sync[k])
-        if v != sync[k]:
-            sync[k] = v
-
-
 def pull_gui_state():
+    """Refresh the in-memory arch state from the live Redis values."""
     print("Pulling gui state")
     try:
-        d1 = kv.get_dict("/sys/arch")
+        live_arch = kv.get_dict("/sys/arch")
     except Exception as e:
         print(e)
-        d1 = {}
-    d2 = SYS_CFG["arch"]
-    d3 = check_default(d2, d1)
-    sync_dicts(d3, d2)
+        return
+    deep_merge(SYS_CFG["arch"], live_arch)
 
 
 def save_camera_config(curr_cfg=None):
