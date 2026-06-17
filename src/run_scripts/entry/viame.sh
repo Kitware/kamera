@@ -70,7 +70,11 @@ fi
 # Directory to store detection csv files.
 _DETECTION_CSV_DIR="${DATA_MOUNT_POINT}/$(date +%Y%m%d%H%M%S)"
 
-PIPEFILE=$(redis-cli -h ${REDIS_HOST} -p 6379 get "/sys/${NODE_HOSTNAME}/detector/pipefile")
+# Resolve the detector pipefile from the active camera configuration (defined
+# per-FOV in camera_cfgs), rather than a duplicated per-host value.
+SYS_CFG_NAME=$(redis-cli -h ${REDIS_HOST} -p 6379 get "/sys/arch/sys_cfg")
+PIPEFILE=$(redis-cli -h ${REDIS_HOST} -p 6379 get "/sys/camera_cfgs/${SYS_CFG_NAME}/${CAM_FOV}_sys_pipe")
+[[ "$PIPEFILE" == "null" ]] && PIPEFILE=""
 DETECTION_CSV_DIR="$(redis-cli -h ${REDIS_HOST} -p 6379 get "/sys/syscfg_dir")/../detections"
 
 DETECTION_DSV_DIR=${DETECTION_DSV_DIR:-$_DETECTION_CSV_DIR}
