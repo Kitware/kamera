@@ -21,6 +21,22 @@ p1getsrv = "get_phaseone_parameter"
 setsrv = "set_camera_attr"
 getsrv = "get_camera_attr"
 
+P1_SHUTTER_MODE_LABELS = {"LS": "1", "ES": "2"}
+
+
+def normalize_p1_shutter_mode(val):
+    """Map Phase One shutter mode labels and numeric values to '1' or '2'."""
+    if val in (None, ""):
+        return None
+    s = str(val).strip()
+    if s in P1_SHUTTER_MODE_LABELS:
+        return P1_SHUTTER_MODE_LABELS[s]
+    try:
+        return str(int(float(s)))
+    except (TypeError, ValueError):
+        return s
+
+
 class CamParamMonitor(object):
     """ A class to monitor state that is set in Redis,
         and the value reported by the cameras,
@@ -89,9 +105,12 @@ class CamParamMonitor(object):
                 # Phase one params have the type in the return string
                 getsrv_val = ''.join(getsrv_val.split(' ')[1:])
                 # A random s is sometimes in shutter speed
-                if "s" in getsrv_val:
+                if "s" in getsrv_val and param != "Shutter Mode":
                     getsrv_val = getsrv_val[:-1]
-                if isinstance(requested_val, float):
+                if param == "Shutter Mode":
+                    getsrv_val = normalize_p1_shutter_mode(getsrv_val)
+                    requested_val = normalize_p1_shutter_mode(requested_val)
+                elif isinstance(requested_val, float):
                     try:
                         getsrv_val = float(getsrv_val)
                     except:
