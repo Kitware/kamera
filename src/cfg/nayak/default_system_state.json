@@ -287,6 +287,12 @@
         "p1debayerq": {
             "processed": 0,
             "total": 0
+        },
+        "power": {
+            "actual": "idle",
+            "desired": "idle",
+            "status": "ready",
+            "updated_at": 0
         }
     },
     "left1nayak": {
@@ -304,6 +310,12 @@
         "p1debayerq": {
             "processed": 0,
             "total": 0
+        },
+        "power": {
+            "actual": "idle",
+            "desired": "idle",
+            "status": "ready",
+            "updated_at": 0
         }
     },
     "right2nayak": {
@@ -321,6 +333,12 @@
         "p1debayerq": {
             "processed": 0,
             "total": 0
+        },
+        "power": {
+            "actual": "idle",
+            "desired": "idle",
+            "status": "ready",
+            "updated_at": 0
         }
     },
     "channels": {
