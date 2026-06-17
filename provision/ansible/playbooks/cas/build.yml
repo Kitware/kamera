@@ -1,20 +1,17 @@
 # Playbook for properly configuring individual systems
 - hosts: all
   tasks:
-    - name: Make nuvo images
+    - name: Make leader images
       command:
         chdir: "{{ kamera_dir }}"
-        cmd: make nuvo
+        cmd: make leader
+        when: leader
 
-    - name: Make viame images
+    - name: Make follower images
       command:
         chdir: "{{ kamera_dir }}"
-        cmd: make viame
-    
-    - name: Make postflight images
-      command:
-        chdir: "{{ kamera_dir }}"
-        cmd: make postflight
+        cmd: make follower
+        when: follower
 
     - name: Clean dangling images
       command:
