@@ -15,7 +15,7 @@
         "overlap_percent": 25.0,
         "project": "glacial_2024",
         "rgb_vfov": 14,
-        "sys_cfg": "images_30deg_N68RF",
+        "sys_cfg": "default_camera_configuration",
         "trigger_freq": 1.0,
         "turn_off_nuc_in_shapefile": 1,
         "use_archive_region": 0,
@@ -55,7 +55,8 @@
                 "Shutter_Mode": "2",
                 "Shutter_Speed": 0.01,
                 "Shutter_Speed_Max": 6.25e-05,
-                "Shutter_Speed_Min": 0.25
+                "Shutter_Speed_Min": 0.25,
+                "Exposure_Comp.": 0
             },
             "uv": {
                 "ExposureAuto": "Continuous",
@@ -80,7 +81,8 @@
                 "Shutter_Mode": "2",
                 "Shutter_Speed": 0.01,
                 "Shutter_Speed_Max": 6.25e-05,
-                "Shutter_Speed_Min": 0.008
+                "Shutter_Speed_Min": 0.008,
+                "Exposure_Comp.": 0
             },
             "uv": {
                 "ExposureAuto": "Continuous",
@@ -105,7 +107,8 @@
                 "Shutter_Mode": "2",
                 "Shutter_Speed": 0.01,
                 "Shutter_Speed_Max": 6.25e-05,
-                "Shutter_Speed_Min": 0.008
+                "Shutter_Speed_Min": 0.008,
+                "Exposure_Comp.": 0
             },
             "uv": {
                 "ExposureAuto": "Continuous",
@@ -128,5 +131,5 @@
     "show_right": true,
     "show_saturated_pixels": true,
     "show_uv": false,
-    "syscfg_dir": "/mnt/data/glacial_2024/fl02/images_30deg_N68RF/"
+    "syscfg_dir": "/mnt/data/glacial_2024/fl02/default_camera_configuration/"
 }

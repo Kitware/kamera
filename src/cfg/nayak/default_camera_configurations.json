@@ -1,0 +1,17 @@
+{
+    "default_camera_configuration": {
+        "description": "Default configuration with IR-only detection.",
+        "center_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/default/center_ir.yaml",
+        "center_rgb_yaml_path": "",
+        "center_uv_yaml_path": "",
+        "center_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/detector_ir_yolo.pipe",
+        "left_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/default/left_ir.yaml",
+        "left_rgb_yaml_path": "",
+        "left_uv_yaml_path": "",
+        "left_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/detector_ir_yolo.pipe",
+        "right_ir_yaml_path": "/mnt/flight_data/detector_models/camera_models/default/right_ir.yaml",
+        "right_rgb_yaml_path": "",
+        "right_uv_yaml_path": "",
+        "right_sys_pipe": "/mnt/flight_data/detector_models/VIAME-JoBBS-Models-v2021.01.20/configs/pipelines/detector_ir_yolo.pipe"
+    }
+}
