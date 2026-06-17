@@ -4,4 +4,4 @@ Name=kamera_gui
 Terminal=true
 Icon=process-stop
 Type=Application
-Name[en_US]=HALT\nKAMERA
+Name[en_US]=Stop\nKAMERA
