@@ -10,7 +10,6 @@ services:
     tty: true
     user: root
     environment:
-      REDIS_HOST: "${REDIS_HOST}"
       NODE_HOSTNAME: "${NODE_HOSTNAME}"
       SYSTEM_NAME: "${SYSTEM_NAME}"
     volumes:
