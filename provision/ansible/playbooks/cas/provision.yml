@@ -75,6 +75,34 @@
       become: True
       apt: name={{ sys_packages }}
 
+    - name: Add Tailscale apt key
+      become: True
+      get_url:
+        url: "https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_lsb.codename }}.noarmor.gpg"
+        dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+        mode: '0644'
+
+    - name: Add Tailscale apt repository
+      become: True
+      get_url:
+        url: "https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_lsb.codename }}.tailscale-keyring.list"
+        dest: /etc/apt/sources.list.d/tailscale.list
+        mode: '0644'
+
+    - name: Install Tailscale
+      become: True
+      apt:
+        name: tailscale
+        state: present
+        update_cache: yes
+
+    - name: Enable Tailscale daemon
+      become: True
+      service:
+        name: tailscaled
+        state: started
+        enabled: yes
+
     - name: Install redis on redis host
       become: True
       apt: name=redis-server
