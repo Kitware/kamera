@@ -3,4 +3,5 @@ Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/kamera_power.s
 Name=reboot_all
 Terminal=true
 Type=Application
-Name[en_US]=reboot_all
+Icon=system-reboot
+Name[en_US]=Reboot\nBoth Systems

@@ -3,4 +3,5 @@ Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/kamera_power.s
 Name=reboot_left
 Terminal=true
 Type=Application
-Name[en_US]=reboot_left
+Icon=system-reboot
+Name[en_US]=Reboot\nLeft System

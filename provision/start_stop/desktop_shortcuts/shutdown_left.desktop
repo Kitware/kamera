@@ -3,4 +3,5 @@ Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/kamera_power.s
 Name=shutdown_left
 Terminal=true
 Type=Application
-Name[en_US]=shutdown_left
+Icon=system-shutdown
+Name[en_US]=Shutdown\nLeft System
