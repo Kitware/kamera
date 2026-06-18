@@ -2826,7 +2826,7 @@ class MainFrame(form_builder_output.MainFrame):
         if center_rgb_yaml and os.path.isfile(center_rgb_yaml):
             SYS_CFG["rgb_vfov"] = load_from_file(center_rgb_yaml).fov()[1]
         SYS_CFG["arch"]["sys_cfg"] = curr_str
-        save_camera_config(curr_str)
+        save_camera_config(curr_str, camera_cfgs=SYS_CFG["camera_cfgs"])
         self.update_project_flight_params()
 
     # ------------------------- END Camera Configuration -------------------------
