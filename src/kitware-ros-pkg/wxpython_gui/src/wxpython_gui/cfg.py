@@ -346,6 +346,16 @@ def save_camera_config(curr_cfg=None):
         return camera_config_filename
 
 
+def _format_shutter_speed_label(exposure_us):
+    """Render Phase One shutter speed as a fractional stop (e.g. 1/2500)."""
+    if exposure_us is None:
+        return "Spd: ?"
+    seconds = float(exposure_us) * 1e-6
+    if seconds <= 0:
+        return "Spd: ?"
+    return "Spd: 1/%d" % int(round(1.0 / seconds))
+
+
 def format_status(
     timeval=None,
     num_dropped=None,
@@ -395,11 +405,14 @@ def format_status(
             total = total - 1 if total > 0 else total
         drop_str += " | DB: {}/{}".format(processed, total)
     processed_str = "" if processed is None else "{}".format(processed)
-    expo_str = (
-        "Exp: ? ms"
-        if exposure_us is None
-        else "Exp: {:0.2f} ms".format(float(exposure_us) * 1e-3)
-    )
+    if chan == "rgb":
+        expo_str = _format_shutter_speed_label(exposure_us)
+    else:
+        expo_str = (
+            "Exp: ? ms"
+            if exposure_us is None
+            else "Exp: {:0.2f} ms".format(float(exposure_us) * 1e-3)
+        )
     if chan == "ir":
         fmt = "{fps}\n{drop}"
         out = fmt.format(fps=fps_str, drop=drop_str)

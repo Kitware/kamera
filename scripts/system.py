@@ -9,12 +9,14 @@ hosts = [ f"center0{SYSTEM_NAME}", f"left1{SYSTEM_NAME}", f"right2{SYSTEM_NAME}"
 group = SYSTEM_NAME
 pod = [
     "image_manager",
-    "kamerad",
     f"{group}:fps_monitor",
     f"{group}:imageview",
     f"{group}:cam_rgb",
     f"{group}:cam_ir",
     f"{group}:cam_uv",
+]
+daemon = [
+    "kamerad",
 ]
 
 host = sys.argv[1].strip()
@@ -25,6 +27,7 @@ action = sys.argv[2]
 cluster = sys.argv[3]
 group2processes = {
     "pod": pod,
+    "daemon": daemon,
     "central": [f"{group}:ins", f"{group}:daq"],
     "monitor": [
         f"{group}:cam_param_monitor",
