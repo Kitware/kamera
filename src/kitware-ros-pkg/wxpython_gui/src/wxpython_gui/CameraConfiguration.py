@@ -127,7 +127,8 @@ class CameraConfiguration(fbocc.MainFrame):
 
         self.curr_cfg = key
         self.update_combo(select_str=key)
-        # Refresh current combo in parent in case it changed
+        # Refresh main panel combo and select the saved configuration.
+        self.parent.set_camera_config_dict(select_str=key)
         self.parent.on_camera_config_combo()
 
         # Remove a tmp definition if present.
@@ -137,6 +138,7 @@ class CameraConfiguration(fbocc.MainFrame):
             pass
 
         self.save_camera_config_dict(SYS_CFG["camera_cfgs"])
+        self.Close()
 
     def save_camera_config_dict(self, config_dict):
         # Save camera config to only local config here, saved to /mnt in parent
@@ -329,9 +331,3 @@ class CameraConfiguration(fbocc.MainFrame):
                 .format(self.curr_cfg))
         self.save_camera_config_dict(SYS_CFG["camera_cfgs"])
         self.parent.set_camera_config_dict()
-
-    def on_done(self, event=None):
-        """When the 'Cancel' button is selected.
-
-        """
-        self.Close()

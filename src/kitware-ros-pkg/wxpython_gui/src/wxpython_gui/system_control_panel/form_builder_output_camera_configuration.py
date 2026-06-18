@@ -17,7 +17,7 @@ import wx.xrc
 class MainFrame ( wx.Frame ):
 	
 	def __init__( self, parent ):
-		wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = u"System Configuration Editor", pos = wx.DefaultPosition, size = wx.Size( 994,969 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
+		wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = u"System Configuration Editor", pos = wx.DefaultPosition, size = wx.Size( 994,1080 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
 		
 		self.SetSizeHints( wx.Size( 400,400 ), wx.DefaultSize )
 		self.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
@@ -66,18 +66,6 @@ class MainFrame ( wx.Frame ):
 		
 		
 		bSizer22.Add( bSizer9, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
-		
-		bSizer23 = wx.BoxSizer( wx.HORIZONTAL )
-		
-		self.m_button7 = wx.Button( self.m_panel2, wx.ID_ANY, u"Finished Making Changes", wx.DefaultPosition, wx.DefaultSize, 0 )
-		bSizer23.Add( self.m_button7, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
-		
-		self.m_staticText20 = wx.StaticText( self.m_panel2, wx.ID_ANY, u"Make sure to save changes first", wx.DefaultPosition, wx.DefaultSize, 0 )
-		self.m_staticText20.Wrap( -1 )
-		bSizer23.Add( self.m_staticText20, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
-		
-		
-		bSizer22.Add( bSizer23, 1, wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
 		
 		self.m_panel2.SetSizer( bSizer22 )
@@ -428,7 +416,6 @@ class MainFrame ( wx.Frame ):
 		self.m_button4.Bind( wx.EVT_BUTTON, self.on_new )
 		self.m_button41.Bind( wx.EVT_BUTTON, self.on_new_from_current )
 		self.m_button42.Bind( wx.EVT_BUTTON, self.on_delete )
-		self.m_button7.Bind( wx.EVT_BUTTON, self.on_done )
 		self.m_button18.Bind( wx.EVT_BUTTON, self.on_find_left_rgb_yaml )
 		self.m_button61.Bind( wx.EVT_BUTTON, self.on_clear_left_rgb_yaml )
 		self.m_button19.Bind( wx.EVT_BUTTON, self.on_find_left_ir_yaml )
@@ -461,7 +448,6 @@ class MainFrame ( wx.Frame ):
 		self.m_button4.Unbind( wx.EVT_BUTTON, None )
 		self.m_button41.Unbind( wx.EVT_BUTTON, None )
 		self.m_button42.Unbind( wx.EVT_BUTTON, None )
-		self.m_button7.Unbind( wx.EVT_BUTTON, None )
 		self.m_button18.Unbind( wx.EVT_BUTTON, None )
 		self.m_button61.Unbind( wx.EVT_BUTTON, None )
 		self.m_button19.Unbind( wx.EVT_BUTTON, None )
@@ -500,9 +486,6 @@ class MainFrame ( wx.Frame ):
 		event.Skip()
 	
 	def on_delete( self, event ):
-		event.Skip()
-	
-	def on_done( self, event ):
 		event.Skip()
 	
 	def on_find_left_rgb_yaml( self, event ):
