@@ -21,7 +21,7 @@ Python modules for the GUI. The main window lives under
 ``system_control_panel/``: ``gui.fbp`` is the wxFormBuilder layout,
 ``form_builder_output*.py`` are the generated frame classes, and
 ``gui.py`` subclasses them with application logic. Shared helpers
-(e.g. ``RemoteImagePanel.py``, ``camera_models.py``) sit alongside
+(e.g. ``RemoteImagePanel.py``) sit alongside
 that directory.
 
 Notes
