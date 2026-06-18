@@ -4,4 +4,4 @@ Name=reboot_all
 Terminal=true
 Type=Application
 Icon=system-reboot
-Name[en_US]=Reboot\All Systems
+Name[en_US]=Reboot\nAll Systems
