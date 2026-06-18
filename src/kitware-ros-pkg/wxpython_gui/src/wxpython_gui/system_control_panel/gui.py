@@ -459,6 +459,9 @@ class MainFrame(form_builder_output.MainFrame):
 
         # ------------------------- Missed Frame --------------------------
         self._setup_rgb_controls()
+        self._set_camera_param_btn_default_bg = self.m_button10.GetBackgroundColour()
+        self._set_camera_param_btn_default_fg = self.m_button10.GetForegroundColour()
+        self._bind_camera_param_dropdown_handlers()
         self.camera_setting_rgb_uv_combo.Bind(wx.EVT_COMBOBOX, self.on_modal_selection)
         self.rgb_shutter_mode_combo.Bind(wx.EVT_COMBOBOX, self.on_rgb_shutter_mode)
         # Call once to hide/show proper options
@@ -750,6 +753,52 @@ class MainFrame(form_builder_output.MainFrame):
             wx.WHITE if enabled else wx.Colour(*DISABLED_GRAY)
         )
         ctrl.Refresh()
+
+    def _camera_param_dropdowns(self):
+        return (
+            self.rgb_shutter_mode_combo,
+            self.exposure_min_combo,
+            self.exposure_max_combo,
+            self.gain_min_combo,
+            self.gain_max_combo,
+            self.aperture_min_combo,
+            self.aperture_max_combo,
+        )
+
+    def _camera_param_dropdown_state(self):
+        state = []
+        for combo in self._camera_param_dropdowns():
+            if not combo.IsEnabled():
+                continue
+            sel = combo.GetSelection()
+            if sel == wx.NOT_FOUND:
+                state.append((id(combo), None))
+            else:
+                state.append((id(combo), combo.GetStringSelection()))
+        return tuple(state)
+
+    def _bind_camera_param_dropdown_handlers(self):
+        for combo in self._camera_param_dropdowns():
+            combo.Bind(wx.EVT_COMBOBOX, self._on_camera_param_dropdown_changed)
+
+    def _on_camera_param_dropdown_changed(self, event):
+        self._update_set_camera_param_button_highlight()
+        event.Skip()
+
+    def _save_applied_camera_param_state(self):
+        self._applied_camera_param_state = self._camera_param_dropdown_state()
+        self._update_set_camera_param_button_highlight()
+
+    def _update_set_camera_param_button_highlight(self):
+        applied = getattr(self, "_applied_camera_param_state", ())
+        pending = self._camera_param_dropdown_state() != applied
+        if pending:
+            self.m_button10.SetBackgroundColour(wx.Colour(*WARN_AMBER))
+            self.m_button10.SetForegroundColour(wx.Colour(*TEXTCTRL_DARK))
+        else:
+            self.m_button10.SetBackgroundColour(self._set_camera_param_btn_default_bg)
+            self.m_button10.SetForegroundColour(self._set_camera_param_btn_default_fg)
+        self.m_button10.Refresh()
 
     @staticmethod
     def _format_aperture_stop(stop):
@@ -1157,6 +1206,8 @@ class MainFrame(form_builder_output.MainFrame):
                 self.gain_min_value_txt_ctrl.SetValue(str(gain_min))
                 self.gain_max_value_txt_ctrl.SetValue(str(gain_max))
 
+        self._save_applied_camera_param_state()
+
     def on_set_camera_parameter(self, event):
         mode = self.camera_setting_rgb_uv_combo.GetStringSelection()
         host = self.camera_setting_subsys.GetString(
@@ -1188,6 +1239,7 @@ class MainFrame(form_builder_output.MainFrame):
                 self.set_camera_parameter(hosts, mode, param, val=0)
                 param = "CorrectionAutoUseDeltaTemp"
                 self.set_camera_parameter(hosts, mode, param, val=1)
+                self._save_applied_camera_param_state()
                 return
             else:
                 # Received a certain delta T to use, disable delta temp and enable delta time
@@ -1381,6 +1433,7 @@ class MainFrame(form_builder_output.MainFrame):
             host = "all"
         else:
             host = hosts[0]
+        self._save_applied_camera_param_state()
 
     def on_exp_key_press(self, event):
         # type: (wx.KeyEvent) -> None
@@ -1666,8 +1719,12 @@ class MainFrame(form_builder_output.MainFrame):
         except KeyError as e:
             print(e)
         self.flight_number_text_ctrl.Unbind(wx.EVT_TEXT)
+        self.flight_number_text_ctrl.Unbind(wx.EVT_TEXT_ENTER)
+        self.flight_number_text_ctrl.Unbind(wx.EVT_KILL_FOCUS)
         self.flight_number_text_ctrl.SetValue(self.flight_number_str)
-        self.flight_number_text_ctrl.Bind(wx.EVT_TEXT, self.on_update_flight_number)
+        self.flight_number_text_ctrl.Bind(wx.EVT_TEXT, self.on_flight_number_text)
+        self.flight_number_text_ctrl.Bind(wx.EVT_TEXT_ENTER, self.on_flight_number_commit)
+        self.flight_number_text_ctrl.Bind(wx.EVT_KILL_FOCUS, self.on_flight_number_commit)
         self.update_collect_colors()
         print("Loaded config.")
 
@@ -2148,19 +2205,41 @@ class MainFrame(form_builder_output.MainFrame):
         else:
             self.gnss_status_flag_txtctrl.SetValue("")
 
-    def on_update_flight_number(self, event=None):
-        flight_number_str = self.flight_number_text_ctrl.GetValue()
-        try:
-            test = int(flight_number_str)
-        except:
-            self.flight_number_text_ctrl.SetValue(self.flight_number_str)
+    def on_flight_number_text(self, event=None):
+        val = self.flight_number_text_ctrl.GetValue()
+        if val == "":
+            self.flight_number_text_ctrl.SetForegroundColour(wx.Colour(180, 180, 180))
+        elif self._flight_number_valid(val):
+            self.flight_number_text_ctrl.SetForegroundColour(wx.NullColour)
+        else:
+            self.flight_number_text_ctrl.SetForegroundColour(wx.Colour(200, 0, 0))
+        self.flight_number_text_ctrl.Refresh()
+
+    def on_flight_number_commit(self, event=None):
+        val = self.flight_number_text_ctrl.GetValue()
+        if self._flight_number_valid(val):
+            self.flight_number_str = val
+            self.flight_number_text_ctrl.SetForegroundColour(wx.NullColour)
+            self.flight_number_text_ctrl.Refresh()
+            self.add_to_console_log(self.flight_number_str, "on_flight_number_commit")
+        else:
             msg = "Flight number must be an integer, e.g. 01, 02, 001, etc."
-            dlg = wx.MessageDialog(self, msg, "Error", wx.OK | wx.ICON_ERROR)
+            dlg = wx.MessageDialog(self, msg, "Invalid Flight Number", wx.OK | wx.ICON_WARNING)
             dlg.ShowModal()
             dlg.Destroy()
-            return
-        self.flight_number_str = flight_number_str
-        self.add_to_console_log(self.flight_number_str, "on_update_flight_number")
+            self.flight_number_text_ctrl.SetValue(self.flight_number_str)
+            self.flight_number_text_ctrl.SetForegroundColour(wx.NullColour)
+            self.flight_number_text_ctrl.Refresh()
+        if event:
+            event.Skip()
+
+    @staticmethod
+    def _flight_number_valid(val):
+        try:
+            int(val)
+            return bool(val)
+        except (ValueError, TypeError):
+            return False
 
     # ---------------------------- Show/Hide Images --------------------------
     def on_show_or_hide_left(self, event):
