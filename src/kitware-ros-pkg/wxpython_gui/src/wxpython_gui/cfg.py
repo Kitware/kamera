@@ -317,13 +317,23 @@ def pull_gui_state():
     deep_merge(SYS_CFG["arch"], live_arch)
 
 
-def save_camera_config(curr_cfg=None):
+def _plain_dict(val):
+    """Recursively convert ``Cfg`` wrappers to plain dicts for JSON serialization."""
+    if isinstance(val, dict):
+        return {k: _plain_dict(v) for k, v in val.items()}
+    return val
+
+
+def save_camera_config(curr_cfg=None, camera_cfgs=None):
     print("Saving camera configuration")
+    presets = _plain_dict(
+        camera_cfgs if camera_cfgs is not None else SYS_CFG["camera_cfgs"]
+    )
     # Save to local cache
     if not os.path.isfile(camera_config_filename):
         wxpython_gui.utils.make_path(camera_config_filename, from_file=True)
     with open(camera_config_filename, "w") as outfile:
-        json.dump(SYS_CFG["camera_cfgs"], outfile, indent=4, sort_keys=True)
+        json.dump(presets, outfile, indent=4, sort_keys=True)
         print("Saved config: {}".format(camera_config_filename))
 
     # Saving specific camera config to dir
@@ -334,13 +344,11 @@ def save_camera_config(curr_cfg=None):
         if dirname is not None:
             fname = "%s/sys_config.json" % dirname
         else:
-            return
+            return camera_config_filename
         if not os.path.isfile(fname):
             wxpython_gui.utils.make_path(fname, from_file=True)
         with open(fname, "w") as outfile:
-            json.dump(
-                SYS_CFG["camera_cfgs"][curr_cfg], outfile, indent=4, sort_keys=True
-            )
+            json.dump(presets[curr_cfg], outfile, indent=4, sort_keys=True)
             print("Saved sys config: {}".format(fname))
         return dirname
     else:
