@@ -41,6 +41,20 @@ if [[ -z "${MODE}" ]]; then
     exit 1
 fi
 
+# If rosmaster is already reachable on a start/up, skip the full startup and
+# just open the GUI so config files aren't re-seeded on a live system.
+if [[ "${MODE}" == "up" ]]; then
+    echo "Checking if system is up..."
+    cd ${KAM_REPO_DIR} && docker compose -f ${KAM_REPO_DIR}/compose/nodelist.yml run --rm nodelist > /dev/null 2>&1
+    code=$?
+    if [[ $code == 0 ]]; then
+        blueprintf "System already up. Opening GUI only.\n"
+        xhost +local:root
+        docker compose -f "${KAM_REPO_DIR}/compose/gui.yml" up
+        exit $?
+    fi
+fi
+
 ## === === === === === ===   Env setup  === === === === === === ===
 blueprintf "Configuring main KAMERA entrypoint."
 # Add detector ENV variables to Redis
@@ -155,6 +169,8 @@ IFS=$'\n' sorted_hosts=($(sort <<<"${hosts[*]}"))
 unset IFS
 for host in "${sorted_hosts[@]}"; do
     if [[ $(cq ".arch.hosts.${host}.enabled") == 'true' ]]; then
+        # daemon group (kamerad) is always started and never stopped by normal operations
+        python3 ${KAM_REPO_DIR}/scripts/system.py $host start daemon
 	python3 ${KAM_REPO_DIR}/scripts/system.py $host "${ARGS[@]}" pod &
         PIDS[${host}]=$!
     else
