@@ -2759,11 +2759,14 @@ class MainFrame(form_builder_output.MainFrame):
             self._camera_config_frame = CameraConfiguration(
                 self, SYS_CFG["arch"]["sys_cfg"]
             )
+        else:
+            self._camera_config_frame.Show()
 
         self._camera_config_frame.Raise()
+        wx.CallAfter(gui_utils.unclip_static_text, self._camera_config_frame)
 
-    def set_camera_config_dict(self, config_dict=None):
-        curr_str = self.get_sys_cfg()
+    def set_camera_config_dict(self, config_dict=None, select_str=None):
+        curr_str = select_str if select_str is not None else self.get_sys_cfg()
         SYS_CFG["arch"]["sys_cfg"] = curr_str
 
         self.camera_config_combo.SetEditable(True)
@@ -2819,9 +2822,9 @@ class MainFrame(form_builder_output.MainFrame):
         curr_str = self.get_sys_cfg()
         self.add_to_event_log("system_config: %s" % curr_str)
         cc = SYS_CFG["camera_cfgs"][curr_str]
-        syscfg_dir = SYS_CFG["syscfg_dir"]
-        vfov = load_from_file(cc["center_rgb_yaml_path"]).fov()[1]
-        SYS_CFG["rgb_vfov"] = vfov
+        center_rgb_yaml = (cc.get("center_rgb_yaml_path") or "").strip()
+        if center_rgb_yaml and os.path.isfile(center_rgb_yaml):
+            SYS_CFG["rgb_vfov"] = load_from_file(center_rgb_yaml).fov()[1]
         SYS_CFG["arch"]["sys_cfg"] = curr_str
         save_camera_config(curr_str)
         self.update_project_flight_params()
