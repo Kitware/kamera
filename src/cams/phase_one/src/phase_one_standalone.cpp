@@ -550,6 +550,8 @@ namespace phase_one
                             }
                         }
                         total_counter++;
+                        envoy_->put("/sys/" + hostname + "/p1debayerq/total",
+                                    std::to_string(total_counter));
                     } catch (boost::filesystem::filesystem_error &e) {
                         ROS_ERROR("|CAPTURE| Archive Failed [%d]: %s", e.code().value(), e.what());
                     } catch (const std::ios_base::failure& e) {
@@ -676,14 +678,29 @@ namespace phase_one
             auto tic1 = std::chrono::high_resolution_clock::now();
             std::string filename;
             std::unique_lock<std::mutex> lock(mtx);
-            // Add in (at least) a 1 image delay so that detection can keep up
-            // This does always leave the last image not debayered, but that's
-            // generally of the tarmac, so not a serious concern.
-            int delay = 10;
-            if ( filename_to_seq_map_.size() > delay ) {
-                // grab most-recent filename (could make a LIFO queue?)
+            // Hold back at least "delay" images so the detection callback has time
+            // to process and skip images with no detections before debayering.
+            // When archiving stops, flush the remaining tail without the delay so
+            // the queue drains cleanly and the counter reaches 0 (rather than
+            // being stuck at delay - 1).
+            const int delay = 10;
+            if (filename_to_seq_map_.size() > (size_t)delay) {
                 filename = filename_to_seq_map_.begin()->first;
-                // remove from map
+                filename_to_seq_map_.erase(filename);
+            } else if (!filename_to_seq_map_.empty()) {
+                lock.unlock();
+                int is_archiving = ArchiverHelper::get_is_archiving(envoy_, "/sys/arch/is_archiving");
+                if (is_archiving) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    continue;
+                }
+                lock.lock();
+                if (filename_to_seq_map_.empty()) {
+                    lock.unlock();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    continue;
+                }
+                filename = filename_to_seq_map_.begin()->first;
                 filename_to_seq_map_.erase(filename);
             } else {
                 lock.unlock();
@@ -778,11 +795,8 @@ namespace phase_one
             }
             // Throw results into redis for access
             std::string base = "/sys/" + hostname + "/p1debayerq/";
-            std::string total = base + "total";
             std::string num_processed = base + "processed";
             std::string processed_str = std::to_string(processed_counter);
-            std::string total_str = std::to_string(total_counter);
-            envoy_->put(total, total_str);
             envoy_->put(num_processed, processed_str);
             toc = std::chrono::high_resolution_clock::now();
             dt = toc - tic1;
@@ -1389,11 +1403,8 @@ namespace phase_one
                 std::ofstream output(fname);
                 // Throw results into redis for access
                 std::string base = "/sys/" + hostname + "/p1debayerq/";
-                std::string total = base + "total";
                 std::string num_processed = base + "processed";
                 std::string processed_str = std::to_string(processed_counter);
-                std::string total_str = std::to_string(total_counter);
-                envoy_->put(total, total_str);
                 envoy_->put(num_processed, processed_str);
             }
         } // else image has detections, so save regardless
