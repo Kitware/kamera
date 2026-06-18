@@ -4,4 +4,4 @@ Name=shutdown_all
 Terminal=true
 Type=Application
 Icon=system-shutdown
-Name[en_US]=Shutdown\nBoth Systems
+Name[en_US]=Shutdown\nAll Systems
