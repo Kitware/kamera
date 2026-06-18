@@ -78,6 +78,7 @@ from wxpython_gui.cfg import (
     APP_GRAY,
     BRIGHT_RED,
     COLLECT_GREEN,
+    COLLECT_ALERT_RED,
     ERROR_RED,
     FLAT_GRAY,
     DISABLED_GRAY,
@@ -283,6 +284,7 @@ class MainFrame(form_builder_output.MainFrame):
 
         # Setting wx.CB_READONLY doesn't allow you to SetEditable(True) later.
         self.effort_combo_box.SetEditable(False)
+        self.effort_combo_box.SetBackgroundColour(wx.WHITE)
         self.camera_config_combo.SetEditable(False)
 
         self._collecting = None
@@ -299,6 +301,10 @@ class MainFrame(form_builder_output.MainFrame):
         self._spoof_gps = kv.get("/debug/spoof_gps", False) and self._debug_enable
         self._spoof_events = int(kv.get("/debug/spoof_events", 0))
         self.last_ins_time = 0.0
+        self._collect_health_ssd_ok = True
+        self._collect_health_nas_ok = True
+        self._collect_health_cameras_ok = True
+        self._collect_stream_stale_sec = 10.0
         if self._spoof_gps:
             print("SPOOF GPS ENABLED")
         if self._spoof_events == 1:
@@ -708,6 +714,17 @@ class MainFrame(form_builder_output.MainFrame):
 
     def _apply_system_sanity(self, results, nas_unmounts):
         """Apply system_sanity_check results to the UI (main thread only)."""
+        ssd_ok = True
+        for host in self.hosts:
+            entry = results.get(host, {})
+            if entry.get("ssd_err") or entry.get("ssd_gb") is None:
+                ssd_ok = False
+                break
+        center_entry = results.get(self.hosts[0], {})
+        nas_ok = not nas_unmounts and center_entry.get("nas_gb") is not None
+        self._collect_health_ssd_ok = ssd_ok
+        self._collect_health_nas_ok = nas_ok
+
         for host, entry in results.items():
             try:
                 fov = SYS_CFG["arch"]["hosts"][host]["fov"]
@@ -733,6 +750,119 @@ class MainFrame(form_builder_output.MainFrame):
             self.nas_disk_space.SetLabel("NAS Err: " + "".join(nas_unmounts))
             self.nas_disk_space.SetForegroundColour(ERROR_RED)
             gui_utils.refit_label(self.nas_disk_space)
+        self.update_collect_colors()
+
+    def _ins_stream_healthy(self):
+        if self.last_ins_time <= 0:
+            return False
+        return time.time() - self.last_ins_time <= self._collect_stream_stale_sec
+
+    def _collecting_critical_health_ok(self):
+        if not self._collect_health_ssd_ok:
+            return False
+        if not self._collect_health_nas_ok:
+            return False
+        if not self._collect_health_cameras_ok:
+            return False
+        return True
+
+    def _flight_data_header_widgets(self):
+        return (
+            self.m_staticText14211,
+            self.m_staticText33,
+            self.m_staticText34,
+            self.flight_number_text_ctrl,
+            self.m_staticText331,
+            self.observer_text_ctrl,
+            self.m_staticText18171311,
+            self.effort_combo_box,
+        )
+
+    def _collecting_panel_colour(self):
+        if not self._collecting_critical_health_ok():
+            return wx.Colour(*COLLECT_ALERT_RED)
+        if self._spoof_events == 1 or not self._ins_stream_healthy():
+            return self._spoof_events_colour()
+        return wx.Colour(*COLLECT_GREEN)
+
+    def _apply_flight_data_header_background(self, colour):
+        for widget in self._flight_data_header_widgets():
+            if widget is self.effort_combo_box:
+                continue
+            widget.SetBackgroundColour(colour)
+            widget.Refresh()
+        self.effort_combo_box.SetBackgroundColour(wx.WHITE)
+        self.effort_combo_box.Refresh()
+
+    def _reset_flight_data_header_backgrounds(self):
+        for widget in self._flight_data_header_widgets():
+            if widget in (self.flight_number_text_ctrl, self.observer_text_ctrl):
+                if widget.IsEditable():
+                    widget.SetBackgroundColour(wx.WHITE)
+                else:
+                    widget.SetBackgroundColour(wx.Colour(*DISABLED_GRAY))
+            elif widget is self.effort_combo_box:
+                widget.SetBackgroundColour(wx.WHITE)
+            else:
+                widget.SetBackgroundColour(wx.Colour(*APP_GRAY))
+            widget.Refresh()
+
+    def _reset_flight_data_panel_child_backgrounds(self):
+        """Clear collecting-state colours from child widgets."""
+        self._reset_flight_data_header_backgrounds()
+        for child in self.flight_data_panel.GetChildren():
+            if child in self._flight_data_header_widgets():
+                continue
+            if child in (self.recording_gauge, self.detectors_gauge):
+                continue
+            if isinstance(child, wx.StaticLine):
+                continue
+            if isinstance(child, wx.TextCtrl):
+                if child.IsEditable():
+                    child.SetBackgroundColour(wx.WHITE)
+                else:
+                    child.SetBackgroundColour(wx.Colour(*DISABLED_GRAY))
+            elif isinstance(child, (wx.Button, wx.ComboBox)):
+                child.SetBackgroundColour(
+                    wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)
+                )
+            else:
+                child.SetBackgroundColour(wx.Colour(*APP_GRAY))
+            child.Refresh()
+
+    def _spoof_events_colour(self):
+        return wx.Colour(*WARN_AMBER)
+
+    def _set_panel_background(self, panel, colour, propagate=False):
+        panel.SetBackgroundColour(colour)
+        if propagate:
+            for child in panel.GetChildren():
+                if isinstance(child, wx.StaticLine):
+                    continue
+                child.SetBackgroundColour(colour)
+        panel.Refresh()
+
+    def _reset_navigation_panel_background(self):
+        if self._spoof_gps:
+            self._set_panel_background(
+                self.ins_control_panel, self._spoof_events_colour(), propagate=True
+            )
+            return
+        self._set_panel_background(
+            self.ins_control_panel, wx.Colour(*APP_GRAY), propagate=True
+        )
+        for child in self.ins_control_panel.GetChildren():
+            if isinstance(child, wx.TextCtrl):
+                child.SetBackgroundColour(wx.WHITE)
+
+    def _apply_event_spoof_panel_style(self, active):
+        colour = self._spoof_events_colour()
+        if active:
+            self._set_panel_background(
+                self.ins_control_panel, colour, propagate=True
+            )
+        else:
+            self._reset_navigation_panel_background()
 
     def _set_field_enabled(self, ctrl, enabled):
         """Enable/disable an input field and make the disabled state obvious.
@@ -1578,23 +1708,28 @@ class MainFrame(form_builder_output.MainFrame):
             self._did_initial_unclip = True
             gui_utils.unclip_static_text(self)
 
-        self.update_collect_colors()
-
-        # Check to see if imagery has been received recently.
+        cameras_ok = True
+        now = time.time()
         for panel in self.remote_image_panels:
             # Refresh images if needed
             panel.update_all_if_needed()
-            chan = panel.attrs["chan"]
             if panel.last_update is None:
+                cameras_ok = False
                 panel.status_static_text.SetLabel(format_status())
                 panel.status_static_text.SetForegroundColour(BRIGHT_RED)
                 gui_utils.refit_label(panel.status_static_text)
             else:
-                dt = time.time() - panel.last_update
-                if dt > 10:
+                dt = now - panel.last_update
+                if dt > self._collect_stream_stale_sec:
+                    cameras_ok = False
                     panel.status_static_text.SetLabel(format_status(dt=dt))
                     panel.status_static_text.SetForegroundColour(BRIGHT_RED)
                     gui_utils.refit_label(panel.status_static_text)
+        self._collect_health_cameras_ok = (
+            cameras_ok if self.remote_image_panels else True
+        )
+
+        self.update_collect_colors()
 
         # Check to see if imagery has been received recently.
         if self._image_inspection_frame:
@@ -1669,24 +1804,32 @@ class MainFrame(form_builder_output.MainFrame):
                     self.start_collecting()
                 else:
                     self.stop_collecting()
+                    self._reset_flight_data_panel_child_backgrounds()
         self.last_collecting = is_collecting
         self._collecting = False if is_collecting is None else is_collecting
         self._collect_in_region = (
             False if collect_in_region is None else collect_in_region
         )
+        self._spoof_events = int(kv.get("/debug/spoof_events", 0))
 
         if is_collecting == True:
             self.recording_gauge.SetBackgroundColour((0, 255, 0))
-            self.flight_data_panel.SetBackgroundColour(COLLECT_GREEN)
+            panel_colour = self._collecting_panel_colour()
+            self.flight_data_panel.SetBackgroundColour(panel_colour)
+            self._apply_flight_data_header_background(panel_colour)
 
         elif is_collecting == False:
             self.recording_gauge.SetBackgroundColour((200, 200, 200))
             if collect_in_region is None or collect_in_region is False:
-                self.flight_data_panel.SetBackgroundColour(APP_GRAY)
+                self.flight_data_panel.SetBackgroundColour(wx.Colour(*APP_GRAY))
             else:
-                self.flight_data_panel.SetBackgroundColour(SHAPE_COLLECT_BLUE)
+                self.flight_data_panel.SetBackgroundColour(
+                    wx.Colour(*SHAPE_COLLECT_BLUE)
+                )
         else:
             raise Exception("invalid value encountered for is_collecting")
+
+        self._apply_event_spoof_panel_style(self._spoof_events == 1)
 
     @property
     def collect_in_region(self):
@@ -2178,17 +2321,15 @@ class MainFrame(form_builder_output.MainFrame):
         else:
             self.ins_status_flag_txtctrl.SetValue("")
 
-        if self._spoof_gps:
-            self.ins_control_panel.SetBackgroundColour(WARN_AMBER)
-            self.gnss_status_flag_txtctrl.SetValue("gps spoofed!")
         self._spoof_events = int(kv.get("/debug/spoof_events", 0))
         if self._spoof_events == 1:
-            self.ins_control_panel.SetBackgroundColour(WARN_AMBER)
+            self._apply_event_spoof_panel_style(True)
             self.gnss_status_flag_txtctrl.SetValue("no fix! event spoof!")
             return
-        else:
-            self.ins_control_panel.SetBackgroundColour(APP_GRAY)
-        if msg.gnss_status == 0:
+        self._apply_event_spoof_panel_style(False)
+        if self._spoof_gps:
+            self.gnss_status_flag_txtctrl.SetValue("gps spoofed!")
+        elif msg.gnss_status == 0:
             self.gnss_status_flag_txtctrl.SetValue("No Fix")
         elif msg.gnss_status == 1:
             self.gnss_status_flag_txtctrl.SetValue("SPS Mode")

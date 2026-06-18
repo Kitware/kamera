@@ -253,6 +253,7 @@ APP_GRAY = (220, 218, 213)  # Default application background
 FLAT_GRAY = (200, 200, 200)
 DISABLED_GRAY = (150, 150, 150)  # Darker fill for disabled input fields
 COLLECT_GREEN = (55, 120, 25)
+COLLECT_ALERT_RED = (215, 65, 65)  # alert red while collecting with a fault
 SHAPE_COLLECT_BLUE = (
     52,
     100,
@@ -400,9 +401,6 @@ def format_status(
     )
     fps_str = "? fps" if fps is None else "{:4.2f} fps".format(fps)
     if total is not None and processed is not None:
-        # display N/N, even if internally it's N-1/N
-        if processed < total:
-            total = total - 1 if total > 0 else total
         drop_str += " | DB: {}/{}".format(processed, total)
     processed_str = "" if processed is None else "{}".format(processed)
     if chan == "rgb":
