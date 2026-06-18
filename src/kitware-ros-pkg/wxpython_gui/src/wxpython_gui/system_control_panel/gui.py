@@ -59,7 +59,7 @@ from custom_msgs.srv import (
     RequestImageView,
     CamSetAttr,
 )
-from wxpython_gui.camera_models import load_from_file
+from kamera.colmap_processing.camera_models import load_from_file
 
 # Sibling modules within the system_control_panel package
 import wxpython_gui.system_control_panel.form_builder_output as form_builder_output

@@ -5,7 +5,7 @@ import wx
 import yaml
 import numpy as np
 import sys
-from wxpython_gui.camera_models import load_from_file
+from kamera.colmap_processing.camera_models import load_from_file
 import wxpython_gui.system_control_panel.form_builder_output_camera_configuration as fbocc
 from wxpython_gui.cfg import SYS_CFG, save_camera_config
 from wxpython_gui.system_control_panel.gui_utils import unclip_static_text
