@@ -3,14 +3,17 @@
 
 #include <memory>
 #include <mutex>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <std_msgs/Bool.h>
-#include <std_msgs/Float64.h>
+#include <map>
+#include <functional>
+
+#include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/float64.hpp>
 
 #include <roskv/envoy.h>
-#include <custom_msgs/SetTriggerRate.h>
-#include <custom_msgs/GSOF_EVT.h>
+#include <custom_msgs/srv/set_trigger_rate.hpp>
+#include <custom_msgs/srv/read_pin.hpp>
+#include <custom_msgs/msg/gsof_evt.hpp>
 
 #include "usbdaq.h"
 
@@ -18,160 +21,134 @@ using std::shared_ptr;
 
 bool is_simple_frac(double d);
 
+/// Minimal stand-in for ros::TimerEvent (rclcpp timers have void callbacks)
+struct TimerEvent {
+    rclcpp::Time current_real;
+};
+
+using TimerCallback = std::function<void(const TimerEvent &)>;
+
 class TriggerTimer {
 private:
-    ros::NodeHandlePtr node;
+    rclcpp::Node::SharedPtr node;
     UsbDaq             usbDaq;
-    ros::Publisher     bus_pub;
-    ros::ServiceServer srvTrigger;
+    rclcpp::Service<custom_msgs::srv::SetTriggerRate>::SharedPtr srvTrigger;
     bool               trigger_is_running = false;
     const double       default_freq       = 0.5;
     const double       quick_idle_freq    = 10;
     double             freq_set           = default_freq;
-    ros::Timer         timer;
-    ros::Time          last_call          = ros::Time::now();
-    ros::Time          last_edge          = ros::Time::now();
-    ros::Time          next_edge          = ros::Time::now();
-    ros::Duration      last_duration      = ros::Duration(0.5);
-    int                flippy             = 0;
+    rclcpp::Time       last_call;
+    rclcpp::Time       last_edge;
+    rclcpp::Time       next_edge;
 public:
 
-    TriggerTimer(ros::NodeHandlePtr node_, UsbDaq &usbDaq1);
+    TriggerTimer(rclcpp::Node::SharedPtr node_, UsbDaq &usbDaq1);
 
     bool is_running();
 
-    bool call();
-
     void set_trigger_run(bool state);
 
-    void set_trigger_run(const std_msgs::Bool::ConstPtr &msg);
+    void set_trigger_run(const std_msgs::msg::Bool::ConstSharedPtr &msg);
 
     void set_trigger_freq(double frequency);
 
-    void set_trigger_freq(const std_msgs::Float64::ConstPtr &msg);
-    ros::Rate get_trigger_freq();
-    ros::Duration get_trigger_dur();
+    void set_trigger_freq(const std_msgs::msg::Float64::ConstSharedPtr &msg);
+    rclcpp::Duration get_trigger_dur();
 
     void set_trigger_period(double t_seconds);
 
-    void set_trigger_period(ros::Duration duration);
+    void set_trigger_period(rclcpp::Duration duration);
 
-    void trigger_tic(const ros::TimerEvent &event);
+    void setTriggerRate(const std::shared_ptr<custom_msgs::srv::SetTriggerRate::Request> req,
+                        std::shared_ptr<custom_msgs::srv::SetTriggerRate::Response> resp);
 
-    bool setTriggerRate(custom_msgs::SetTriggerRate::Request &req,
-                        custom_msgs::SetTriggerRate::Response &resp);
-
-    void nop(const ros::TimerEvent &event);
-    ros::Time get_next_edge();
+    rclcpp::Time get_next_edge();
     void next();
-    void sleep();
     void spin_then_sleep();
     void sleep_until_edge(double granularity);
-    void sleep_next();
 
-
-    ros::Rate rate = ros::Rate(quick_idle_freq);
+    /// current period, seconds
+    double period_sec = 1.0 / 10;
 };
-
-void cb_print(const ros::TimerEvent &e) {
-    ROS_INFO("default callback");
-}
 
 class OneShotManager {
 public:
     OneShotManager() = default;
 
-    void erase(boost::uuids::uuid i);
+    void erase(uint64_t i);
 
-    boost::uuids::uuid addOneShot(ros::NodeHandlePtr nhp,
-                                    const ros::Duration &period,
-                                    const ros::TimerCallback& callback);
+    uint64_t addOneShot(rclcpp::Node::SharedPtr nhp,
+                        const rclcpp::Duration &period,
+                        const TimerCallback& callback);
 
 private:
-    std::map<boost::uuids::uuid, ros::Timer> timer_map;
+    uint64_t next_id_ = 0;
+    std::map<uint64_t, rclcpp::TimerBase::SharedPtr> timer_map;
 };
 
 class AsyncTriggerTimer {
 private:
-    ros::NodeHandlePtr nhp;
+    rclcpp::Node::SharedPtr nhp;
     std::mutex         mutex;
-    ros::Publisher     bus_pub;
-    ros::Publisher     spoof_evt_pub;
-    ros::ServiceServer srvTrigger;
-    bool               trigger_is_running = false;
-    const double       default_freq       = 0.5;
-    ros::Time          last_call          = ros::Time::now();
-    ros::Time          next_expected      = ros::Time::now();
-    ros::Duration      last_duration      = ros::Duration(0.5);
-    ros::Duration      period_            = ros::Duration(1); /// this is the new main variable
-    ros::Duration      min_period_        = ros::Duration(0.1); /// minimum time between triggers
-    ros::Duration      max_period_        = ros::Duration(10.0); /// minimum time between triggers
+    rclcpp::Publisher<custom_msgs::msg::GsofEvt>::SharedPtr spoof_evt_pub;
+    rclcpp::Time       last_call;
+    rclcpp::Time       next_expected;
+    rclcpp::Duration   period_            = rclcpp::Duration::from_seconds(1); /// this is the new main variable
+    rclcpp::Duration   min_period_        = rclcpp::Duration::from_seconds(0.1); /// minimum time between triggers
+    rclcpp::Duration   max_period_        = rclcpp::Duration::from_seconds(10.0); /// maximum time between triggers
     int                spoof_events_      = 0;
     std::shared_ptr<RedisEnvoy> envoy_;
-    int                flippy             = 0;
 
-    ros::TimerCallback callback{cb_print};
+    TimerCallback callback;
     OneShotManager osm;
 
 public:
 
-    AsyncTriggerTimer(ros::NodeHandlePtr nhp, ros::Duration period,
-                      ros::Duration min_period, ros::Duration max_period,
+    AsyncTriggerTimer(rclcpp::Node::SharedPtr nhp, rclcpp::Duration period,
+                      rclcpp::Duration min_period, rclcpp::Duration max_period,
                       int spoof_events, std::shared_ptr<RedisEnvoy> envoy);
-    AsyncTriggerTimer(ros::NodeHandlePtr nhp, ros::Duration period);
-    bool is_running();
+    AsyncTriggerTimer(rclcpp::Node::SharedPtr nhp, rclcpp::Duration period);
 
     void start();
-    void set_trigger_run(bool state);
-    void cb_set_trigger_run(const std_msgs::Bool::ConstPtr &msg);
 
     /** This is merely a convenience wrapper around setPeriod
      *
      * @param frequency - Set the trigger frequency
      */
     void setRate(double frequency);
-    void cb_setRate(const std_msgs::Float64::ConstPtr &msg);
+    void cb_setRate(const std_msgs::msg::Float64::ConstSharedPtr &msg);
 
     /** All timing sets should happen through here
      *
      * @param period - Set the trigger period, clipping to the min/max period
      */
-    void setPeriod(const ros::Duration &period);
-    void cb_setPeriod(const std_msgs::Float64::ConstPtr &msg);
+    void setPeriod(const rclcpp::Duration &period);
+    void cb_setPeriod(const std_msgs::msg::Float64::ConstSharedPtr &msg);
 
-    void setCallback(const ros::TimerCallback &callback_);
+    void setCallback(const TimerCallback &callback_);
 
-    void callTick(const ros::TimerEvent &event);
+    void callTick(const TimerEvent &event);
 
     void call();
 
-    void call(const ros::TimerEvent &event);
+    void call(const TimerEvent &event);
 
-    bool setTriggerRate(custom_msgs::SetTriggerRate::Request &req,
-                        custom_msgs::SetTriggerRate::Response &resp);
-
-    ros::Rate get_trigger_freq();
-    ros::Duration get_trigger_dur();
+    rclcpp::Duration get_trigger_dur();
 
 };
 
 class DaqWrapper {
 private:
-    ros::NodeHandlePtr node;
+    rclcpp::Node::SharedPtr node;
     UsbDaq             usbDaq;
-    ros::Publisher     bus_pub;
-    ros::ServiceServer srvTrigger;
+    rclcpp::Service<custom_msgs::srv::ReadPin>::SharedPtr readPinSrv;
 
 public:
 
-    DaqWrapper(ros::NodeHandlePtr node_, UsbDaq &usbDaq1);
+    DaqWrapper(rclcpp::Node::SharedPtr node_, UsbDaq &usbDaq1);
 
-    bool call();
-
-    bool readPin( custom_msgs::ReadPinRequest &req,
-                  custom_msgs::ReadPinResponse &rsp);
-    bool analogWrite( custom_msgs::ReadPinRequest &req,
-                        custom_msgs::ReadPinResponse &rsp);
+    void readPin(const std::shared_ptr<custom_msgs::srv::ReadPin::Request> req,
+                 std::shared_ptr<custom_msgs::srv::ReadPin::Response> rsp);
 
 };
 

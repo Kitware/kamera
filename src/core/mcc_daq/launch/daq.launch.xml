@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Launches DAQ node -->
+<launch>
+    <arg name="start_running" default="true"/>
+    <arg name="dummy" default="false"/>
+    <arg name="respawn" default="true"/>
+
+    <node name="daq_node" pkg="mcc_daq" exec="daq_node" output="screen"
+          respawn="$(var respawn)">
+        <param name="start_running" value="$(var start_running)"/>
+        <param name="dummy" value="$(var dummy)"/>
+    </node>
+</launch>

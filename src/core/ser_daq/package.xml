@@ -1,31 +1,21 @@
 <?xml version="1.0"?>
-<package format="2">
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
   <name>ser_daq</name>
-  <version>0.5.0</version>
+  <version>1.0.0</version>
   <description>
     Drives I/O via serial port
   </description>
 
   <maintainer email="adam.romlein@kitware.com">Adam Romlein</maintainer>
-
-
-  <!-- One license tag required, multiple allowed, one license per tag -->
-  <!-- Commonly used license strings: -->
-  <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
   <license>Apache 2.0</license>
 
-  <author email="michael.mcdermott@kitware.com">Michael McDermott</author>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>python3-serial</exec_depend>
 
-  <buildtool_depend>catkin</buildtool_depend>
-  <!--<build_depend>roslint</build_depend>-->
-  <exec_depend>rospy</exec_depend>
-  <exec_depend>python-serial</exec_depend>
-  <exec_depend>custom_msgs</exec_depend>
-
-  <!--<test_depend>roslint</test_depend>-->
-  <!-- The export tag contains other, unspecified, tags -->
   <export>
-    <!-- This is a pure Python package, so mark it architecture independent -->
     <architecture_independent/>
+    <build_type>ament_python</build_type>
   </export>
 </package>
