@@ -40,7 +40,7 @@
 #include <cstring>
 #include <arpa/inet.h>
 
-#include <ros/console.h>
+#include <rclcpp/rclcpp.hpp>
 #include <nlohmann/json.hpp>
 #include <sw/redis++/redis++.h>
 using namespace sw;
@@ -59,9 +59,13 @@ do {                                                       \
 Watchdog::Watchdog() : failCallback_{cb_fail_shutdown} {}
 Watchdog::Watchdog(double lookback_period, double health_threshold)
         :
-        lookback_period_{lookback_period},
+        lookback_period_{rclcpp::Duration::from_seconds(lookback_period)},
         health_threshold{health_threshold},
         failCallback_{cb_fail_shutdown} {}
+
+rclcpp::Time Watchdog::now() {
+    return clock_.now();
+}
 
 /**Start the watchdog. Events are ignored until started.
  *
@@ -75,10 +79,12 @@ void Watchdog::Start() {
  *
  * @param t - delay (seconds)
  */
-void Watchdog::DelayedStart(ros::NodeHandlePtr nhp, double t) {
-    delayStartTimer_ = nhp->createTimer(ros::Duration{t}, [this](ros::TimerEvent const &e ) {
-        this->Start();
-    }, true, true);
+void Watchdog::DelayedStart(rclcpp::Node::SharedPtr nhp, double t) {
+    delayStartTimer_ = nhp->create_wall_timer(
+        std::chrono::duration<double>(t), [this]() {
+            delayStartTimer_->cancel();
+            this->Start();
+        });
 }
 
 void Watchdog::Stop() {
@@ -89,13 +95,13 @@ bool Watchdog::Ok() {
     return this->computeHealth() > health_threshold;
 }
 
-void Watchdog::push_back(ros::Time const &t, double val) {
+void Watchdog::push_back(rclcpp::Time const &t, double val) {
     std::lock_guard<std::mutex> guard(mutex_);
-    if (!t.isValid()) {
+    if (t.nanoseconds() == 0) {
         ROS_ERROR("zero/invalid time encountered in Watchdog::push_back()");
         return;
     }
-    array.emplace_back(std::pair<ros::Time, double>(t, val));
+    array.emplace_back(std::pair<rclcpp::Time, double>(t, val));
 }
 
 int Watchdog::size() {
@@ -106,14 +112,14 @@ int Watchdog::size() {
 void Watchdog::show() {
     std::lock_guard<std::mutex> guard(mutex_);
     for (const auto pair : array) {
-        std::cout << pair.first << ": " << pair.second << std::endl;
+        std::cout << pair.first.seconds() << ": " << pair.second << std::endl;
     }
     std::cout << "\n---" << std::endl;
 }
 
 void Watchdog::purge() {
     std::lock_guard<std::mutex> guard(mutex_);
-    auto now = ros::Time::now();
+    auto now = clock_.now();
     std::size_t index = 0;
     for (const auto pair : array) {
         auto age = now - pair.first ;
@@ -127,7 +133,7 @@ void Watchdog::purge() {
 
 void Watchdog::pet() {
     ROS_INFO("Pet the watchdog");
-    this->push_back(ros::Time::now(), 1.0);
+    this->push_back(now(), 1.0);
 }
 
 void Watchdog::kick() {
@@ -135,7 +141,7 @@ void Watchdog::kick() {
         return;
     }
     ROS_WARN("kicked the watchdog");
-    this->push_back(ros::Time::now(), -1.0);
+    this->push_back(now(), -1.0);
 }
 
 void Watchdog::check() {
@@ -159,14 +165,13 @@ double Watchdog::computeHealth() {
     return accu / total;
 }
 
-void Watchdog::setFailCallback(ros::TimerCallback callback) {
+void Watchdog::setFailCallback(std::function<void()> callback) {
     failCallback_ = callback;
 }
 
 void Watchdog::callFail() {
     ROS_ERROR("failed health check");
-    ros::TimerEvent e;
-    failCallback_(e);
+    failCallback_();
 }
 
 namespace prosilica {
@@ -199,18 +204,18 @@ namespace prosilica {
         }
     }
 
-    ros::Time CvtPvTimestamp(uint32_t timehi, uint32_t timelo) {
+    rclcpp::Time CvtPvTimestamp(uint32_t timehi, uint32_t timelo) {
         return CvtPvTimestamp(timehi, timelo, 1000000000);
     }
-    ros::Time CvtPvTimestamp(uint32_t timehi, uint32_t timelo, uint32_t freq) {
+    rclcpp::Time CvtPvTimestamp(uint32_t timehi, uint32_t timelo, uint32_t freq) {
         uint64_t utime = ((uint64_t )timehi) << 32;
         utime = utime + (uint64_t )timelo;
         double dtime = double (utime) / (double) freq;
         if (dtime <= 0) {
             ROS_ERROR("Calculated time is non-positive: %lf", dtime);
-            return ros::Time{};
+            return rclcpp::Time{0, 0, RCL_ROS_TIME};
         }
-        return ros::Time{dtime};
+        return rclcpp::Time{(int64_t)(dtime * 1e9), RCL_ROS_TIME};
     }
 
 
@@ -371,25 +376,6 @@ static void openCamera(boost::function<tPvErr (tPvCameraInfo*)> info_fn,
 }
 
 
-    void OneShotManager::erase(boost::uuids::uuid i) {
-        timer_map.erase(i);
-//    std::cout << "erasing: " << i << " sz: " << timer_map.size() <<std::endl;
-    }
-
-    boost::uuids::uuid OneShotManager::addOneShot(ros::NodeHandlePtr nhp,
-                                                  const ros::Duration &period,
-                                                  const ros::TimerCallback& callback) {
-        boost::uuids::uuid i = boost::uuids::random_generator()();
-
-        ros::TimerCallback cb2 = [i, this, callback](const ros::TimerEvent &e) {
-            callback(e);
-            erase(i);
-        };
-        ros::Timer tmp = nhp->createTimer(period, cb2, true, false);
-        timer_map.emplace(i, tmp);
-        tmp.start(); // safety here, need to ensure it's in the map before it pops
-        return i;
-    }
 
 
 

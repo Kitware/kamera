@@ -38,16 +38,15 @@
 #include <stdexcept>
 #include <string>
 #include <sstream>
+#include <functional>
 #include <condition_variable>
 
 #include <boost/function.hpp>
 #include <boost/thread.hpp>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
 
 /// only for defining MetaFrame struct
-#include <ros/ros.h>
-#include <sensor_msgs/Image.h>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/image.hpp>
 
 // PvApi.h isn't aware of the usual detection macros
 //  these include support for i386, x86_64, and arm, on Linux and OSX
@@ -57,9 +56,18 @@
 #undef _LINUX
 #undef _x86
 
-void cb_fail_shutdown(ros::TimerEvent e) {
+// rclcpp logging shims to keep ROS1-style call sites
+#define ROS_INFO(...) RCLCPP_INFO(rclcpp::get_logger("prosilica"), __VA_ARGS__)
+#define ROS_WARN(...) RCLCPP_WARN(rclcpp::get_logger("prosilica"), __VA_ARGS__)
+#define ROS_ERROR(...) RCLCPP_ERROR(rclcpp::get_logger("prosilica"), __VA_ARGS__)
+#define ROS_DEBUG(...) RCLCPP_DEBUG(rclcpp::get_logger("prosilica"), __VA_ARGS__)
+#define ROS_INFO_STREAM(args) RCLCPP_INFO_STREAM(rclcpp::get_logger("prosilica"), args)
+#define ROS_WARN_STREAM(args) RCLCPP_WARN_STREAM(rclcpp::get_logger("prosilica"), args)
+#define ROS_ERROR_STREAM(args) RCLCPP_ERROR_STREAM(rclcpp::get_logger("prosilica"), args)
+
+inline void cb_fail_shutdown() {
     ROS_WARN("Shutting down due to unhealthy");
-    ros::requestShutdown();
+    rclcpp::shutdown();
 }
 
 template <class T>
@@ -90,12 +98,12 @@ public:
     Watchdog();
     Watchdog(double lookback_period, double health_threshold);
 
-    void DelayedStart(ros::NodeHandlePtr nhp, double t);
+    void DelayedStart(rclcpp::Node::SharedPtr nhp, double t);
     void Start();
     void Stop();
     bool Ok();
 
-    void push_back(ros::Time const &t, double val);
+    void push_back(rclcpp::Time const &t, double val);
 
     int size();
 
@@ -112,28 +120,31 @@ public:
 
     double computeHealth();
 
-    void setFailCallback(ros::TimerCallback callback);
+    void setFailCallback(std::function<void()> callback);
     void callFail();
+
+    rclcpp::Time now();
 
 
 private:
     bool enabled_{false};
 
     /// lookback period in seconds  to consider events
-    ros::Duration lookback_period_{30};
+    rclcpp::Duration lookback_period_{30, 0};
 
     /// 0 = balanced 50/50
     double health_threshold{0.0};
+    rclcpp::Clock clock_{RCL_ROS_TIME};
     std::mutex mutex_;
-    std::vector<std::pair<ros::Time, double>> array;
-    ros::TimerCallback failCallback_;
-    ros::Timer delayStartTimer_;
+    std::vector<std::pair<rclcpp::Time, double>> array;
+    std::function<void()> failCallback_;
+    rclcpp::TimerBase::SharedPtr delayStartTimer_;
 };
 
 namespace prosilica {
 
-ros::Time CvtPvTimestamp(uint32_t timehi, uint32_t timelo);
-ros::Time CvtPvTimestamp(uint32_t timehi, uint32_t timelo, uint32_t freq);
+rclcpp::Time CvtPvTimestamp(uint32_t timehi, uint32_t timelo);
+rclcpp::Time CvtPvTimestamp(uint32_t timehi, uint32_t timelo, uint32_t freq);
 
 
 struct ProsilicaException : public std::runtime_error
@@ -223,20 +234,6 @@ public:
 
 typedef std::shared_ptr<PvFrameWrapper> PvFrameWrapperPtr;
 
-class OneShotManager {
-public:
-    OneShotManager() = default;
-
-    void erase(boost::uuids::uuid i);
-
-    boost::uuids::uuid addOneShot(ros::NodeHandlePtr nhp,
-                                  const ros::Duration &period,
-                                  const ros::TimerCallback& callback);
-
-private:
-    std::map<boost::uuids::uuid, ros::Timer> timer_map;
-};
-
 
 /// According to FrameStartTriggerMode Enum - AVT GigE Camera and Driver Attributes
 /// Firmware 1.38 April 7,2010
@@ -318,9 +315,8 @@ public:
     /// This violates some of the isolation of the non-ros and ros code, but this driver is already
     /// heavily modified. :shrug:. The trailing underscore matches the prosilica_nodelet convention.
     boost::mutex frameMutex_;
-    sensor_msgs::Image img_;
-    sensor_msgs::Image broken;
-    ros::Timer postProcTimer; // for doing things like dumping image
+    sensor_msgs::msg::Image img_;
+    sensor_msgs::msg::Image broken;
 
 };
 
