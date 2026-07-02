@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <arg name="node_name" default="daq"/>
+
+  <node name="$(var node_name)" pkg="ser_daq" exec="ser_daq_driver" output="screen"/>
+</launch>
