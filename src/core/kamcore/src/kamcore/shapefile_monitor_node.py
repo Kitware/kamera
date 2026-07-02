@@ -2,18 +2,19 @@
 
 import io
 import os
+import time
+
+import numpy as np
 import pygeodesy
 import redis
-import requests
 import shapefile
 import shapely
 import shapely.geometry
-import time
-import numpy as np
 
-import rospy
+import rclpy
+from rclpy.node import Node
 
-from custom_msgs.msg import GSOF_INS
+from custom_msgs.msg import GsofIns
 from roskv.impl.redis_envoy import RedisEnvoy
 from roskv.util import filter_hosts_by_system
 
@@ -22,15 +23,17 @@ KAM_DIR = os.environ["DOCKER_KAMERA_DIR"]
 geod_filename = os.path.join(KAM_DIR, 'assets/geods/egm84-15.pgm')
 geod = pygeodesy.geoids.GeoidPGM(geod_filename)
 
-class ShapefileMonitor(object):
+
+class ShapefileMonitor(Node):
     """ A class to monitor the shapefile provided by a redis db,
         monitoring if any changes occur and setting archiving if
         the INS reports within the shapefile, turning off archiving
         if it reports outside the shapefile.
     """
     def __init__(self):
+        super().__init__("shapefile_monitor")
         self.redis = redis.Redis(os.environ["REDIS_HOST"],
-                                client_name="shapefile_monitor")
+                                 client_name="shapefile_monitor")
         envoy = RedisEnvoy(os.environ["REDIS_HOST"],
                            client_name="shapefile_monitor")
         self.hosts = filter_hosts_by_system(
@@ -63,26 +66,26 @@ class ShapefileMonitor(object):
             self.archive_region = archive_region
             if fn is not None:
                 self.redis.set("/stat/shapefile_name", fn)
-            rospy.loginfo("Successfully loaded shapefile from Redis db!")
+            self.get_logger().info("Successfully loaded shapefile from Redis db!")
         else:
-            rospy.logwarn("Failed to load shapefile from Redis db, waiting for "
-                          "entry.")
-        rospy.loginfo("Time for shapefile check was %0.4fs." %
-                       (time.time() - tic))
+            self.get_logger().warning(
+                "Failed to load shapefile from Redis db, waiting for entry.")
+        self.get_logger().info("Time for shapefile check was %0.4fs." %
+                               (time.time() - tic))
 
     def listener(self):
-        sub = rospy.Subscriber("/ins", GSOF_INS,
-                               callback=self.ins_callback,
-                               queue_size=100)
+        self.sub = self.create_subscription(GsofIns, "/ins",
+                                            self.ins_callback, 100)
 
     def ins_callback(self, msg):
-        """ Takes and input GSOF_INS msg and turns archiving on/off
+        """ Takes an input GsofIns msg and turns archiving on/off
         depending on if it's in the shapefile or not.
 
         :param msg: The input ros msg.
-        :type msg: custom_msgs.msg/GSOF_EVENT.
+        :type msg: custom_msgs.msg/GsofIns.
         """
-        rospy.loginfo_throttle(10, "Processing incoming INS msgs.")
+        self.get_logger().info("Processing incoming INS msgs.",
+                               throttle_duration_sec=10)
 
         # Only check points every 1 s
         if self.cnt < 100:
@@ -117,14 +120,14 @@ class ShapefileMonitor(object):
             min_fps = float(self.redis.get("/sys/arch/min_frame_rate"))
             max_fps = float(self.redis.get("/sys/arch/max_frame_rate"))
             if rate < min_fps or rate > max_fps:
-                rospy.logwarn("Overlap percent of %s at alt %s wants "
-                               "to set framerate to %s, but min and max "
-                               "are %s and %s." % (overlap, alt, rate,
-                                   min_fps, max_fps))
+                self.get_logger().warning(
+                    "Overlap percent of %s at alt %s wants "
+                    "to set framerate to %s, but min and max "
+                    "are %s and %s." % (overlap, alt, rate, min_fps, max_fps))
             fps = np.clip(rate, min_fps, max_fps)
             self.redis.set("/sys/arch/trigger_freq", fps)
-            rospy.loginfo("Set triggering rate to map overlap %s to %s." %
-                          (overlap, fps))
+            self.get_logger().info("Set triggering rate to map overlap %s to %s." %
+                                   (overlap, fps))
 
         use_archive_region = int(self.redis.get("/sys/arch/use_archive_region"))
         load_sf = int(self.redis.get("/sys/arch/load_shapefile"))
@@ -145,35 +148,38 @@ class ShapefileMonitor(object):
                 print("is_archiving = 0")
                 self.redis.set("/sys/arch/is_archiving", 0)
                 # make sure nucmode is set to automatic by default
-                for host in self.hosts:
-                    topic = "/".join(["", 'sys', 'requested_geni_params',
-                                host, "ir", "CorrectionAutoEnabled"])
-                    self.redis.set(topic, "1")
+                self.set_nuc_mode("1")
         else:
             # make sure nucmode is set to automatic by default
-            for host in self.hosts:
-                topic = "/".join(["", 'sys', 'requested_geni_params',
-                            host, "ir", "CorrectionAutoEnabled"])
-                self.redis.set(topic, "1")
+            self.set_nuc_mode("1")
         is_archiving = int(self.redis.get("/sys/arch/is_archiving")) == 1
         allow_ir_nuc = int(self.redis.get("/sys/arch/allow_ir_nuc")) == 1
         if not allow_ir_nuc and is_archiving:
             print("Turning off NUCing when archiving.")
             # Make sure NUCing is turned off
-            for host in self.hosts:
-                topic = "/".join(["", 'sys', 'requested_geni_params',
-                            host, "ir", "CorrectionAutoEnabled"])
-                self.redis.set(topic, "0")
+            self.set_nuc_mode("0")
+
+    def set_nuc_mode(self, val):
+        for host in self.hosts:
+            topic = "/".join(["", 'sys', 'requested_geni_params',
+                              host, "ir", "CorrectionAutoEnabled"])
+            self.redis.set(topic, val)
 
 
+def main(args=None):
+    rclpy.init(args=args)
+    sm = ShapefileMonitor()
+    sm.load_shapefile()
+    sm.listener()
+    sm.get_logger().info("Waiting for incoming messages on /ins ...")
+    try:
+        rclpy.spin(sm)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        sm.destroy_node()
+        rclpy.shutdown()
 
-def main():
-    rospy.init_node("shapefile_monitor")
-    SM = ShapefileMonitor()
-    SM.load_shapefile()
-    SM.listener()
-    rospy.loginfo("Waiting for incoming messages on /ins ...")
-    rospy.spin()
 
 if __name__ == "__main__":
     main()
