@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- launch file -->
+<launch>
+    <!-- Specify input SynchronizedImages topics, which will be multiplexed
+         through the detector pipeline. The first instance of
+         synchronized_images_in# with "unused" indicates no more inputs. -->
+    <arg name="system_name" default="system"/>
+    <arg name="synchronized_images_in1"/>
+    <arg name="synchronized_images_in2" default="unused"/>
+    <arg name="synchronized_images_in3" default="unused"/>
+
+    <!-- Mapping from RGB, IR, and UV images into VIAME pipeline port
+         (0=unused, 1=image, 2=image2, 3=image2) -->
+    <arg name="rgb_port_ind" default="1"/>
+    <arg name="ir_port_ind" default="2"/>
+    <arg name="uv_port_ind" default="3"/>
+
+    <!-- Name of the detector node -->
+    <arg name="detector_node" default="detector"/>
+
+    <!-- Topic to publish detections on -->
+    <arg name="det_topic" default="detections_out"/>
+
+    <!-- Detector ID string populating the 'detector' field in output detection messages -->
+    <arg name="detector_id_string" default="unspecified"/>
+
+    <!-- Where the Redis server is hosted. -->
+    <arg name="redis_uri" default="tcp://192.168.88.10:6379"/>
+
+    <!-- The pipefile should be specified on the command line or other means. -->
+    <arg name="detection_pipefile"/>
+    <arg name="pipeline_dir" default=""/>
+
+    <!-- Number of threads for OpenCV parallel regions to utilize. -->
+    <arg name="ocv_num_threads" default="-1"/>
+
+    <!-- Size of sync message queue to buffer in ROS. -->
+    <arg name="sync_q_size" default="1"/>
+
+    <arg name="respawn" default="true"/>
+
+    <node name="$(var detector_node)" pkg="sprokit_adapters"
+          exec="kw_detector_fusion_adapter_node" output="screen"
+          namespace="/$(var system_name)"
+          respawn="$(var respawn)">
+
+        <env name="PYTHONPATH" value="/opt/noaa/viame/lib/python3.6:/opt/noaa/viame/lib/python3.6/site-packages:/opt/noaa/viame/lib/dist-packages"/>
+        <env name="PYTHON_LIBRARY" value="/opt/noaa/viame/lib/libpython3.so"/>
+
+        <param name="synchronized_images_in1" value="$(var synchronized_images_in1)"/>
+        <param name="synchronized_images_in2" value="$(var synchronized_images_in2)"/>
+        <param name="synchronized_images_in3" value="$(var synchronized_images_in3)"/>
+
+        <param name="rgb_port_ind" value="$(var rgb_port_ind)"/>
+        <param name="ir_port_ind" value="$(var ir_port_ind)"/>
+        <param name="uv_port_ind" value="$(var uv_port_ind)"/>
+
+        <param name="redis_uri" value="$(var redis_uri)"/>
+
+        <remap from="~/detections_out" to="$(var det_topic)"/>
+        <param name="detector_id_string" value="$(var detector_id_string)"/>
+        <param name="pipe_file" value="$(var detection_pipefile)"/>
+        <param name="pipeline_dir" value="$(var pipeline_dir)"/>
+        <param name="ocv_num_threads" value="$(var ocv_num_threads)"/>
+        <param name="sync_q_size" value="$(var sync_q_size)"/>
+    </node>
+</launch>
