@@ -1,11 +1,7 @@
-import rospy
-
 # This is an abstract base class
 class DispatchBase(object):
-    publisher = None
     msg = None
 
-    # todo: better pattern to manage class-bound variables
     # message_class, pubs, and optionally counter should be re-defined in each child
     message_class = None
     pubs = {}
@@ -18,13 +14,14 @@ class DispatchBase(object):
         return x
 
     @classmethod
-    def add_publisher(cls, name, queue_size=3):
-        if name not in cls.pubs:
-            cls.pubs.update(
-                {'name': rospy.Publisher(name, cls.message_class, tcp_nodelay=True,
-                                         queue_size=queue_size)})
-        else:
+    def add_publisher(cls, node, name, queue_size=3):
+        """Register a publisher on `node` for this dispatch class.
+
+        In ROS2 publishers are owned by a node, so one must be provided.
+        """
+        if name in cls.pubs:
             raise ValueError('Publisher already exists: {}'.format(name))
+        cls.pubs[name] = node.create_publisher(cls.message_class, name, queue_size)
 
     @property
     def new_message(self):

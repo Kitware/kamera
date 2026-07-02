@@ -12,9 +12,9 @@ string file_path_ir
 string file_path_uv
 
 # Actual data
-custom_msgs/PathImage image_rgb
-custom_msgs/PathImage image_ir
-custom_msgs/PathImage image_uv
+PathImage image_rgb
+PathImage image_ir
+PathImage image_uv
 
 # metadata expansion field
 string meta_json

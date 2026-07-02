@@ -8,10 +8,10 @@ std_msgs/Header header
 float64 time
 
 # system time of the system receiving the event
-time sys_time
+builtin_interfaces/Time sys_time
 
 # time associated with the gps event message
-time gps_time
+builtin_interfaces/Time gps_time
 
 # INS quality indicator.
 # {0: 'gps only', 1: 'coarse leveling', 2: 'degraded', 3: 'aligned', 4: 'full nav'}
