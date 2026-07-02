@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <arg name="node_name" default="image_view_server"/>
+
+  <!-- Whether to compress / decompress imagery for detector -->
+  <arg name="compress_imagery" default="true"/>
+
+  <!-- Whether to send any image bytes to the detector -->
+  <arg name="send_image_data" default="true"/>
+
+  <node name="$(var node_name)" pkg="view_server" exec="image_view_server"
+        output="screen" respawn="true">
+    <param name="compress_imagery" value="$(var compress_imagery)"/>
+    <param name="send_image_data" value="$(var send_image_data)"/>
+  </node>
+</launch>

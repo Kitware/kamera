@@ -1,10 +1,20 @@
-#!/usr/bin/env python
-from distutils.core import setup
-from catkin_pkg.python_setup import generate_distutils_setup
+from setuptools import setup
 
-# this function uses information from package.xml to populate dict
-d = generate_distutils_setup(packages=['nexus'],
-                             install_requires=["backports.tempfile"],
-                             package_dir={'': 'src'})
+package_name = "nexus"
 
-setup(**d)
+setup(
+    name=package_name,
+    version="1.0.0",
+    packages=[package_name],
+    package_dir={"": "src"},
+    data_files=[
+        ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
+        ("share/" + package_name, ["package.xml"]),
+    ],
+    install_requires=["setuptools"],
+    zip_safe=True,
+    maintainer="Adam Romlein",
+    maintainer_email="adam.romlein@kitware.com",
+    description="KAMERA archiving and image-transport library",
+    license="Apache 2.0",
+)

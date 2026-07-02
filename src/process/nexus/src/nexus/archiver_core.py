@@ -5,9 +5,9 @@ from __future__ import division, print_function, absolute_import
 import os
 import re
 import errno
+import socket
 import datetime
 
-# import threading
 import time
 import json
 import yaml
@@ -16,29 +16,24 @@ from roskv.impl.redis_envoy import RedisEnvoy, StateService
 
 
 try:
-    import rospy
-    import genpy
+    from builtin_interfaces.msg import Time as MsgTime
 
-    # from profilehooks import timecall
     from std_msgs.msg import Header
     from std_msgs.msg import UInt64 as MsgUInt64
     from std_msgs.msg import String as MsgString
 
-    from msgdispatch.archive import ArchiveSchemaDispatch
     from custom_msgs.srv import SetArchiving, AddToEventLog
-    from custom_msgs.msg import GSOF_INS, GSOF_EVT
+    from custom_msgs.msg import GsofIns, GsofEvt
 
 except ImportError as exc:
     import sys
 
     print(
-        "cannot import rospy or messages. if this is not a test environment, this is bad!",
+        "cannot import rclpy interfaces. if this is not a test environment, this is bad!",
         file=sys.stderr,
     )
     if not os.environ.get("IGNORE_ROS_IMPORT", False):
         raise exc
-
-# from custom_msgs.srv import EraseDataDisk
 
 PAT_BRACED = re.compile(r"\{(\w+)\}")
 PAT_DOUBLE_SLASH = re.compile(r"//")
@@ -66,13 +61,22 @@ def conformKwargsToFormatter(tmpl, kwargs):
 
 
 def msg_as_dict(msg):
-    if isinstance(msg, genpy.rostime.TVal):
-        return msg.to_sec()
-    elif isinstance(msg, genpy.message.Message):
-        return {str(k): msg_as_dict(getattr(msg, k)) for k in msg.__slots__}
+    """Recursively convert a ROS2 message to plain python types."""
+    if isinstance(msg, MsgTime):
+        return msg.sec + msg.nanosec * 1e-9
+    elif hasattr(msg, "get_fields_and_field_types"):
+        return {
+            str(k): msg_as_dict(getattr(msg, k))
+            for k in msg.get_fields_and_field_types()
+        }
     elif isinstance(msg, dict):
         return {str(k): v for k, v in msg.items()}
     return msg
+
+
+def stamp_to_sec(stamp):
+    # type: (MsgTime) -> float
+    return stamp.sec + stamp.nanosec * 1e-9
 
 
 def pathsafe_timestamp(now=None, show_micros=False, show_millis=False):
@@ -140,7 +144,7 @@ class _Fmt(object):
     @staticmethod
     def msg_as_dict_headless(msg):
         """unused I think"""
-        dd = {k: getattr(msg, k) for k in msg.__slots__}
+        dd = {k: getattr(msg, k) for k in msg.get_fields_and_field_types()}
         dd.pop("header", None)
         return dd
 
@@ -151,7 +155,7 @@ class _Fmt(object):
         for field in fields:
             x = getattr(msg, field, None)
             d.update({field: str(x)})
-        fields = ["seq", "stamp", "frame_id"]
+        fields = ["stamp", "frame_id"]
         for field in fields:
             x = getattr(msg.header, field, None)
             d["header"].update({field: str(x)})
@@ -163,7 +167,6 @@ class _Fmt(object):
         """Ambigous abbreviations, this use should be discouraged"""
         return field[0].upper()
 
-    # @pysnooper.snoop()
     @staticmethod
     def fmt_filename(
         proj, flight, ts, field=None, mode="{mode}", ext="{ext}", note=None
@@ -197,22 +200,23 @@ fmt = _Fmt()
 
 class ArchiverBase(object):
 
-    def __init__(self, agent_name=None, bytes_halt_archiving=1e9, verbosity=0):
+    def __init__(self, node, agent_name=None, bytes_halt_archiving=1e9, verbosity=0):
         """
         Class for managing the archiving of data coming from the system.
         By convention, paths are '/' terminated.
+
+        :param node: rclpy node owning the subscriptions/publishers/services
         """
-        node_host = rospy.get_namespace().strip("/")
-        cam_fov = rospy.get_param(
-            os.path.join("/cfg", "hosts", node_host, "fov"), "node"
-        )
+        self.node = node
+        self.log = node.get_logger()
+        node_host = os.environ.get("NODE_HOSTNAME") or socket.gethostname()
 
         self.node_host = node_host
         self._redis_host = os.environ.get("REDIS_HOST", "nuvo0")
 
         ## deprecated
         self.verbosity = verbosity
-        self._name_system = rospy.get_param("/system_name", "default_system")
+        self._name_system = os.environ.get("SYSTEM_NAME", "default_system")
         self._name_sync = "sync"
         self._name_ins = "ins"
         self._name_meta = "meta"
@@ -224,11 +228,16 @@ class ArchiverBase(object):
         self.erase_service = None
 
         self.bytes_halt_archiving = bytes_halt_archiving
-        rospy.Subscriber("/ins", GSOF_INS, self.ins_callback)
-        rospy.Subscriber("/event", GSOF_EVT, self.evt_callback)
+        node.create_subscription(GsofIns, "/ins", self.ins_callback, 10)
+        node.create_subscription(GsofEvt, "/event", self.evt_callback, 10)
 
-        self.pub_diskfree = rospy.Publisher("disk_free_bytes", MsgUInt64, queue_size=1)
+        self.pub_diskfree = node.create_publisher(MsgUInt64, "disk_free_bytes", 1)
+        self.rawmsg_pub = node.create_publisher(MsgString, "/rawmsg", 99)
         self.counter = 0
+
+        self.envoy = RedisEnvoy(self._redis_host, client_name=node_host + "-nexus")
+        self.state_service = StateService(self.envoy, node_host, "nexus")
+
         self.image_formats = {}
         default_types = {
             "rgb": "jpg",
@@ -238,16 +247,13 @@ class ArchiverBase(object):
             "ins": "json",
         }
         for chan in ["rgb", "uv", "ir", "evt", "ins"]:
-            self.image_formats[chan] = rospy.get_param(
-                os.path.join("/cfg/file_formats", chan), default_types[chan]
-            )
+            try:
+                self.image_formats[chan] = self.envoy.get("/sys/arch/ext_%s" % chan)
+            except KeyError:
+                self.image_formats[chan] = default_types[chan]
 
-        self.last_ins = GSOF_INS()
-        self.latch_ins = GSOF_INS()
-        print("\n\n VERSION CHECK 1 \n")
-
-        self.envoy = RedisEnvoy(self._redis_host, client_name=node_host + "-nexus")
-        self.state_service = StateService(self.envoy, node_host, "nexus")
+        self.last_ins = GsofIns()
+        self.latch_ins = GsofIns()
 
         # Get Redis Params
         arch = self.envoy.get("/sys/arch")
@@ -369,25 +375,21 @@ class ArchiverBase(object):
         # type: (str, str, str, str) -> None
 
         if namespace is None:
-            namespace = rospy.get_namespace()
-
-        else:
-            if namespace not in ["/", "~"] and namespace[-1] != "/":
-                namespace += "/"
+            namespace = self.node.get_namespace()
+        if namespace not in ["/", "~"] and namespace[-1] != "/":
+            namespace += "/"
+        if not namespace.startswith("/"):
+            namespace = "/" + namespace
         name_archive = namespace + name_archive
         name_log = namespace + name_log
-        name_erase = namespace + name_erase
-        self.archive_service = rospy.Service(
-            name_archive, SetArchiving, self.call_set_archiving
+        self.archive_service = self.node.create_service(
+            SetArchiving, name_archive, self.call_set_archiving
         )
-        self.log_service = rospy.Service(
-            name_log, AddToEventLog, self.call_add_to_event_log
+        self.log_service = self.node.create_service(
+            AddToEventLog, name_log, self.call_add_to_event_log
         )
-        # self.erase_service = rospy.Service(name_log, EraseDataDisk, self.call_erase_disk)
-        rospy.loginfo("Subscribing {} to {}".format(namespace, name_archive))
-        rospy.loginfo("Subscribing {} to {}".format(namespace, name_log))
-
-    #        self.erase_service = rospy.Service(name_log, EraseDataDisk, self.call_erase_disk)
+        self.log.info("Subscribing {} to {}".format(namespace, name_archive))
+        self.log.info("Subscribing {} to {}".format(namespace, name_log))
 
     def fmt_flight_path(self):
         # type: () -> str
@@ -483,7 +485,6 @@ class ArchiverBase(object):
         Returns:
             Fully qualified path with {mode} and {ext} substitution points
         """
-        # init_time_short = pathsafe_timestamp(self._init_time, show_millis=True)
         # leave mode and ext to be formatted by the file dump
         filename = self.fmt_filename("", field)
 
@@ -542,7 +543,7 @@ class ArchiverBase(object):
             make_path(filename, from_file=True)
         else:
             if not os.path.exists(os.path.dirname(filename)):
-                rospy.logerr(
+                self.log.error(
                     "Archiving directory not created yet and `make_dir` set to false. "
                     "Could not write: {}".format(filename)
                 )
@@ -577,15 +578,15 @@ class ArchiverBase(object):
 
     def update_project_flight(self, project, flight, effort="", collection_mode="?"):
         if not project:
-            rospy.logwarn("Missing project string, setting to default")
+            self.log.warning("Missing project string, setting to default")
             project = "arch_core_svc_no_project"
 
         if not flight:
-            rospy.logwarn("Missing flight string, setting to default")
+            self.log.warning("Missing flight string, setting to default")
             flight = "00"
 
         if not effort:
-            rospy.logwarn("Missing effort string, setting to default")
+            self.log.warning("Missing effort string, setting to default")
             effort = "arch_core_svc_no_effort"
 
         self._project = project
@@ -594,14 +595,13 @@ class ArchiverBase(object):
         self._collection_mode = collection_mode
         return project, flight, effort
 
-    def call_set_archiving(self, req):
-        # type: (SetArchiving) -> bool
-        rospy.loginfo("!! DEPRECATED !! call_set_archiving v2: {}".format(req))
-        return True
+    def call_set_archiving(self, req, resp):
+        self.log.info("!! DEPRECATED !! call_set_archiving v2: {}".format(req))
+        resp.success = True
+        return resp
 
-    def call_add_to_event_log(self, req):
-        # type: (AddToEventLog) -> bool
-        rospy.loginfo("maybe deprecating? call_add_to_event_log: {}".format(req))
+    def call_add_to_event_log(self, req, resp):
+        self.log.info("maybe deprecating? call_add_to_event_log: {}".format(req))
         self.update_project_flight(
             req.project, req.flight, req.effort, req.collection_mode
         )
@@ -615,20 +615,14 @@ class ArchiverBase(object):
             "collection_mode": req.collection_mode,
         }
         self.dump_log_yaml(data)
-        return True
+        resp.success = True
+        return resp
 
     def update_schema(self, msg):
-        # type: (ArchiveSchemaDispatch) -> None
-        rospy.loginfo("Set schema: \n{}".format(str(msg)))
+        self.log.info("Set schema: \n{}".format(str(msg)))
         self._project = msg.project
         fl_number = "".join([d for d in msg.flight if d.isdigit()])
         self._flight = "fl{:0>2}".format(fl_number)
-
-    @staticmethod
-    def call_erase_disk(req):
-        print(req)
-        parent_host = rospy.get_namespace().strip("/")
-        rospy.logwarn("Deleting disk on {}: ".format(parent_host))
 
     def disk_check(self, dirname, every_nth=8):
         """
@@ -638,12 +632,11 @@ class ArchiverBase(object):
         :param every_nth:
         :return:
         """
-        rospy.loginfo("disk check on {} (every {}th)".format(dirname, every_nth))
+        self.log.info("disk check on {} (every {}th)".format(dirname, every_nth))
         if every_nth > 1:
             self.counter += 1
             if self.counter % every_nth:
                 return
-        rospy.loginfo("checking!!!!!!!")
         stats = os.statvfs(dirname)
         bytes_free = stats.f_frsize * stats.f_bavail
         diskmsg = MsgUInt64()
@@ -669,18 +662,17 @@ class ArchiverBase(object):
             )
             self.fail(txt)
         else:
-            rospy.loginfo("Mount OK: {}".format(sentinel))
+            self.log.info("Mount OK: {}".format(sentinel))
 
     def fail(self, txt):
-        rospy.logwarn(txt)
-        # if self.is_archiving:
+        self.log.warning(txt)
         self.rawmsg_publish_err(txt)
         self.envoy.put("/sys/arch/is_archiving", 0)
 
     def rawmsg_publish_err(self, txt):
-        msg = MsgString(txt)
-        rospy.logerr_throttle(1, txt)
-        self.rawmsg_pub = rospy.Publisher("/rawmsg", MsgString, queue_size=99)
+        msg = MsgString()
+        msg.data = txt
+        self.log.error(txt, throttle_duration_sec=1)
         self.rawmsg_pub.publish(msg)
 
     @property
