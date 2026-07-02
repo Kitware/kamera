@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import struct
+import time as _time
 import datetime
-from typing import Tuple
-import rospy
+from typing import List, Tuple
+
+import rclpy.logging
+from builtin_interfaces.msg import Time as MsgTime
+
 from . import gps_leap_seconds
 
 from kamcore.structures import BasicStamp, BasicHeader, BasicEvent
 from std_msgs.msg import Empty
-from custom_msgs.msg import GSOF_INS, GSOF_EVT
+from custom_msgs.msg import GsofIns, GsofEvt
 from msgdispatch.base import DispatchBase
 
+log = rclpy.logging.get_logger("gsof")
 
 # Constants
-gps_epoch = datetime.datetime(1980,1,6)
+gps_epoch = datetime.datetime(1980, 1, 6)
 unix_epoch = datetime.datetime(1970, 1, 1)
 gps_leap_td = datetime.timedelta(seconds=gps_leap_seconds.GPS_LEAP_SECONDS)
 
@@ -41,6 +46,27 @@ $PASHR,154056.000,354.688,T,1.115,-2.610,,0.248,0.248,71.520,1,2*27
 TEST_GSOF_PACKET = TEST_NMEA + TEST_GSOF_INTS
 
 
+def time_msg_from_sec(t):
+    # type: (float) -> MsgTime
+    """Build a builtin_interfaces Time message from unix float seconds"""
+    sec = int(t)
+    nanosec = int(round((t - sec) * 1e9))
+    if nanosec >= 1000000000:
+        sec += 1
+        nanosec -= 1000000000
+    return MsgTime(sec=sec, nanosec=nanosec)
+
+
+def time_msg_now():
+    # type: () -> MsgTime
+    return time_msg_from_sec(_time.time())
+
+
+def time_msg_to_sec(msg):
+    # type: (MsgTime) -> float
+    return msg.sec + msg.nanosec * 1e-9
+
+
 def datetime_to_float(d):
     # type: (datetime.datetime) -> float
     """
@@ -52,8 +78,7 @@ def datetime_to_float(d):
     Returns:
         unix seconds since epoch
     """
-    total_seconds =  (d - unix_epoch).total_seconds()
-    #
+    total_seconds = (d - unix_epoch).total_seconds()
     return total_seconds
 
 
@@ -133,7 +158,7 @@ class GsofHeader(object):
             return None
         header = struct.unpack('>9B', buf[:9])
         if header[0] != START_TX:
-            rospy.logwarn('Start byte does not match STX')
+            log.warning('Start byte does not match STX')
             return None
 
         self = object.__new__(cls)
@@ -141,13 +166,10 @@ class GsofHeader(object):
         self.message_type = header[2]
         ln = header[3]
 
-        # try:
         checksum, end = struct.unpack('>BB', buf[4+ln:6+ln])
         computed_checksum = sum(bytearray(buf[1:-2])) & 0xff
-        # except struct.error as err:
-        #     print('failed to unpack {}'.format(err  ))
         if end != END_TX:
-            rospy.logwarn('Final byte does not match ETX')
+            log.warning('Final byte does not match ETX')
             return None
 
         self.len = ln
@@ -192,7 +214,7 @@ def wrap_gsof(payload, message_type=GSOF_TYPE_MSG, record_type=GSOF_TYPE_EVENT, 
 def parse_gsof_evt(buf, cls=BasicEvent):
     # type: (bytes, type) -> BasicEvent
     """ The return type is spoofed in order to allow static type checking, this will actually return a
-    type `cls` e.g. GSOF_EVT message"""
+    type `cls` e.g. GsofEvt message"""
     msg = cls()  # type: BasicEvent
     data = struct.unpack('>BHdL', buf)
 
@@ -224,8 +246,7 @@ class GsofEvtSpoofer(object):
 
     def next_msg(self, now=None):
         if now is None:
-            import time
-            now = time.time()
+            now = _time.time()
         self.inc()
         gps_week, gps_time = utc_to_gps(now)
         data = struct.pack('>BHdL', self.event_port, gps_week, gps_time, self.event_num)
@@ -251,8 +272,8 @@ class GsofInsSpoofer(object):
 
     def ins_from_envoy(self):
         dd = self.envoy.get_dict('/debug/spoof/ins')
-        msg = GSOF_INS()
-        for k,v in dd.items():
+        msg = GsofIns()
+        for k, v in dd.items():
             try:
                 setattr(msg, k, v)
             except AttributeError as exc:
@@ -262,8 +283,7 @@ class GsofInsSpoofer(object):
 
     def next_struct(self, msg=None, now=None):
         if now is None:
-            import time
-            now = time.time()
+            now = _time.time()
         self.inc()
 
         if msg is None:
@@ -293,7 +313,7 @@ class GsofInsSpoofer(object):
         buf[19] = msg.acceleration_y
         buf[20] = msg.acceleration_z
 
-        data    = struct.pack('>HLbbdddffffddddffffff', *buf)
+        data = struct.pack('>HLbbdddffffddddffffff', *buf)
 
         return data
 
@@ -304,7 +324,7 @@ class GsofInsSpoofer(object):
 
 class GsofInsDispatch(DispatchBase):
     counter = 0
-    message_class = GSOF_INS
+    message_class = GsofIns
     pubs = {}
     label = 'ins'
     __slots__ = (
@@ -325,16 +345,15 @@ class GsofInsDispatch(DispatchBase):
         data     = struct.unpack('>HLbbdddffffddddffffff', buf)
 
         gps_week = data[0]
-        gps_time = data[1] * 1e-3 # convert ms to s
+        gps_time = data[1] * 1e-3  # convert ms to s
         utc_time = gps_to_utc(gps_week, gps_time)  # as unix time
 
-        self.msg.header.stamp   = rospy.Time.from_sec(utc_time)
-        self.msg.header.seq     = self.next_id()
+        self.next_id()
+        self.msg.header.stamp = time_msg_from_sec(utc_time)
         self.msg.header.frame_id = 'ins'
 
-
         self.msg.time           = utc_time
-        self.msg.gps_time       = rospy.Time.from_sec(utc_time)
+        self.msg.gps_time       = time_msg_from_sec(utc_time)
         self.msg.align_status   = data[2]
         self.msg.gnss_status    = data[3]
         self.msg.latitude       = data[4]
@@ -359,7 +378,7 @@ class GsofInsDispatch(DispatchBase):
 
 class GsofEventDispatch(DispatchBase):
     counter = 0
-    message_class = GSOF_EVT
+    message_class = GsofEvt
     pubs = {}
     label = 'evt'
     __slots__ = ['header', 'time', 'event_port', 'event_num']
@@ -367,7 +386,7 @@ class GsofEventDispatch(DispatchBase):
     def __new__(cls, buf):
         self     = object.__new__(cls)
         self.msg = self.new_message()
-        self.msg.header.stamp = rospy.Time.now()
+        self.msg.header.stamp = time_msg_now()
         self.buf = bytes()
 
         if buf is None:
@@ -381,23 +400,21 @@ class GsofEventDispatch(DispatchBase):
         gps_time = data[2]  # is actually seconds, unlike INS packet
         utc_time = gps_to_utc(gps_week, gps_time)  # as unix time
 
-        self.msg.gps_time = rospy.Time.from_sec(utc_time)
+        self.msg.gps_time = time_msg_from_sec(utc_time)
 
-        self.msg.time   = utc_time
+        self.msg.time = utc_time
         self.msg.event_port = data[0]
-        self.msg.event_num  = data[3] # todo: should seq id match this?
-        # self.msg.header.seq   = self.next_id()
+        self.msg.event_num = data[3]
 
         self.msg.header.stamp = self.msg.gps_time
         self.msg.header.frame_id = '/ins_evt?eventNum={}'.format(self.event_num)
-        self.msg.header.seq   = self.event_num # todo: probably, things get really weird if these don't match
-        rospy.loginfo('{} {}: {}'.format(self.msg.header.seq, self.msg.event_num, self.msg.time))
+        log.info('{}: {}'.format(self.msg.event_num, self.msg.time))
         return self
 
 
 class GsofSpoofEventDispatch(DispatchBase):
     counter = 0
-    message_class = GSOF_EVT
+    message_class = GsofEvt
     pubs = {}
     label = 'evt_spoof'
 
@@ -408,22 +425,22 @@ class GsofSpoofEventDispatch(DispatchBase):
         self.buf = bytes()
 
         if stamp is None:
-            stamp = rospy.Time.now()
+            stamp = time_msg_now()
+        seq = self.next_id()
         self.msg.header.stamp = stamp
-        self.msg.header.seq   = self.next_id()
         self.msg.header.frame_id = 'systime'
 
         self.msg.sys_time = stamp
         self.msg.gps_time = stamp
-        self.msg.time = stamp.to_sec()
+        self.msg.time = time_msg_to_sec(stamp)
         self.msg.event_port = 23  # sentinel value
-        self.msg.event_num = self.msg.header.seq & 0xffff
+        self.msg.event_num = seq & 0xffff
         return self
 
 
 class GsofSpoofInsDispatch(DispatchBase):
     counter = 0
-    message_class = GSOF_INS
+    message_class = GsofIns
     pubs = {}
     label = 'ins_spoof'
 
@@ -433,14 +450,13 @@ class GsofSpoofInsDispatch(DispatchBase):
         self.msg = self.new_message()
         self.buf = bytes()
 
-
         utc_time = datetime_to_float(datetime.datetime.now())  # as unix time
 
-        self.msg.header.stamp = rospy.Time.from_sec(utc_time)
-        self.msg.header.seq   = self.next_id()
+        self.next_id()
+        self.msg.header.stamp = time_msg_from_sec(utc_time)
         self.msg.header.frame_id = 'systime'
 
-        self.msg.time   = utc_time
+        self.msg.time = utc_time
         self.msg.altitude       = 333.0
         self.msg.total_speed    = 75.0
         self.msg.latitude       = 42.864407
@@ -450,7 +466,7 @@ class GsofSpoofInsDispatch(DispatchBase):
 
 
 def stream_gsof_chunker(buf):
-    # type: (bytes) -> List(Tuple)
+    # type: (bytes) -> List[Tuple]
     """
     Break a binary stream into header/buffer pairs chunked into message size
     Args:
@@ -476,6 +492,7 @@ def stream_gsof_chunker(buf):
 
 NullDispatch = ClsNullDispatch()
 
+
 def parse_gsof(header, buf):
     # type: (GsofHeader, bytes) -> DispatchBase
     """
@@ -491,7 +508,7 @@ def parse_gsof(header, buf):
     """
 
     if header.message_type != GSOF_TYPE_MSG:
-        rospy.logwarn('invalid message')
+        log.warning('invalid message')
         return NullDispatch
 
     start = 9
@@ -503,7 +520,7 @@ def parse_gsof(header, buf):
     elif header.record_type == GSOF_TYPE_RMS:
         raise NotImplementedError('RMS parser not available')
     else:
-        rospy.logwarn('message type not understood')
+        log.warning('message type not understood')
         return NullDispatch
 
 
@@ -542,13 +559,6 @@ def separate_nmea(buf):
 
     Returns:
         (list_of_nmea, binary)
-
-    Examples:
-        >>> stuff = separate_nmea(TEST_GSOF_PACKET)
-        >>> stuff[0]
-        '$GNGGA,154056.00,4251.87736134,N,07346.28348206,W,1,12,1.6,118.450,M,-31.849,M,,*4A'
-        >>> stuff[1]
-        '$PASHR,154056.000,354.688,T,1.115,-2.610,,0.248,0.248,71.520,1,2*27'
     """
     nmea_list = []
     tail = bytes(buf)
@@ -565,20 +575,3 @@ def separate_nmea(buf):
             break
 
     return nmea_list, tail
-
-
-def run_tests():
-    from pprint import pprint
-    nmea_list, data = separate_nmea(TEST_GSOF_PACKET)
-
-    dispatch = parse_gsof(data)
-    pprint(nmea_list)
-    print(len(data))
-    print(data.hex())
-    pprint(dispatch.msg)
-
-
-if __name__ == '__main__':
-    run_tests()
-
-
