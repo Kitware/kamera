@@ -1,9 +1,12 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>kw_genicam_driver</name>
+  <name>cam_utils</name>
   <version>1.0.0</version>
-  <description>GenICam (Teledyne DALSA GigE-V) driver for the FLIR A6750/A6xx IR cameras</description>
+  <description>
+    Shared camera-driver utilities: event/image matching cache and small
+    parsing helpers (formerly compiled straight out of the phase_one tree).
+  </description>
 
   <maintainer email="adam.romlein@kitware.com">Adam Romlein</maintainer>
   <license>Apache 2.0</license>
@@ -12,13 +15,7 @@
 
   <depend>rclcpp</depend>
   <depend>std_msgs</depend>
-  <depend>sensor_msgs</depend>
   <depend>custom_msgs</depend>
-  <depend>image_transport</depend>
-  <depend>cv_bridge</depend>
-  <depend>cam_utils</depend>
-  <depend>roskv</depend>
-  <depend>libopencv-dev</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

@@ -2,20 +2,21 @@
 #include <csignal>
 #include <cstring>
 #include <cstdio>
+#include <filesystem>
 #include <string>
 #include <mutex>
 #include <deque>
 #include <atomic>
+#include <thread>
 
 // ROS stuff
-#include <ros/ros.h>
-#include "std_msgs/UInt8.h"
-#include "std_msgs/Int8.h"
-
-#include <boost/filesystem.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include "std_msgs/msg/u_int8.hpp"
+#include "std_msgs/msg/int8.hpp"
+#include "std_msgs/msg/header.hpp"
 
 #include <cv_bridge/cv_bridge.h>
-#include <image_transport/image_transport.h>
+#include <image_transport/image_transport.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <roskv/envoy.h>
@@ -26,12 +27,12 @@
 // Includes from: /usr/dalsa/GigeV/include/
 #include <gevapi.h>
 
-#include <custom_msgs/GSOF_EVT.h>
-#include <custom_msgs/Stat.h>
-#include <custom_msgs/CamGetAttr.h>
-#include <custom_msgs/CamSetAttr.h>
-#include <custom_msgs/StrList.h>
-#include <phase_one/phase_one_utils.h>
+#include <custom_msgs/msg/gsof_evt.hpp>
+#include <custom_msgs/msg/stat.hpp>
+#include <custom_msgs/srv/cam_get_attr.hpp>
+#include <custom_msgs/srv/cam_set_attr.hpp>
+#include <custom_msgs/srv/str_list.hpp>
+#include <cam_utils/event_cache.hpp>
 
 
 #include "utils.h"
@@ -45,28 +46,18 @@ enum FirmwareMode { Bayer=0, Color=1, Mono=2, Mono8=3, Mono16=4};
 
 /// Forward declarations
 
-void cb_request_shutdown(std_msgs::Int8 const &msg) {
-    ROS_INFO("Requesting clean shutdown: %d", msg.data);
-    ros::requestShutdown();
-}
-
 class Transporter {
 public:
-    Transporter(ros::NodeHandlePtr nhp, const std::string &out_topic) :
-            nhp_{nhp},
-            it_raw(*nhp),
+    Transporter(rclcpp::Node::SharedPtr nhp, const std::string &out_topic) :
+            it_raw(nhp),
             it_raw_pub(it_raw.advertise(out_topic, 1)) {}
 
     image_transport::ImageTransport it_raw;
     image_transport::Publisher it_raw_pub;
-private:
-    ros::NodeHandlePtr nhp_;
 };
 
-typedef std::pair<ros::Time, cv::Mat> TimeMat;
 
-
-int purge_stale(std::map<ros::Time, sensor_msgs::ImagePtr> &image_map, ros::Time t)
+int purge_stale(std::map<rclcpp::Time, sensor_msgs::msg::Image::SharedPtr> &image_map, rclcpp::Time t)
 {
     int stale = 0;
     for (const auto pair: image_map) {
@@ -80,59 +71,39 @@ int purge_stale(std::map<ros::Time, sensor_msgs::ImagePtr> &image_map, ros::Time
 };
 
 
-std::string dumpImageMessage(const sensor_msgs::ImagePtr & received_image, const std::string &filename)
+std::string dumpImageMessage(const sensor_msgs::msg::Image::SharedPtr & received_image, const std::string &filename)
 {
     std::vector<int> compression_params;
     compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
     compression_params.push_back(100);
     cv_bridge::CvImagePtr cvPtr;
-    auto start_db = ros::Time::now();
+    auto start_db = steady_clock::now();
     cvPtr = cv_bridge::toCvCopy(received_image, received_image->encoding);
-    ROS_INFO("debayered %ld in %2.3f ", (long int)(cvPtr->image.total() * cvPtr->image.elemSize()), (ros::Time::now()-start_db).toSec());
-    cv::Mat undist = cvPtr->image;
-    auto now = ros::WallTime::now();
-    auto nodeName = ros::this_node::getName();
+    ROS_INFO("debayered %ld in %2.3f ", (long int)(cvPtr->image.total() * cvPtr->image.elemSize()),
+             duration<double>(steady_clock::now() - start_db).count());
 
-    start_db = ros::Time::now();
+    start_db = steady_clock::now();
 
-    boost::filesystem::path path_filename{filename};
-    boost::filesystem::create_directories(path_filename.parent_path());
+    std::filesystem::path path_filename{filename};
+    std::filesystem::create_directories(path_filename.parent_path());
     cv::imwrite(filename, cvPtr->image, compression_params);
-//    cv::imwrite(filename, cvPtr->image);
-    ROS_INFO("dumped   %ld in %2.3f ", (long int)(cvPtr->image.total() * cvPtr->image.elemSize()), (ros::Time::now()-start_db).toSec());
-    start_db = ros::Time::now();
-//    auto filename2 = std::string("/mnt/ram/miketest/driverdump/") + nodeName + "/" + std::to_string(now.toSec()) + ".jpg";
-//    cv::imwrite(filename2, cvPtr->image, compression_params);
-//    auto out = cv::imread(filename, cv::IMREAD_UNCHANGED);
-//    ROS_INFO("read     %ld in %2.3f ", (long int)(out.total() * out.elemSize()), (ros::Time::now()-start_db).toSec());
+    ROS_INFO("dumped   %ld in %2.3f ", (long int)(cvPtr->image.total() * cvPtr->image.elemSize()),
+             duration<double>(steady_clock::now() - start_db).count());
     return filename;
-
-//    return cvPtr->toImageMsg();
 }
 
 
 class CameraTimeSync {
 public:
-    static ros::Time timestampToRos(uint32_t timehi, uint32_t timelo) {
+    static rclcpp::Time timestampToRos(uint32_t timehi, uint32_t timelo) {
         return timestampToRos(timehi, timelo, 1000000000);
     }
-    static ros::Time timestampToRos(uint32_t timehi, uint32_t timelo, uint32_t freq) {
+    static rclcpp::Time timestampToRos(uint32_t timehi, uint32_t timelo, uint32_t freq) {
         uint64_t utime = ((uint64_t )timehi) << 32;
         utime = utime + (uint64_t )timelo;
         double dtime = double (utime) / (double) freq;
-//        double dtime = (double)(((uint64_t )timehi) << 32);
-        return ros::Time{dtime};
+        return rclcpp::Time{(int64_t)(dtime * 1e9), RCL_ROS_TIME};
     }
-};
-
-class DriverHandlerOpts {
-public:
-    DriverHandlerOpts(int rawImageCVMatType)
-    :
-    rawImageCVMatType{rawImageCVMatType}
-    {}
-    int rawImageCVMatType;
-    std::string output_topic_raw;
 };
 
 
@@ -150,57 +121,10 @@ void signalHandler( int signum ) {
     G_SIGINT_TRIGGERED = true;
 }
 
-
-/** Rescale the image pixel values according to a specified temperature range.
- * Will set the output range approximately such that
- * minTempK ~= min(dst) = -N-sigma and maxTempK ~= max(dst) = +N-sigma
- * Note: the A6750 in mono16/temp10mK mode has min/max values of 0/65535, even though the average is ~30000.
- * This prevents naive approach to min-max-scaling. We want the lower / bounds on the histogram (+/- N-sigma).
- *  # in progress! #
- *
- * @param src       - input matrix
- * @param dest      - destination matrix
- * @param minTempK  - expected min temperature, in Kelvin
- * @param maxTempK  - expected max temperature, in Kelvin
- * @param rtype     - output matrix data type
- * @param nSigma     - lower/upper threshold.
- */
-void rerange_temp(cv::Mat src, cv::Mat dest, double minTempK=273, double maxTempK=303, int rtype=CV_16UC1,
-                    double nSigma=3.0) {
-    double imax;
-    if (rtype == CV_16UC1) {
-        imax = 65535;
-    } else if (rtype == CV_8UC1) {
-        imax = 255;
-    } else {
-        ROS_WARN("Unsupported matrix data type. Falling back to mono8");
-        imax = 255;
-        rtype = CV_8UC1;
-    }
-    double mean, minVal, maxVal;
-    double countRange = (maxTempK - minTempK) / 0.01; // adjust for 10mK/count
-    double scaler = 4; //imax / countRange / 2.0f;
-    cv::Scalar tmp;
-    cv::minMaxLoc(src, &minVal, &maxVal);
-    tmp = cv::mean(src);
-    mean = tmp.val[0];
-    ROS_WARN("Input Min/Max/Mean: %.1f %.1f %.1f", minVal, maxVal, mean);
-    cv::Scalar tmpx = cv::mean(src);
-    mean = (float) tmpx.val[0];
-    cv::Mat srcD(src.rows, src.cols, CV_32FC1);
-    src.convertTo(srcD, CV_32FC1);
-//    srcD -= mean/2.0;
-    srcD *= 0.01; // Convert to Kelvin
-    srcD -= 273.15; // Convert to C
-    cv::minMaxLoc(srcD, &minVal, &maxVal);
-    tmp = cv::mean(srcD);
-    mean = tmp.val[0];
-    ROS_WARN("Celcius Min/Max/Mean: %.1f %.1f %.1f", minVal, maxVal, mean);
-    srcD.convertTo(dest, CV_16UC1, 1500.); // rescale into 16 bit range
-    cv::minMaxLoc(dest, &minVal, &maxVal);
-    tmp = cv::mean(dest);
-    mean = tmp.val[0];
-    ROS_WARN("Output Min/Max/Mean: %.1f %.1f %.1f", minVal, maxVal, mean);
+void cb_request_shutdown(std_msgs::msg::Int8 const &msg) {
+    ROS_INFO("Requesting clean shutdown: %d", msg.data);
+    G_SIGINT_TRIGGERED = true;
+    rclcpp::shutdown();
 }
 
 
@@ -227,6 +151,7 @@ struct NodeSettings {
     uint32_t uint_cam_ip_addr = 0;
     CameraIdentifier camera_id;
 
+    rclcpp::Node::SharedPtr node_;
     std::shared_ptr<RedisEnvoy>         envoy_;
 
     /** XML Feature settings parameters
@@ -252,11 +177,11 @@ struct NodeSettings {
             output_image_crop_bot_row;
 
     std::string frame_id;                       // Frame ID string to set in output messages.
-    ros::Subscriber brightness_sub;             // handle to subscriber
-    ros::Subscriber event_sub;                  // handle to gps events
-    ros::Subscriber shutdown_sub;                  // sub for clean shutdown
-    ros::Publisher  stat_pub;                  // handle to tracing stat
-    ros::Publisher  errstat_pub;                  // handle to error tracing
+    rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr brightness_sub;   // handle to subscriber
+    rclcpp::Subscription<custom_msgs::msg::GsofEvt>::SharedPtr event_sub;   // handle to gps events
+    rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr shutdown_sub;      // sub for clean shutdown
+    rclcpp::Publisher<custom_msgs::msg::Stat>::SharedPtr stat_pub;          // handle to tracing stat
+    rclcpp::Publisher<custom_msgs::msg::Stat>::SharedPtr errstat_pub;       // handle to error tracing
     std::string output_topic_raw;               // Name of topic to output raw image to.
     float output_frame_rate;                    // Output frame-rate (hz).
     std::string output_topic_debayer;           // Topic to output debayered image to.
@@ -265,17 +190,17 @@ struct NodeSettings {
     std::string rawImageCVEncoding;
     int rawImageCVMatType;
 
-    std_msgs::Header last_published_; // Last header which was successfully published
-    custom_msgs::GSOF_EVT event_;     // store the last received event
+    std_msgs::msg::Header last_published_; // Last header which was successfully published
+    custom_msgs::msg::GsofEvt event_;     // store the last received event
 
     /**
-     * Construct settings from a node handle (usually the private handle).
+     * Construct settings from the node.
      *
      * \throws ConfigurationError Failed extracting setting values appropriately.
      */
-    NodeSettings(ros::NodeHandle const &nh) {
+    NodeSettings(rclcpp::Node::SharedPtr node) : node_{node} {
         bool failed(false);
-        int tmp_int;
+        rclcpp::Node &nh = *node;
 
         G_INFO_VERBOSITY = static_cast<UINT8>( parse_pos_int(nh, "info_verbosity", failed, 0) );
         ROS_INFO("Info Verbosity set to %d", G_INFO_VERBOSITY);
@@ -299,11 +224,11 @@ struct NodeSettings {
         rawImageCVEncoding = FirmModeToCVEnc[firmwareMode];
         rawImageCVMatType = FirmModeToCVMat[firmwareMode];
 
-        nh.param("camera_username", camera_id.username, std::string());
-        nh.param("camera_manufacturer", camera_id.manufacturer, std::string());
-        nh.param("camera_ip_addr", camera_id.ip_addr, std::string());
-        nh.param("camera_serial", camera_id.serial, std::string());
-        nh.param("camera_mac", camera_id.mac, std::string());
+        camera_id.username = nh.declare_parameter("camera_username", std::string());
+        camera_id.manufacturer = nh.declare_parameter("camera_manufacturer", std::string());
+        camera_id.ip_addr = nh.declare_parameter("camera_ip_addr", std::string());
+        camera_id.serial = nh.declare_parameter("camera_serial", std::string());
+        camera_id.mac = nh.declare_parameter("camera_mac", std::string());
 
         if (G_INFO_VERBOSITY >= 2) { print_camera_id(camera_id); }
 
@@ -323,20 +248,19 @@ struct NodeSettings {
         }
 
         // Optional path to an XML settings file to load and use.
-        nh.param("xmlFeatures_filepath", xmlFeatures_filepath, std::string());
+        xmlFeatures_filepath = nh.declare_parameter("xmlFeatures_filepath", std::string());
 
-        nh.param("xmlFeatures_autoBrightness", xmlFeatures_autoBrightness, false);
-        nh.param("xmlFeatures_autoBrightnessTarget", tmp_int, 128);
-        xmlFeatures_autoBrightnessTarget = tmp_int;
+        xmlFeatures_autoBrightness = nh.declare_parameter("xmlFeatures_autoBrightness", false);
+        xmlFeatures_autoBrightnessTarget = nh.declare_parameter("xmlFeatures_autoBrightnessTarget", 128);
         // 0 - Off, 1 - On Demand, 2 - Periodic
-        nh.param("xmlFeatures_BalanceWhiteAuto", xmlFeatures_BalanceWhiteAuto, 0);
+        xmlFeatures_BalanceWhiteAuto = nh.declare_parameter("xmlFeatures_BalanceWhiteAuto", 0);
 
         imageTransfer_numImageBuffers = static_cast<UINT32>( parse_pos_int(nh, "imageTransfer_numImageBuffers", failed) );
         nextImage_timeout = static_cast<UINT32>( parse_pos_int(nh, "nextImage_timeout", failed) );
         output_frame_rate = parse_pos_float(nh, "output_frame_rate", failed);
 
-        nh.param("output_image_crop_top_row", output_image_crop_top_row, -1);
-        nh.param("output_image_crop_bot_row", output_image_crop_bot_row, -1);
+        output_image_crop_top_row = nh.declare_parameter("output_image_crop_top_row", -1);
+        output_image_crop_bot_row = nh.declare_parameter("output_image_crop_bot_row", -1);
         if (output_image_crop_bot_row >= 0 &&
             output_image_crop_bot_row <= output_image_crop_top_row) {
             failed = true;
@@ -344,17 +268,19 @@ struct NodeSettings {
                       output_image_crop_bot_row, output_image_crop_top_row);
         }
 
-        if (!nh.getParam("frame_id", frame_id)) {
+        frame_id = nh.declare_parameter("frame_id", std::string());
+        if (frame_id.empty()) {
             failed = true;
             ROS_ERROR("No frame ID provided!");
         }
-        if (!nh.getParam("output_topic_raw", output_topic_raw)) {
+        output_topic_raw = nh.declare_parameter("output_topic_raw", std::string());
+        if (output_topic_raw.empty()) {
             failed = true;
             ROS_ERROR("No output topic string provided");
         }
         // Debayer output is optional
         // - Debayering is undefined if the firmware is not set to bayer mode.
-        nh.param("output_topic_debayer", output_topic_debayer, std::string());
+        output_topic_debayer = nh.declare_parameter("output_topic_debayer", std::string());
         if (output_topic_debayer.size() > 0
             && firmware_mode != FirmwareMode::Bayer) {
             failed = true;
@@ -420,7 +346,7 @@ struct NodeSettings {
      * @param width Pixel width of the image to crop.
      * @roi Output cv::Rect to set the crop ROI to.
      */
-    cv::Rect makeRoi(int height, int width, cv::Rect &roi) {
+    void makeRoi(int height, int width, cv::Rect &roi) {
         roi.x = 0;
         roi.y = 0;
         roi.width = width;
@@ -471,24 +397,6 @@ struct NodeSettings {
      * @param[out] cam_opts Camera options structure to set values to.
      */
     void set_camera_options(GEV_CAMERA_OPTIONS &cam_opts) {
-        /**
-         typedef struct
-         {                                      // Defaults:
-               UINT32 numRetries;               // 3
-               UINT32 command_timeout_ms;       // 2000
-               UINT32 heartbeat_timeout_ms;     // 10000
-               UINT32 streamPktSize;            // algorithmic
-               UINT32 streamPktDelay;           // 0
-               UINT32 streamNumFramesBuffered;  // 4
-               UINT32 streamMemoryLimitMax;     // ???
-               UINT32 streamMaxPacketResends;   // 100
-               UINT32 streamFrame_timeout_ms;   // 1000
-               INT32  streamThreadAffinity;     // -1
-               INT32  serverThreadAffinity;     // -1
-               UINT32 msgChannel_timeout_ms;    // 1000
-         } GEV_CAMERA_OPTIONS, *PGEV_CAMERA_OPTIONS;
-         */
-
         /** Transferring values from example/previous driver.
          * The following states there is 32MB of onboard memory for acquisitions:
          * http://info.teledynedalsa.com/acton/attachment/14932/f-054e/1/-/-/l-0042/l-0042/Genie%20Nano%20Series%20User%20Manual.pdf
@@ -537,17 +445,6 @@ struct NodeSettings {
         // Global GenApi exception handling
         UINT16 genapi_exception_status(0);
         try {
-            GenApi::CFloatPtr float_node_ptr;
-            GenApi::CIntegerPtr int_node_ptr;
-            GenApi::CEnumerationPtr enum_node_ptr;
-
-            /** Auto-brightness, AB target, and AWB not currently used */
-//            push_node_ptr(feature_node_map_ptr, "autoBrightnessMode", (int) xmlFeatures_autoBrightness);
-//            push_node_ptr(feature_node_map_ptr, "autoBrightnessTarget", ((int) xmlFeatures_autoBrightnessTarget) & 0xff);
-//            push_node_ptr(feature_node_map_ptr, "BalanceWhiteAuto", (int) xmlFeatures_BalanceWhiteAuto);
-//            push_node_ptr(feature_node_map_ptr, "autoBrightnessAlgoConvergenceTime", (float) 15.0);
-
-
             /** Set the GenICam camera parameters. See `docs/devices/genicam.rst` for more info
              * TriggerMode = { FreeRun, TriggeredFreeRun, TriggeredSequence, TriggeredPresetAdvance }
              * TriggerSelector not used by A6750
@@ -557,7 +454,6 @@ struct NodeSettings {
              * */
             if (camType == "6750") {
                 push_node_ptr(feature_node_map_ptr, "TriggerMode", "FreeRun");
-//            push_node_ptr(feature_node_map_ptr, "TriggerSelector", "FrameStart");
                 push_node_ptr(feature_node_map_ptr, "TriggerSource", triggerSource);
 
                 push_node_ptr(feature_node_map_ptr, "FrameSyncSource", frameSyncSource);
@@ -586,7 +482,7 @@ struct NodeSettings {
     // ROS Subscriber callback methods.
 
     /** Accepts a message of expected type. */
-    void update_autobrightness(const std_msgs::UInt8 &msg) {
+    void update_autobrightness(const std_msgs::msg::UInt8 &msg) {
         xmlFeatures_autoBrightnessTarget = msg.data;
         ROS_INFO_STREAM("Received new brightness target: " << xmlFeatures_autoBrightnessTarget);
 
@@ -595,31 +491,37 @@ struct NodeSettings {
     }
 
     /** Set listener callbacks for this node. */
-    void set_callback(ros::NodeHandle &nh) {
+    void set_callback(rclcpp::Node::SharedPtr nh) {
         // Setup listener for camera_brightness topic
-        brightness_sub  = nh.subscribe(std::string("camera_brightness"), 1, &NodeSettings::update_autobrightness, this);
-        event_sub       = nh.subscribe(std::string("/event"), 5, &NodeSettings::eventCallback, this);
-        shutdown_sub    = nh.subscribe("/shutdown", 1, cb_request_shutdown);
-        stat_pub        = nh.advertise<custom_msgs::Stat>(std::string("/stat"), 5);
-        errstat_pub        = nh.advertise<custom_msgs::Stat>(std::string("/errstat"), 5);
+        brightness_sub = nh->create_subscription<std_msgs::msg::UInt8>(
+            "camera_brightness", 1,
+            [this](const std_msgs::msg::UInt8::ConstSharedPtr msg) { update_autobrightness(*msg); });
+        event_sub = nh->create_subscription<custom_msgs::msg::GsofEvt>(
+            "/event", 5,
+            [this](const custom_msgs::msg::GsofEvt::ConstSharedPtr msg) { eventCallback(msg); });
+        shutdown_sub = nh->create_subscription<std_msgs::msg::Int8>(
+            "/shutdown", 1,
+            [](const std_msgs::msg::Int8::ConstSharedPtr msg) { cb_request_shutdown(*msg); });
+        stat_pub = nh->create_publisher<custom_msgs::msg::Stat>("/stat", 5);
+        errstat_pub = nh->create_publisher<custom_msgs::msg::Stat>("/errstat", 5);
 
     }
 
 
-    void eventCallback (const custom_msgs::GSOF_EVTConstPtr& msg)
+    void eventCallback (const custom_msgs::msg::GsofEvt::ConstSharedPtr& msg)
     {
-        ROS_INFO("<^> eventCallback <>         %2.2f", msg->gps_time.toSec());
+        ROS_INFO("<^> eventCallback <>         %2.2f", rclcpp::Time(msg->gps_time).seconds());
         event_ = *msg;
-        auto nodeName = ros::this_node::getName();
-        custom_msgs::Stat stat_msg;
+        auto nodeName = std::string(node_->get_name());
+        custom_msgs::msg::Stat stat_msg;
         std::stringstream link;
-        stat_msg.header.stamp = ros::Time::now();
+        stat_msg.header.stamp = node_->now();
         stat_msg.trace_header = (*msg).header;
         stat_msg.trace_topic = nodeName + "/eventCallback";
         stat_msg.node = nodeName;
-        link << nodeName << "/event/" << event_.header.seq; // link this trace to the event trace
+        link << nodeName << "/event/" << event_.event_num; // link this trace to the event trace
         stat_msg.link = link.str();
-        stat_pub.publish(stat_msg);
+        stat_pub->publish(stat_msg);
         trigger.fire_cond();
     }
 
@@ -627,115 +529,118 @@ struct NodeSettings {
 
 class CamParamHandler {
 public:
-    CamParamHandler(ros::NodeHandlePtr nhp, GEV_CAMERA_HANDLE camera_handle, const boost::shared_ptr<NodeSettings> settings)
+    CamParamHandler(rclcpp::Node::SharedPtr nhp, GEV_CAMERA_HANDLE camera_handle, const std::shared_ptr<NodeSettings> settings)
     :
+    settings{settings},
     nhp_{nhp},
-    camera_handle_{camera_handle},
-    settings{settings} {
+    camera_handle_{camera_handle} {
         genapi_ = std::make_shared<GenApiConnector>(camera_handle_);
-        get_camera_attr_srv_ = nhp_->advertiseService("get_camera_attr", &CamParamHandler::getCameraAttr, this);
-        set_camera_attr_srv_ = nhp_->advertiseService("set_camera_attr", &CamParamHandler::setCameraAttr, this);
-        get_attr_list_srv_   = nhp->advertiseService("get_attr_list", &CamParamHandler::getAttrList, this);
-
-        nuc_srv_             = nhp_->advertiseService("nuc", &CamParamHandler::nuc, this);
+        get_camera_attr_srv_ = nhp_->create_service<custom_msgs::srv::CamGetAttr>(
+            "get_camera_attr",
+            [this](const std::shared_ptr<custom_msgs::srv::CamGetAttr::Request> req,
+                   std::shared_ptr<custom_msgs::srv::CamGetAttr::Response> rsp) { getCameraAttr(req, rsp); });
+        set_camera_attr_srv_ = nhp_->create_service<custom_msgs::srv::CamSetAttr>(
+            "set_camera_attr",
+            [this](const std::shared_ptr<custom_msgs::srv::CamSetAttr::Request> req,
+                   std::shared_ptr<custom_msgs::srv::CamSetAttr::Response> rsp) { setCameraAttr(req, rsp); });
+        get_attr_list_srv_ = nhp_->create_service<custom_msgs::srv::StrList>(
+            "get_attr_list",
+            [this](const std::shared_ptr<custom_msgs::srv::StrList::Request> req,
+                   std::shared_ptr<custom_msgs::srv::StrList::Response> rsp) { getAttrList(req, rsp); });
+        nuc_srv_ = nhp_->create_service<custom_msgs::srv::CamSetAttr>(
+            "nuc",
+            [this](const std::shared_ptr<custom_msgs::srv::CamSetAttr::Request> req,
+                   std::shared_ptr<custom_msgs::srv::CamSetAttr::Response> rsp) { nuc(req, rsp); });
     }
 
-    bool getCameraAttr(custom_msgs::CamGetAttrRequest &req, custom_msgs::CamGetAttrResponse &rsp) {
-        ROS_INFO("<API> getCameraAttr(%s)", req.name.c_str());
-        bool stat{false};
-        int feature_type;
+    void getCameraAttr(const std::shared_ptr<custom_msgs::srv::CamGetAttr::Request> req,
+                       std::shared_ptr<custom_msgs::srv::CamGetAttr::Response> rsp) {
+        ROS_INFO("<API> getCameraAttr(%s)", req->name.c_str());
+        int feature_type = 0;
         try {
-            stat = genapi_->getCamAttr(req.name, rsp.value, &feature_type);
+            genapi_->getCamAttr(req->name, rsp->value, &feature_type);
         }
         catch (std::exception &e) {
-            rsp.value = "error:" + std::string(e.what());
+            rsp->value = "error:" + std::string(e.what());
         }
-        ROS_INFO("<API ON GET> %s[%d]: %s.", req.name.c_str(), feature_type, rsp.value.c_str());
-        return stat;
+        ROS_INFO("<API ON GET> %s[%d]: %s.", req->name.c_str(), feature_type, rsp->value.c_str());
     }
 
-    bool setCameraAttr(custom_msgs::CamSetAttrRequest &req, custom_msgs::CamSetAttrResponse &rsp) {
-        ROS_INFO("<API> setCameraAttr(%s)", req.name.c_str());
-        ROS_INFO("<API> setCameraVal(%s)", req.value.c_str());
-        if (! is_number(req.value) ) {
+    void setCameraAttr(const std::shared_ptr<custom_msgs::srv::CamSetAttr::Request> req,
+                       std::shared_ptr<custom_msgs::srv::CamSetAttr::Response> rsp) {
+        ROS_INFO("<API> setCameraAttr(%s)", req->name.c_str());
+        ROS_INFO("<API> setCameraVal(%s)", req->value.c_str());
+        if (! is_number(req->value) ) {
             std::string error = "Invalid value for attribute, must be a number.";
-            ROS_ERROR(error.c_str());
-            rsp.value = error;
-            return false;
+            ROS_ERROR("%s", error.c_str());
+            rsp->value = error;
+            return;
         }
-	    std::string tmp;
-	    int feature_type;
-	    bool success = genapi_->getCamAttr(req.name, tmp, &feature_type);
-	    if (!success) {
-	        ROS_ERROR("Camera Attribute %s does not exist.", req.name.c_str());
-	        return false;
-	    }
-	    ROS_INFO("<API BEFORE SET> %s[%d]: %s.", req.name.c_str(), feature_type, tmp.c_str());
-	    bool stat = genapi_->setCamAttr(req.name, req.value, tmp);
-	    genapi_->getCamAttr(req.name, rsp.value, &feature_type);
-	    ROS_INFO("<API AFTER SET> %s[%d]: %s.", req.name.c_str(), feature_type, rsp.value.c_str());
-	    return stat;
+        std::string tmp;
+        int feature_type = 0;
+        bool success = genapi_->getCamAttr(req->name, tmp, &feature_type);
+        if (!success) {
+            ROS_ERROR("Camera Attribute %s does not exist.", req->name.c_str());
+            return;
+        }
+        ROS_INFO("<API BEFORE SET> %s[%d]: %s.", req->name.c_str(), feature_type, tmp.c_str());
+        genapi_->setCamAttr(req->name, req->value, tmp);
+        genapi_->getCamAttr(req->name, rsp->value, &feature_type);
+        ROS_INFO("<API AFTER SET> %s[%d]: %s.", req->name.c_str(), feature_type, rsp->value.c_str());
     }
 
-    bool getAttrList(custom_msgs::StrListRequest &req, custom_msgs::StrListResponse &rsp) {
+    void getAttrList(const std::shared_ptr<custom_msgs::srv::StrList::Request> req,
+                     std::shared_ptr<custom_msgs::srv::StrList::Response> rsp) {
+        (void) req;
         std::vector<std::string> paramList;
-        bool status = get_attr_list(camera_handle_, paramList);
+        get_attr_list(camera_handle_, paramList);
         if (!paramList.size()) {
             ROS_ERROR("failed to populate param list");
-            return false;
+            return;
         }
-        for (int i = 0; i < paramList.size(); i++) {
-            rsp.values.push_back(paramList[i]);
+        for (size_t i = 0; i < paramList.size(); i++) {
+            rsp->values.push_back(paramList[i]);
         }
-        return true;
     }
 
-   bool nuc(custom_msgs::CamSetAttrRequest &req, custom_msgs::CamSetAttrResponse &rsp) {
-//        return genapi_->tryNuc();
-        /* This always seems to report 1, so can't use as a method
-        std::string tmp;
-        int feature_type;
-        genapi_->getCamAttr("CorrectionAutoInProgress", tmp, &feature_type);
-        int status = std::stoi(tmp);
-        if ( status != 1 ) {
-            ROS_ERROR("Correction already in progress, aborting.");
-	    rsp.value = "ERROR";
-            return false;
-        }*/
+    void nuc(const std::shared_ptr<custom_msgs::srv::CamSetAttr::Request> req,
+             std::shared_ptr<custom_msgs::srv::CamSetAttr::Response> rsp) {
+        (void) req;
         ROS_INFO("Initiating a camera NUC via service call.");
-        rsp.value = tryNucCam(camera_handle_);
-        return true;
+        rsp->value = tryNucCam(camera_handle_) ? "OK" : "ERROR";
     }
         private:
-    const boost::shared_ptr<NodeSettings> settings;
-    ros::NodeHandlePtr nhp_;
+    const std::shared_ptr<NodeSettings> settings;
+    rclcpp::Node::SharedPtr nhp_;
     GEV_CAMERA_HANDLE camera_handle_ = NULL;  // void* type
     std::shared_ptr<GenApiConnector> genapi_;
 
-    ros::ServiceServer                  get_camera_attr_srv_;
-    ros::ServiceServer                  set_camera_attr_srv_;
-    ros::ServiceServer                  get_attr_list_srv_;
-    ros::ServiceServer                  nuc_srv_;
+    rclcpp::Service<custom_msgs::srv::CamGetAttr>::SharedPtr get_camera_attr_srv_;
+    rclcpp::Service<custom_msgs::srv::CamSetAttr>::SharedPtr set_camera_attr_srv_;
+    rclcpp::Service<custom_msgs::srv::StrList>::SharedPtr    get_attr_list_srv_;
+    rclcpp::Service<custom_msgs::srv::CamSetAttr>::SharedPtr nuc_srv_;
 };
 
 /**
  * */
 class EventHandler {
 public:
-    EventHandler(ros::NodeHandlePtr nhp, GEV_CAMERA_HANDLE camera_handle, CameraImageInfo cam_image_info,
-                 const boost::shared_ptr<NodeSettings> settings, std::shared_ptr<GenApiConnector> genapi) :
-            nhp_{nhp},
+    EventHandler(rclcpp::Node::SharedPtr nhp, GEV_CAMERA_HANDLE camera_handle, CameraImageInfo cam_image_info,
+                 const std::shared_ptr<NodeSettings> settings, std::shared_ptr<GenApiConnector> genapi) :
             camera_handle{camera_handle}, cam_image_info{cam_image_info},
-            settings{settings},
             genapi_{genapi},
+            settings{settings},
+            nhp_{nhp},
             xport{nhp, settings->output_topic_raw} {
-        postprocSub = nhp->subscribe(settings->output_topic_raw, 10,
-                                     &EventHandler::postProcessImage, this, ros::TransportHints().reliable());
-        watchdog.setFailCallback([camera_handle](ros::TimerEvent const &e) {
+        postprocSub = nhp->create_subscription<sensor_msgs::msg::Image>(
+            settings->output_topic_raw, 10,
+            [this](const sensor_msgs::msg::Image::SharedPtr msg) { postProcessImage(msg); });
+        watchdog.setFailCallback([camera_handle]() {
             ROS_ERROR("Failed health check, attempting to safely shut down camera");
             safe_exit(13, camera_handle);
         });
         watchdog.pet(); // initial pet to give it a head start to avoid crib death.
+        init();
     }
 
 
@@ -744,50 +649,42 @@ public:
      * if events aren't being received, we ought to be able to trigger off of the event itself
      * @param msg Event message received
      */
-    void eventCallback(const custom_msgs::GSOF_EVTConstPtr& msg) {
+    void eventCallback(const custom_msgs::msg::GsofEvt::ConstSharedPtr& msg) {
         {
             std::lock_guard<std::mutex> lck(event_mutex);
-            t_event_received_ = ros::Time::now();
+            t_event_received_ = nhp_->now();
             event_ = *msg;
-            event_cache.push_back(msg->sys_time, msg);
+            event_cache.push_back(rclcpp::Time(msg->sys_time), msg);
             event_cache.purge();
             event_cache.show();
         }
-        ROS_INFO("%2.4f <> eventCallback <> ", msg->gps_time.toSec());
-//        if (synced) {
-//            fetchImage(ros::Time{});
-//        }
-//        bool ok = checkSync();
+        ROS_INFO("%2.4f <> eventCallback <> ", rclcpp::Time(msg->gps_time).seconds());
         processImages();
 
     }
 
 
-    void fetchImageRecurrent(const ros::TimerEvent &e) {
+    void fetchLoop() {
         ROS_INFO("fetch loop");
-        fetchImage(ros::Time{});
-//        checkSync();
-        if (running && ros::ok()) {
-            fetchTimer_ = nhp_->createTimer(ros::Duration(0.001),
-                                            &EventHandler::fetchImageRecurrent, this, true, true);
+        while (running && rclcpp::ok() && !G_SIGINT_TRIGGERED) {
+            fetchImage();
         }
-
     }
-    void fetchImage(const ros::Time &eventTime) {
-        GEV_BUFFER_OBJECT *img_buff_obj_ptr;                    // Also the same stuct as GEVBUF_ENTRY and GEVBUF_HEADER        ROS_INFO("<> eventCallback <>         %2.2f", msg->header.stamp.toSec());
+
+    void fetchImage() {
+        GEV_BUFFER_OBJECT *img_buff_obj_ptr;                    // Also the same stuct as GEVBUF_ENTRY and GEVBUF_HEADER
 
         /// timeout is ms
         std::lock_guard<std::mutex> lck(buffer_mutex);
 
         GEV_STATUS call_status = GevWaitForNextImage(camera_handle, &img_buff_obj_ptr, 10000);
-        ros::Time t_image_received = ros::Time::now(); // maybe
+        rclcpp::Time t_image_received = nhp_->now(); // maybe
 
-    	auto nodeName = ros::this_node::getName();
-    	custom_msgs::Stat stat_msg;
-    	stat_msg.header.stamp = ros::Time::now();
-    	stat_msg.trace_header = std_msgs::Header();
-    	stat_msg.trace_topic = nodeName + "/publishImage";
-    	stat_msg.node = nodeName;
+        auto nodeName = std::string(nhp_->get_name());
+        custom_msgs::msg::Stat stat_msg;
+        stat_msg.trace_header = std_msgs::msg::Header();
+        stat_msg.trace_topic = nodeName + "/publishImage";
+        stat_msg.node = nodeName;
         stat_msg.header.stamp = t_image_received;
         stat_msg.trace_header.stamp = t_image_received;
 
@@ -800,7 +697,7 @@ public:
 
         if (img_buff_obj_ptr) {
             t_image_received_ = t_image_received;
-            ROS_INFO("%2.4f Got image", t_image_received.toSec());
+            ROS_INFO("%2.4f Got image", t_image_received.seconds());
         } else {
             ROS_WARN("null image pointer");
             return endOfTurn(img_buff_obj_ptr);
@@ -808,17 +705,15 @@ public:
 
         if (validate_image(img_buff_obj_ptr, &cam_image_info)) {
 
-//            ROS_INFO("image good");
-            ros::Time camTime = CameraTimeSync::timestampToRos(img_buff_obj_ptr->timestamp_hi,
-                                                               img_buff_obj_ptr->timestamp_lo);
+            rclcpp::Time camTime = CameraTimeSync::timestampToRos(img_buff_obj_ptr->timestamp_hi,
+                                                                  img_buff_obj_ptr->timestamp_lo);
             ROS_INFO2("Received image with ID %d (%d x %d) ", img_buff_obj_ptr->id, img_buff_obj_ptr->w, img_buff_obj_ptr->h );
 
             // Check if we're NUCing, and flag as such
-            bool stat{false};
-            int feature_type;
+            int feature_type = 0;
             std::string rsp;
             try {
-                stat = genapi_->getCamAttr("CorrectionAutoInProgress", rsp, &feature_type);
+                genapi_->getCamAttr("CorrectionAutoInProgress", rsp, &feature_type);
             }
             catch (std::exception &e) {
                 rsp = "error:" + std::string(e.what());
@@ -828,15 +723,14 @@ public:
 
             std::string msg;
             msg.resize(128);
-            sprintf(&msg[0], R"({"cam": %f, "recv": %f, "hi": %u, "lo": %u})",
-                    camTime.toSec(), t_image_received.toSec(), img_buff_obj_ptr->timestamp_hi, img_buff_obj_ptr->timestamp_lo);
+            snprintf(&msg[0], msg.size(), R"({"cam": %f, "recv": %f, "hi": %u, "lo": %u})",
+                    camTime.seconds(), t_image_received.seconds(), img_buff_obj_ptr->timestamp_hi, img_buff_obj_ptr->timestamp_lo);
             std::cout << msg << "," << std::endl;
             {
                 cv::Mat raw_image(img_buff_obj_ptr->h, img_buff_obj_ptr->w,
                                   settings->rawImageCVMatType,
                                   img_buff_obj_ptr->address);
                 cv_bridge::CvImagePtr cv_ptr(new cv_bridge::CvImage);
-//        cv_ptr->header.frame_id = this_frame_id.str();
                 cv_ptr->encoding = settings->rawImageCVEncoding;
                 cv_ptr->image = raw_image;
                 cv_ptr->header.frame_id = "?nucing=" + std::string(rsp.c_str());
@@ -852,62 +746,54 @@ public:
                     ROS_INFO("Cropped top row, new: (%d x %d)", cv_ptr->image.cols, cv_ptr->image.rows);
                 }
 
-                std::cout << "!> cv_ptr: type: " << settings->rawImageCVMatType << cv_ptr->header << std::endl;
-                std::cout << "!> img: dims:" << raw_image.dims << " size: "<<  raw_image.size
-                          << " step: "<<  raw_image.step << " rows: "<<  raw_image.rows << " cols: "<<  raw_image.cols
-                          << " type: "<<  raw_image.type() << std::endl;
                 auto imgp = cv_ptr->toImageMsg();
                 ROS_INFO("success at making image message");
 
                 std::string link = "/" + nodeName + "/event/NA"; // link this trace to the event trace
-                stat_msg.trace_header.seq = 0;
                 stat_msg.link = link;
                 stat_msg.note = "success";
 
                 image_map.emplace(t_image_received, imgp);
             }
-//            cv::Mat raw_image(img_buff_obj_ptr->h, img_buff_obj_ptr->w,
-//                              opts.rawImageCVMatType,
-//                              img_buff_obj_ptr->address);
 
             processImages();
         } else {
             stat_msg.note = "failure";
-	    }
+        }
         // Publish status msg, FPS is tracked from this in UI
-        settings->stat_pub.publish(stat_msg);
+        settings->stat_pub->publish(stat_msg);
 
         endOfTurn(img_buff_obj_ptr);
     }
     void start() {
         running = true;
-        fetchTimer_ = nhp_->createTimer(ros::Duration(0.001),
-                                        &EventHandler::fetchImageRecurrent, this, true, true);
+        fetch_thread_ = std::thread([this]() { fetchLoop(); });
     }
 
     void stop() {
         running = false;
+        if (fetch_thread_.joinable()) {
+            fetch_thread_.join();
+        }
     }
 
     void shutdown() {
         ROS_WARN("Shutting down the event handler");
         stop();
-        event_sub.shutdown();
+        event_sub.reset();
     }
 
     void processImages() {
-//        image_map.
-//        auto test = cam_image_info;
         std::lock_guard<std::mutex> lck(event_mutex);
-        ros::Time evt_key;
-        ros::Time img_key;
+        rclcpp::Time img_key;
         bool hit = false;
-        std_msgs::Header gps_header;
+        std_msgs::msg::Header gps_header;
+        uint64_t event_num = 0;
         for ( const auto pair: image_map ) {
             // iterate through every image in the map to find
             // nearest event to image received
-            bool success = event_cache.search(pair.first, gps_header);
-            if (success == 1) {
+            bool success = event_cache.search(pair.first, gps_header, event_num);
+            if (success) {
                 // found a hit
                 img_key = pair.first;
                 hit = true;
@@ -920,13 +806,14 @@ public:
 
         std::stringstream this_frame_id;
         this_frame_id << settings->frame_id;
-        sensor_msgs::ImagePtr img = image_map[img_key];
+        sensor_msgs::msg::Image::SharedPtr img = image_map[img_key];
 
-        this_frame_id << "?lock=1&eventNum=" << gps_header.seq << "&eventTime" << gps_header.stamp.toSec() << img->header.frame_id ;
-        ROS_INFO_STREAM("Timestamp: " << gps_header.stamp.toSec());
+        this_frame_id << "?lock=1&eventNum=" << event_num << "&eventTime"
+                      << rclcpp::Time(gps_header.stamp).seconds() << img->header.frame_id ;
+        ROS_INFO_STREAM("Timestamp: " << rclcpp::Time(gps_header.stamp).seconds());
         img->header = gps_header;
         img->header.frame_id = this_frame_id.str();
-        ROS_INFO(" !!! Found matching %2.4f %2.4f !!! ", gps_header.stamp.toSec(), img_key.toSec());
+        ROS_INFO(" !!! Found matching %2.4f %2.4f !!! ", rclcpp::Time(gps_header.stamp).seconds(), img_key.seconds());
         /// remove the image so we don't get confused later
         image_map.erase(img_key);
         ROS_INFO("Remaining evt %u img %lu ", event_cache.size(), image_map.size());
@@ -934,28 +821,27 @@ public:
         watchdog.pet();
     } // end process_img
 
-    void postProcessImage(const sensor_msgs::ImagePtr &msg) {
+    void postProcessImage(const sensor_msgs::msg::Image::SharedPtr &msg) {
         auto is_archiving = ArchiverHelper::get_is_archiving(settings->envoy_, "/sys/arch/is_archiving");
         if (!is_archiving) {
             return;
         }
         long int sec = msg->header.stamp.sec;
-        long int nsec = msg->header.stamp.nsec;
+        long int nsec = msg->header.stamp.nanosec;
         std::string filename = ArchiverHelper::generateFilename(settings->envoy_, arch_opts_, sec, nsec);
         auto filename_written = dumpImageMessage(msg, filename);
-        ROS_INFO("dumped #%d %s",msg->header.seq, filename_written.c_str());
+        ROS_INFO("dumped %s", filename_written.c_str());
     }
 
-    ros::Time timeLastEventReceived() {
-        ros::Time last;
+    rclcpp::Time timeLastEventReceived() {
+        rclcpp::Time last;
         {
             std::lock_guard<std::mutex> lck(event_mutex);
-//            last = event_.header.stamp();
             last = t_event_received_;
         }
         return last;
     }
-    ros::Time timeLastImageReceived() {
+    rclcpp::Time timeLastImageReceived() {
         std::lock_guard<std::mutex> lck(image_mutex);
         return t_image_received_;
     }
@@ -964,48 +850,47 @@ public:
     int rawImageCVMatType_;
     GEV_CAMERA_HANDLE camera_handle = NULL;  // void* type
     CameraImageInfo cam_image_info;
-    ros::Subscriber event_sub;
+    rclcpp::Subscription<custom_msgs::msg::GsofEvt>::SharedPtr event_sub;
     std::shared_ptr<GenApiConnector> genapi_;
 
 
 private:
     bool synced = false;
-    bool running = false;
-    const boost::shared_ptr<NodeSettings> settings;
-    custom_msgs::GSOF_EVT event_; /// todo: deprecated?
+    std::atomic<bool> running{false};
+    const std::shared_ptr<NodeSettings> settings;
+    custom_msgs::msg::GsofEvt event_; /// todo: deprecated?
     cv::Mat raw_image_;
     EventCache event_cache;
-    std::map<ros::Time, sensor_msgs::ImagePtr> image_map;
-    ros::Time t_event_received_;
-    ros::Time t_image_received_;
-    ros::NodeHandlePtr nhp_;
+    std::map<rclcpp::Time, sensor_msgs::msg::Image::SharedPtr> image_map;
+    rclcpp::Time t_event_received_;
+    rclcpp::Time t_image_received_;
+    rclcpp::Node::SharedPtr nhp_;
     Transporter xport;
     std::mutex event_mutex;
     std::mutex image_mutex;
     std::mutex buffer_mutex;
     Watchdog watchdog;
     ArchiverOpts                        arch_opts_ = ArchiverOpts::from_env();
-    ros::Subscriber postprocSub;             // handle to subscriber
-    ros::Timer fetchTimer_; /// kicks off image fetch async events
+    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr postprocSub;     // handle to subscriber
+    std::thread fetch_thread_;    /// runs blocking image fetch loop
 
-    //    GEV_BUFFER_OBJECT *img_buff_obj_ptr;                    // Also the same stuct as GEVBUF_ENTRY and GEVBUF_HEADER
     void init() {
         static double min_image_delay = 0.05;
         event_cache.set_delay(min_image_delay);
-        event_cache.set_tolerance(ros::Duration(0.49));
+        event_cache.set_tolerance(rclcpp::Duration::from_seconds(0.49));
     }
     void endOfTurn() {
 
         /// event/image messages are kept around for this amount of time, after that the expire
         /// which means they didn't get paired in the grace period
-        ros::Duration lookback_period{10.0};
-        ros::Time old = ros::Time::now() - lookback_period;
+        rclcpp::Duration lookback_period{10, 0};
+        rclcpp::Time old = nhp_->now() - lookback_period;
         int losses = 0;
         losses += purge_stale(image_map, old);
         for (auto i = 0; i < losses; i++ ) {
             watchdog.kick();
         }
-        if ( event_cache.size() > image_map.size() ) {
+        if ( event_cache.size() > (int) image_map.size() ) {
             int diff = event_cache.size() - image_map.size();
             for (int i = 0; i < diff; ++i) {
                 watchdog.kick();
@@ -1026,27 +911,27 @@ private:
 int main(int argc, char **argv) {
     /** Setup signal handler to kick out of run loop for a clean shutdown.
  -- Initializing before GEV stuff in order to be sure we don't interrupt
-    communication to the hardware in case something goes wrong.
- -- We are not calling ros::shutdown() here so as to keep logging
-    functional throughout the exit process.
-     update: it seems with the new async stuff, roslaunch just isn't propagating signals properly
-     */
+    communication to the hardware in case something goes wrong. */
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
 
     // ROS Node initialization + params
-    ros::init(argc, argv, "a6750_driver_node");
-    ros::NodeHandle nh,
-            nhp("~");  // for parameters
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<rclcpp::Node>("a6750_driver_node");
 
     // ROS/GEV Input Parameters
-    boost::shared_ptr<NodeSettings> node_settings = boost::make_shared<NodeSettings>(nhp);
+    std::shared_ptr<NodeSettings> node_settings;
+    try {
+        node_settings = std::make_shared<NodeSettings>(node);
+    } catch (ConfigurationError const &) {
+        return 1;
+    }
 
     CameraImageInfo cam_image_info;
     GEV_CAMERA_HANDLE camera_handle = NULL;  // void* type
 
 
-    node_settings->set_callback(nh);
+    node_settings->set_callback(node);
 
     // Initialize GEV API
     {
@@ -1064,7 +949,6 @@ int main(int argc, char **argv) {
 
         // Pass through option values from NodeSettings as appropriate.
         node_settings->set_library_config_options(options);
-        // Report        ROS_INFO1("Setting library config options:");
         log_config_options("-- ", options);
 
         GEV_STATUS s(GevSetLibraryConfigOptions( &options ));
@@ -1078,7 +962,6 @@ int main(int argc, char **argv) {
 
         // Log information of camera we just connected to.
         {
-//            ROS_INFO("Connected to camera:");
             ROS_GREEN("SUCCESS! Connected to camera:");
             GEV_CAMERA_INFO *ci = GevGetCameraInfo(camera_handle);
             log_camera_interface(*ci, "-- ");
@@ -1105,18 +988,8 @@ int main(int argc, char **argv) {
     catch (CameraConnectionError const &) { return safe_exit(1, camera_handle); }
     catch (CameraInUseError const &) { return safe_exit(1, camera_handle); }
 
-//    tryBootstrap(camera_handle);
-
     /** Set up feature access using the XML retrieved from the camera. */
     GenApi::CNodeMapRef *cam_node_map_ptr = NULL;
-    cam_node_map_ptr = static_cast< GenApi::CNodeMapRef * >(
-            GevGetFeatureNodeMap(camera_handle)
-    );
-    std::shared_ptr<GenApi::CNodeMapRef> nodemap(new GenApi::CNodeMapRef);
-//    cam_node_map_sptr = std::make_shared<GenApi::CNodeMapRef>(*cam_node_map_ptr);
-    {
-
-    }
     auto genapi = std::make_shared<GenApiConnector>(camera_handle);
     genapi->initNodeMap();
     std::string tmp;
@@ -1136,7 +1009,6 @@ int main(int argc, char **argv) {
         } else {
             // true flags saving the XML to disk in the directory:
             //     "$GIGEV_XML_DOWNLOAD/xml/download/"
-            // TODO: Optionalize output of XML features file
             ROS_GREEN("Loading XML from camera");
             GEV_STATUS s(GevInitGenICamXMLFeatures(camera_handle, true));
             RETURN_ON_FAILURE(GevInitGenICamXMLFeatures,
@@ -1152,21 +1024,13 @@ int main(int argc, char **argv) {
         }
         tellFeatureValue(camera_handle, "TriggerMode");
         get_node_val(cam_node_map_ptr, "TriggerMode");
-//        tryBootstrap(camera_handle);
         tellFeatureValue(camera_handle, "GevTimestampTickFrequency");
         tellFeatureValue(camera_handle, "FlagState");
-        std::string tmp;
-        //genapi->setCamAttr("CorrectionAutoEnabled", "1", tmp);
         tellFeatureValue(camera_handle, "CorrectionAutoEnabled");
         tellFeatureValue(camera_handle, "CorrectionAutoUseDeltaTemp");
         tellFeatureValue(camera_handle, "CorrectionAutoUseDeltaTime");
         tellFeatureValue(camera_handle, "CorrectionAutoDeltaTemp");
         tellFeatureValue(camera_handle, "CorrectionAutoDeltaTime");
-
-        //tellfeaturevalue(camera_handle, "correctionautoinprogress");
-        //trynuc(cam_node_map_ptr);
-        //tellfeaturevalue(camera_handle, "correctionautoinprogress");
-
 
     } // cam pointer stuff
 
@@ -1215,7 +1079,7 @@ int main(int argc, char **argv) {
                  node_settings->imageTransfer_numImageBuffers, buffer_size,
                  cam_image_info.width, cam_image_info.height,
                  cam_image_info.depth());
-        for (int i = 0; i < node_settings->imageTransfer_numImageBuffers; ++i) {
+        for (unsigned int i = 0; i < node_settings->imageTransfer_numImageBuffers; ++i) {
             ROS_INFO1("-- buffer %d", i);
             image_buffer_array[i] = (PUINT8) calloc(buffer_size, sizeof(UINT8));
         }
@@ -1237,262 +1101,27 @@ int main(int argc, char **argv) {
                           s, GEVLIB_OK, 1, camera_handle);
     }
 
-    /** ROS broadcast publishers */
-    ROS_INFO1("Creating ROS image-transport publisher for raw image output...");
-    image_transport::ImageTransport it_raw(nh);
-    image_transport::Publisher it_raw_pub(
-            it_raw.advertise(node_settings->output_topic_raw, 1)
-    );
-    ros::Publisher  missed_frames_pub_(
-            nh.advertise<std_msgs::Header>("/missed_frames", 3)
-    );
-
-    image_transport::ImageTransport it_db(nh);
-    image_transport::Publisher it_db_pub;
-    if (node_settings->debayer_enabled()) {
-        ROS_WARN("Creating ROS image-transport publisher for debayered image output...");
-        it_db_pub = it_db.advertise(node_settings->output_topic_debayer, 1);
-    }
-
-    /** ROS Broadcast loop */
-    ROS_INFO1("Starting run-loop");
-    GEV_STATUS call_status(0);
-    cv::Rect roi;
-
     // Command node reference to manually trigger image acquisition.
-//    GenApi::CCommandPtr trigger_cmd_node_ptr = cam_node_map_ptr->_GetNode("TriggerSoftware");
     trigger.bind_node_action(cam_node_map_ptr, node_settings->triggerNodeName.c_str());
-    GEV_BUFFER_OBJECT *img_buff_obj_ptr;                    // Also the same stuct as GEVBUF_ENTRY and GEVBUF_HEADER
-    ros::Rate ros_rate(node_settings->output_frame_rate);    // Acquisition Rate
-    int counter = 0;
-    bool report_timings = false;                            // Enable print timing info
-    // Loop component timers
-    double deltaT;                                          // elapsed time
-    double lpLoopTime = 1.0;                                // low-passed loop time
-    double lpGamma  = 0.1;                                  // low pass coeff
-    system_clock::time_point t_trigger_start, t_trigger_end, t_wait_return, t_after_error_checks,
-            t_make_raw_image, t_yuv_bgr_conversion, t_raw_crop, t_published_raw_img, t_published_bayer_img,
-            t_image_buf_released, t_ros_spin_once, t_brightness_update;
 
-    unsigned int frames_dropped_total_ = 0;
+    EventHandler handler{node, camera_handle, cam_image_info, node_settings, genapi};
+    CamParamHandler paramHandler{node, camera_handle, node_settings};
+    handler.event_sub = node->create_subscription<custom_msgs::msg::GsofEvt>(
+        "/event", 5,
+        [&handler](const custom_msgs::msg::GsofEvt::ConstSharedPtr msg) { handler.eventCallback(msg); });
 
-    auto nodeName = ros::this_node::getName();
-    custom_msgs::Stat stat_msg;
-    stat_msg.header.stamp = ros::Time::now();
-    stat_msg.trace_header = std_msgs::Header();
-    stat_msg.trace_topic = nodeName + "/publishImage";
-    stat_msg.node = nodeName;
+    rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), 3);
+    executor.add_node(node);
+    handler.start();
 
-    /** ======================================= alt loop ========================================================== */
-    if (false) {
-        ROS_WARN("exiting early for the sake of cam param testing (optional)");
-        return safe_exit(0, camera_handle);
-    }
-    if (true) {
-//    DriverHandlerOpts dopts{node_settings->rawImageCVMatType};
-        /// !!! doing the nodehandleptr thing because I don't really know how to solve it
-        ros::NodeHandlePtr nhptr = ros::NodeHandlePtr(new ros::NodeHandle);
-        EventHandler handler{nhptr, camera_handle, cam_image_info, node_settings, genapi};
-        CamParamHandler paramHandler{nhptr, camera_handle, node_settings};
-//    handler.syncUp(nh, 0.0);
-        handler.event_sub = nh.subscribe(std::string("/event"), 5, &EventHandler::eventCallback, &handler);
-        ros::AsyncSpinner spinner{3};
-        spinner.start();
-        handler.start();
-
-        auto terminator = nh.createTimer(ros::Duration(0.25), [&](const ros::TimerEvent &e) {
-            if (G_SIGINT_TRIGGERED) {
-                ROS_WARN("shutting down spinner");
-                spinner.stop();
-                handler.shutdown();
-            }
-        }, false, true);
-        ros::waitForShutdown();
-//    while (ros::ok() && !G_SIGINT_TRIGGERED) {
-//    }
-        return safe_exit(0, camera_handle);
-    }
-
-    /** ======================================= main loop ========================================================== */
-    while (ros::ok() && !G_SIGINT_TRIGGERED) {
-        std::stringstream link;
-        std::stringstream this_frame_id;
-
-        // Log message delineation
-        ROS_INFO3("===============================================");
-        img_buff_obj_ptr = NULL;                // Reset loop variables
-        report_timings = false;
-        ros::Time t_pre_trigger(ros::Time::now());          // Record image timestamp as time of acquisition request
-        stat_msg.header.stamp = ros::Time::now();
-        stat_msg.trace_header.seq = counter;
-
-        t_trigger_start = system_clock::now();
-        trigger.spin_until_trigger();
-//        trigger.fire_cond(node_settings->triggeredBySoftware); // fires off software trigger, assuming that feature exists
-        t_trigger_end = system_clock::now();
-
-        // Get the next image
-        ROS_INFO2("Waiting for next image...");
-        // IR is not remotely rate-limiting, so we will spin a lot to ensure event is captured
-        ros::spinOnce(); // allow most recent event to be received
-        call_status = GevWaitForNextImage(camera_handle, &img_buff_obj_ptr,
-                                          node_settings->nextImage_timeout);
-        t_wait_return = system_clock::now();
-        ros::Time t_image_received = ros::Time::now();
-        stat_msg.trace_header.stamp = t_image_received;
-        ROS_WARN("before");
-        WARN_ON_FAILURE(GevWaitForNextImage, call_status, GEVLIB_OK);
-        ROS_WARN("after");
-        ros::spinOnce(); // allow most recent event to be received
-
-        // bind image to most recent
-        std_msgs::Header gps_header;
-        bool success = false;
-
-
-
-        if (validate_image(img_buff_obj_ptr, &cam_image_info)) {
-            t_after_error_checks = system_clock::now();
-
-            /** Successful image buffer retrieval. */
-            ROS_INFO2("Received image with ID %d", img_buff_obj_ptr->id);
-            cv::Mat raw_image(img_buff_obj_ptr->h, img_buff_obj_ptr->w,
-                              node_settings->rawImageCVMatType,
-                              img_buff_obj_ptr->address);
-            t_make_raw_image = system_clock::now();
-            t_yuv_bgr_conversion = system_clock::now();
-
-            /** Crop image to configured output dims */
-            node_settings->makeRoi(img_buff_obj_ptr->h, img_buff_obj_ptr->w, roi);
-            ROS_INFO2("Cropping to ROI %dx%d+%d+%d", roi.width, roi.height, roi.x, roi.y);
-            if (roi.area() == 0) {
-                ROS_ERROR("Crop ROI has 0 area with raw image height of %d pixels.",
-                          img_buff_obj_ptr->h);
-                return safe_exit(1, camera_handle);
-            }
-            raw_image = raw_image(roi);
-            t_raw_crop = system_clock::now();
-
-            if (it_raw_pub.getNumSubscribers() > 0) {
-                ros::spinOnce(); // allow most recent event to be received
-                ROS_INFO2("Publishing raw image...");
-                cv_bridge::CvImagePtr cv_ptr(new cv_bridge::CvImage);
-                // Set the image timestamp to match the event that actually triggered it
-                if (success) {
-                    cv_ptr->header = gps_header;
-                }
-//                cv_ptr->header.frame_id = this_frame_id.str();
-                cv_ptr->encoding = node_settings->rawImageCVEncoding;
-                cv_ptr->image = raw_image;
-                link << nodeName << "/event/" << node_settings->event_.header.seq; // link this trace to the event trace
-                stat_msg.link = link.str();
-                stat_msg.note = "success";
-
-                std::cout << "!> cv_ptr: type: " << node_settings->rawImageCVMatType << cv_ptr->header << std::endl;
-                std::cout << "!> img: dims:" << raw_image.dims << " size: "<<  raw_image.size
-                          << " step: "<<  raw_image.step << " rows: "<<  raw_image.rows << " cols: "<<  raw_image.cols
-                          << " type: "<<  raw_image.type() << std::endl;
-
-
-                ROS_WARN("<D> evt: %.2f  %.2f", cv_ptr->header.stamp.toSec(), node_settings->event_.gps_time.toSec());
-                it_raw_pub.publish(cv_ptr->toImageMsg());
-            }
-            t_published_raw_img = system_clock::now();
-
-            t_published_bayer_img = system_clock::now();
-            report_timings = true;          // All time_points have been successfully populated.
-        } else {
-            ROS_WARN("taking the nasty path, ptr: %p", img_buff_obj_ptr);
-            std_msgs::Header msg = std_msgs::Header(node_settings->event_.header);
-            std::stringstream status_int, status_name, note;
-
-            if (img_buff_obj_ptr) {
-                status_int <<     img_buff_obj_ptr->status;
-                status_name << decode_sdk_status(img_buff_obj_ptr->status);
-            } else {
-                this_frame_id << "&status=" << 999 << "&error="
-                              << "nil pointer in buffer";
-            }
-            this_frame_id << "&status=" << status_int.str() << "&error=" << status_name.str();
-            note << "status " << status_int.str() << ": " << status_name.str();
-            link << nodeName << "/event/" << node_settings->event_.header.seq; // link this trace to the event trace
-            stat_msg.link = link.str();
-            stat_msg.note = note.str();
-            msg.seq = ++frames_dropped_total_;
-            msg.frame_id = this_frame_id.str();
-            ROS_WARN("about to publish");
-            missed_frames_pub_.publish(msg);
-            node_settings->errstat_pub.publish(stat_msg);
+    auto terminator = node->create_wall_timer(std::chrono::milliseconds(250), [&]() {
+        if (G_SIGINT_TRIGGERED) {
+            ROS_WARN("shutting down spinner");
+            handler.shutdown();
+            rclcpp::shutdown();
         }
-        node_settings->stat_pub.publish(stat_msg);
-
-
-        // Release used image buffer back to GEV acquisition process.
-        GevReleaseImage(camera_handle, img_buff_obj_ptr);
-        t_image_buf_released = system_clock::now();
-
-        // Allow messages to be received
-        ros::spinOnce();
-        t_ros_spin_once = system_clock::now();
-
-        // Check for updated brightness setting
-        if (G_NEW_BRIGHTNESS) {
-            // activate new brightness target
-            ROS_INFO2("Setting new brightness value");
-            if (!node_settings->set_brightness_target(cam_node_map_ptr)) {
-                return safe_exit(1, camera_handle);
-            }
-            G_NEW_BRIGHTNESS = false;
-        }
-
-        t_brightness_update = system_clock::now();
-
-        if (report_timings) {
-            ROS_INFO2("Loop Timings:");
-            ROS_INFO2("-- Before trigger -> After trigger     : %f ms",
-                     milliseconds_between(t_trigger_start, t_trigger_end));
-            ROS_INFO2("-- After trigger  -> Wait return       : %f ms (+%f ms)",
-                     milliseconds_between(t_trigger_start, t_wait_return),
-                     milliseconds_between(t_trigger_end, t_wait_return));
-            if (G_TIMING_VERBOSE) {
-                ROS_INFO2("-- Wait return    -> After checks      : %f ms (+%f ms)",
-                         milliseconds_between(t_trigger_start, t_after_error_checks),
-                         milliseconds_between(t_wait_return, t_after_error_checks));
-                ROS_INFO2("-- After checks   -> Make raw image    : %f ms (+%f ms)",
-                         milliseconds_between(t_trigger_start, t_make_raw_image),
-                         milliseconds_between(t_after_error_checks, t_make_raw_image));
-                ROS_INFO2("-- Make raw image -> YUV2BGR cvt       : %f ms (+%f ms)",
-                         milliseconds_between(t_trigger_start, t_yuv_bgr_conversion),
-                         milliseconds_between(t_make_raw_image, t_yuv_bgr_conversion));
-                ROS_INFO2("-- YUV2BGR cvt    -> Crop Image        : %f ms (+%f ms)",
-                         milliseconds_between(t_trigger_start, t_raw_crop),
-                         milliseconds_between(t_yuv_bgr_conversion, t_raw_crop));
-                ROS_INFO2("-- Crop Image     -> Publish raw       : %f ms (+%f ms)",
-                         milliseconds_between(t_trigger_start, t_published_raw_img),
-                         milliseconds_between(t_raw_crop, t_published_raw_img));
-                ROS_INFO2("-- Publish raw    -> Publish debay     : %f ms (+%f ms)",
-                         milliseconds_between(t_trigger_start, t_published_bayer_img),
-                         milliseconds_between(t_published_raw_img, t_published_bayer_img));
-                ROS_INFO2("-- Publish debay  -> Release image     : %f ms (+%f ms)",
-                         milliseconds_between(t_trigger_start, t_image_buf_released),
-                         milliseconds_between(t_published_bayer_img, t_image_buf_released));
-                ROS_INFO2("-- Release image  -> ROS Spin Once     : %f ms (+%f ms)",
-                         milliseconds_between(t_trigger_start, t_ros_spin_once),
-                         milliseconds_between(t_image_buf_released, t_ros_spin_once));
-                ROS_INFO2("-- ROS Spin Once  -> Update brightness : %f ms (+%f ms)",
-                         milliseconds_between(t_trigger_start, t_brightness_update),
-                         milliseconds_between(t_ros_spin_once, t_brightness_update));
-
-            }
-            deltaT = milliseconds_between(t_trigger_start, t_brightness_update);
-            lpLoopTime = (lpLoopTime * (1-lpGamma)) + (deltaT * lpGamma);
-            ROS_INFO2("-- Overall Cycle Time (rolling avg)    : %f ms (%f ms)", deltaT, lpLoopTime);
-
-        }
-
-        counter++;
-        ros_rate.sleep();
-    }
-
+    });
+    executor.spin();
+    handler.shutdown();
     return safe_exit(0, camera_handle);
 }
