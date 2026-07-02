@@ -5,28 +5,26 @@ from __future__ import division, print_function, absolute_import
 import os
 import sys
 import json
+import socket
 from typing import List, Tuple, Optional
 from datetime import datetime
 import threading
-from functools import partial
 import time
+import urllib.parse as urllib_parse
 
 from roskv.impl.redis_envoy import RedisEnvoy
-from six.moves import urllib_parse
-from six.moves.queue import deque
 import numpy as np
 import cv2
 
 # ROS imports
-import rospy
 from cv_bridge import CvBridge
 from std_msgs.msg import Bool as MsgBool, Float64 as MsgFloat64, String as MsgString
 from std_msgs.msg import Header
 from sensor_msgs.msg import Image as MsgImage
 from custom_msgs.msg import (
     SynchronizedImages,
-    GSOF_EVT,
-    GSOF_INS,
+    GsofEvt,
+    GsofIns,
     SyncedPathImages,
     Stat,
 )
@@ -42,7 +40,6 @@ from nexus.pathimg_bridge import (
     coerce_message,
     InMemBridge,
 )
-from libnmea_navsat_driver.gsof import GsofSpoofEventDispatch
 
 G_DO_DEBAYER = True
 
@@ -74,45 +71,52 @@ bayer_patterns["bayer_grbg16"] = cv2.COLOR_BayerGB2RGB
 bayer_patterns["bayer_bggr16"] = cv2.COLOR_BayerRG2RGB
 bayer_patterns["bayer_gbrg16"] = cv2.COLOR_BayerGR2RGB
 
-ros_immediate = rospy.Duration(nsecs=1)
+log = None  # module logger, set by Nexus
+
+
+def stamp_to_sec(stamp):
+    return stamp.sec + stamp.nanosec * 1e-9
+
+
+def stamp_key(stamp):
+    """Hashable epoch key from a builtin_interfaces Time (ROS2 messages are unhashable)."""
+    return (stamp.sec, stamp.nanosec)
 
 
 def rostime_to_datetime(stamp):
-    # type: (rospy.Time) -> datetime
-    t = stamp.to_sec()
-    return datetime.utcfromtimestamp(t)
+    return datetime.utcfromtimestamp(stamp_to_sec(stamp))
 
 
-def check_image_msg(msg, mode=""):
-    # type: (MsgImage, Optional[str]) -> Optional[np.ndarray]
+def check_image_msg(msg, mode="", logger=None):
+    # type: (MsgImage, Optional[str], object) -> Optional[np.ndarray]
     """
     Checks validity (presence, size, encoding) of image before sending off
     :param msg: Image message object
     :param mode: [optional] Type of message - used for logging
     :return: Decoded image (this step is pretty fast) or None on failure
     """
+    logger = logger or log
     if not msg:
-        rospy.logerr("Message {} is None".format(mode))
+        logger.error("Message {} is None".format(mode))
         return None
     if not msg.encoding:
-        rospy.logerr("Message {} is missing encoding".format(mode))
+        logger.error("Message {} is missing encoding".format(mode))
         return None
 
     data = bridge.imgmsg_to_cv2(msg)  # type: np.ndarray
-    rospy.logdebug(data.shape, data.size)
     if not data.shape:
-        rospy.logerr("Message {} has no shape".format(mode))
+        logger.error("Message {} has no shape".format(mode))
         return None
     if not data.size:
-        rospy.logerr("Message {} has no size".format(mode))
+        logger.error("Message {} has no size".format(mode))
         return None
 
     if data.ndim not in (2, 3):
-        rospy.logerr("Message {} has incorrect ndim: {}".format(mode, data.ndim))
+        logger.error("Message {} has incorrect ndim: {}".format(mode, data.ndim))
         return None
 
     if not (np.prod(data.shape)):
-        rospy.logerr("Message {} has null shape: {}".format(mode, data.shape))
+        logger.error("Message {} has null shape: {}".format(mode, data.shape))
         return None
 
     return data
@@ -127,7 +131,7 @@ def dump_image_array(filename, data, verbosity=0):
     cv2.imwrite(filename, data, (cv2.IMWRITE_JPEG_QUALITY, 100))
     end = time.time()
     if verbosity >= 2:
-        rospy.loginfo("Image Writer saved: {} in {:.3f}s".format(filename, end - start))
+        print("Image Writer saved: {} in {:.3f}s".format(filename, end - start))
 
 
 def dump_image_msg(filename, msg, mode="", verbosity=0):
@@ -144,7 +148,7 @@ def dump_image_msg(filename, msg, mode="", verbosity=0):
 
     # in the rare event of the filename being a dupe, just tag it as such
     if os.path.exists(filename):
-        rospy.logerr("OOPS! Duplicate: {}".format(filename))
+        print("OOPS! Duplicate: {}".format(filename))
         fn, ext = os.path.splitext(filename)
         filename = fn + "_dupe" + ext
 
@@ -154,7 +158,7 @@ def dump_image_msg(filename, msg, mode="", verbosity=0):
     if verbosity >= 4:
         print("{} {} {:.3f} sec".format(msg.encoding, data.shape, end - start))
     if verbosity >= 2:
-        rospy.loginfo("Image Writer saved: {}".format(filename))
+        print("Image Writer saved: {}".format(filename))
 
 
 def debayer_image_msg(msg, do_debayer=G_DO_DEBAYER):
@@ -167,33 +171,18 @@ def debayer_image_msg(msg, do_debayer=G_DO_DEBAYER):
     """
     if not do_debayer:
         return msg
-    tic = time.time()
     if msg.encoding in bayer_patterns.keys():
-        rospy.logdebug("DeBayering from encoding {}".format(msg.encoding))
         image = bridge.imgmsg_to_cv2(msg)
-
-        # image = self.gamma_to_linear_lut[image]
         image = cv2.cvtColor(image, bayer_patterns[msg.encoding])
-        # image = self.linear_to_gamma_lut[image]
-
-        # White balance
-        """
-        RGB_rescale = [0.59987517, 1, 0.96323181]
-        for i in range(3):
-            lut = np.round(np.arange(256)*RGB_rescale[i]).astype(np.uint8)
-            image[:,:,i] =  cv2.LUT(image[:,:,i], lut)
-        """
-
         debayered_msg = bridge.cv2_to_imgmsg(image, encoding="rgb8")
-
         debayered_msg.header.stamp = msg.header.stamp
         debayered_msg.header.frame_id = msg.header.frame_id
-        rospy.logdebug("Debayer Time elapsed: {:.3f} s".format(time.time() - tic))
     elif msg.encoding == "rgb8":
         # message is already decoded, just return
         return msg
     else:
-        rospy.logwarn("Unrecognized Bayer encoding `{}`".format(msg.encoding))
+        if log is not None:
+            log.warning("Unrecognized Bayer encoding `{}`".format(msg.encoding))
         return msg
     return debayered_msg
 
@@ -234,6 +223,7 @@ class Nexus(object):
 
     def __init__(
         self,
+        node,
         rgb_topic,
         ir_topic,
         uv_topic,
@@ -245,6 +235,8 @@ class Nexus(object):
         verbosity=0,
     ):
         """
+        :param node: rclpy node owning the ROS interfaces
+
         :param rgb_topic: Topic to receive RGB ROS Image messages on.
         :type rgb_topic: str
 
@@ -266,8 +258,12 @@ class Nexus(object):
         :type max_wait: float
 
         """
+        global log
+        self.node = node
+        self.log = node.get_logger()
+        log = self.log
         redis_host = os.environ.get("REDIS_HOST", "nuvo0")
-        node_host = rospy.get_namespace().strip("/")
+        node_host = os.environ.get("NODE_HOSTNAME") or socket.gethostname()
         self.envoy = RedisEnvoy(redis_host, client_name=node_host + "_img_nexus")
         cam_fov = self.envoy.get(
             os.path.join("/sys", "arch", "hosts", node_host, "fov")
@@ -283,14 +279,14 @@ class Nexus(object):
 
         if rgb_queue is None:
             raise ValueError("You must provide a rgb_queue parameter")
-        self.rgb_queue = rgb_queue  # type: dequeue
+        self.rgb_queue = rgb_queue
 
         self.image_formats = {}
         for chan in ["rgb", "uv", "ir", "evt", "ins"]:
             self.image_formats[chan] = self.envoy.get("/sys/arch/ext_%s" % chan)
 
         max_wait = 1.0 / max_frame_rate
-        rospy.loginfo(
+        self.log.info(
             "node host: {} fov: {}   max_wait: {:.3f}".format(
                 node_host, cam_fov, max_wait
             )
@@ -298,29 +294,24 @@ class Nexus(object):
 
         self.node_host = node_host
         self.cam_fov = cam_fov
-        self.node_name = rospy.get_name()
+        self.node_name = node.get_name()
 
         self.image_lock = threading.RLock()
         self.pub_timer = None
-        self._current_epoch = rospy.Time.now()
+        self._current_epoch = stamp_key(node.get_clock().now().to_msg())
         self.epoch_dict = dict()
         self._msg_dict = dict()
         self._recent_epochs = []
         self.max_wait = max_wait
         self.rolling_success = LowpassIIR()
         self.topics = {
-            "rgb_topic": rospy.resolve_name(rgb_topic),
-            "ir_topic": rospy.resolve_name(ir_topic),
-            "uv_topic": rospy.resolve_name(uv_topic),
-            "out_topic": rospy.resolve_name(out_topic),
+            "rgb_topic": rgb_topic,
+            "ir_topic": ir_topic,
+            "uv_topic": uv_topic,
+            "out_topic": out_topic,
         }
         topic_base = f"/sys/enabled/{cam_fov}"
         self.enabled = self.envoy.get(topic_base)
-        # self.enabled = {
-        #    'rgb': rospy.get_param(os.path.join('/cfg/enabled', cam_fov, 'rgb'), True),
-        #    'ir': rospy.get_param(os.path.join('/cfg/enabled', cam_fov, 'ir'), True),
-        #    'uv': rospy.get_param(os.path.join('/cfg/enabled', cam_fov, 'uv'), True)
-        # }
         self.enabled_list = [k for k, v in self.enabled.items() if v]
         self.full_packet_list = self.enabled_list + ["evt"]
         self.skip_ir = not self.enabled["ir"]
@@ -328,56 +319,38 @@ class Nexus(object):
         self._is_archiving = False
         self.verbosity = verbosity
         self._pub_ir_leveled = True  # Outputs a stream of z-normalized IR
-        self.archiver = ArchiveManager(agent_name="nexus", verbosity=verbosity)
-        self.archiver.advertise_services()
+        self.archiver = ArchiveManager(node, agent_name="nexus", verbosity=verbosity)
+        self.archiver.advertise_services(namespace=node_host)
         self.stats_logger = SimpleStatsLogger(archiver=self.archiver)
         self.pub_missed = {}  # publish when a frame is missed
         self.image_writers = {}
 
-        if self.enabled["rgb"]:
-            rospy.loginfo("Subscribing to Images topic '%s'" % rgb_topic)
-            rospy.Subscriber(
-                rgb_topic,
+        for mode, topic in (("rgb", rgb_topic), ("ir", ir_topic), ("uv", uv_topic)):
+            if not self.enabled[mode]:
+                continue
+            self.log.info("Subscribing to Images topic '%s'" % topic)
+            node.create_subscription(
                 MsgImage,
-                self.any_queue_callback,
-                callback_args="rgb",
-                queue_size=1,
+                topic,
+                lambda msg, m=mode: self.any_queue_callback(msg, m),
+                1,
             )
-            self.pub_missed["rgb"] = rospy.Publisher("rgb/missed", Header, queue_size=5)
-
-        if self.enabled["ir"]:
-            rospy.loginfo("Subscribing to Images topic '%s'" % ir_topic)
-            rospy.Subscriber(
-                ir_topic,
-                MsgImage,
-                self.any_queue_callback,
-                callback_args="ir",
-                queue_size=1,
+            self.pub_missed[mode] = node.create_publisher(
+                Header, "%s/missed" % mode, 5
             )
-            self.pub_missed["ir"] = rospy.Publisher("ir/missed", Header, queue_size=5)
 
-        if self.enabled["uv"]:
-            rospy.loginfo("Subscribing to Images topic '%s'" % uv_topic)
-            rospy.Subscriber(
-                uv_topic,
-                MsgImage,
-                self.any_queue_callback,
-                callback_args="uv",
-                queue_size=1,
-            )
-            self.pub_missed["uv"] = rospy.Publisher("uv/missed", Header, queue_size=5)
-
-        rospy.Subscriber(
-            "/event", GSOF_EVT, self.any_queue_callback, callback_args="evt"
+        node.create_subscription(
+            GsofEvt, "/event", lambda msg: self.any_queue_callback(msg, "evt"), 10
         )
 
-        self.publisher = rospy.Publisher(out_topic, SyncedImageMsg, queue_size=1)
+        self.publisher = node.create_publisher(SyncedImageMsg, out_topic, 1)
 
-        self.pub_status = rospy.Publisher("status", MsgString, queue_size=3)
+        self.pub_status = node.create_publisher(MsgString, "status", 3)
 
-        self.stat_pub = rospy.Publisher("/stat", Stat, queue_size=3)
-        self.pstat_pub = rospy.Publisher(self.node_name + "/stat", Stat, queue_size=3)
-        self.stat_counter = 0
+        self.stat_pub = node.create_publisher(Stat, "/stat", 3)
+        self.pstat_pub = node.create_publisher(
+            Stat, self.node_name + "/stat", 3
+        )
         self.compress_imagery = compress_imagery
         self.send_image_data = send_image_data
 
@@ -386,9 +359,8 @@ class Nexus(object):
         """Get the most recent message dict"""
         return self.epoch_dict.get(self._current_epoch, {})
 
-    def get_spoof_event(self):
-        rospy.logwarn("No event msg detected, generating spoof event")
-        return GsofSpoofEventDispatch()
+    def now_msg(self):
+        return self.node.get_clock().now().to_msg()
 
     def is_msg_dict_full(self):
         """Check if all requisite messages have been received (regardless of
@@ -402,63 +374,25 @@ class Nexus(object):
 
     def reset_timer(self):
         if self.pub_timer is not None:
-            self.pub_timer.shutdown()
+            self.pub_timer.cancel()
+            self.node.destroy_timer(self.pub_timer)
             self.pub_timer = None
-
-    def timer_writer_callback(self, timer_event=None, msg=None, mode=""):
-        if not msg:
-            raise RuntimeError("No message in timer callback, this should not happen")
-        if not mode:
-            raise RuntimeError("No mode in timer callback, this should not happen")
-        raise NotImplementedError("timer_writer_callback is disabled!")
-
-        self.image_writer_callback(msg=msg, args=mode)
-
-    def image_writer_callback(self, msg, args):
-        # type: (MsgImage, str) -> None
-        rospy.logwarn("Archiving from nexus DEPRECATED")
-        raise NotImplementedError("image_writer_callback is disabled!")
-        return
-        mode = args
-        ext = self.image_formats[mode]
-
-        data = check_image_msg(msg, mode)
-        # We want to emit missed frame messages iff message is bad and we are archiving
-        if data is None and self.archiver.is_archiving:
-            self.pub_missed[mode].publish(msg.header or Header())
-
-        if not self.archiver.is_archiving:
-            return
-        now = datetime.utcfromtimestamp(msg.header.stamp.to_sec())
-        template = self.archiver.fmt_sync_path(now)
-        filename = template.format(mode=mode, ext=ext)
-        dirname = make_path(filename, from_file=True)
-        try:
-            dump_image_msg(filename, msg, mode, verbosity=self.verbosity)
-
-        except ImageEncodingMissingError:
-            pass  # we logged this with check_image
-        except Exception:
-            exc_type, value, traceback = sys.exc_info()
-            rospy.logerr("dump_image_msg failed: {}: {}".format(exc_type, value))
 
     def end_of_turn(self, stale_time=1.5):
         """
         Finalize and publish completed packets
         :param stale_time:
-        :param timeout_time:
         :return:
         """
-        stale_time = rospy.Duration.from_sec(stale_time)
-        now = rospy.Time.now()
+        now = time.time()
         completed = []
         stale = []
         with self.image_lock:
             for ep in self.epoch_dict:
                 msg_dict = self.epoch_dict.get(ep)
-                age = now - ep
+                age = now - (ep[0] + ep[1] * 1e-9)
                 if all(key in msg_dict for key in self.full_packet_list):
-                    rospy.loginfo(
+                    self.log.info(
                         "[_] Comp {: >4}: {} {}".format(
                             msg_dict["evt"].event_num, ep, msg_dict.keys()
                         )
@@ -466,7 +400,7 @@ class Nexus(object):
                     completed.append(ep)
 
                 elif age > stale_time:
-                    rospy.logerr(
+                    self.log.error(
                         "[_] Messages timed out, epoch {}: {}".format(
                             ep, msg_dict.keys()
                         )
@@ -474,11 +408,9 @@ class Nexus(object):
                     stale.append(ep)
                 else:
                     pass
-                    # rospy.loginfo("[_] Partial  : {}".format(ep))
 
             for candidate in completed + stale:
                 msg_dict = self.epoch_dict.pop(candidate)
-                # rospy.loginfo("Publishing {}".format(candidate))
                 self._publish(msg_dict=msg_dict)
 
         self._recent_epochs = self._recent_epochs[-20:]
@@ -487,9 +419,12 @@ class Nexus(object):
         modality = modality.lower()
         urlp = urllib_parse.urlparse(msg.header.frame_id)
         qs = urllib_parse.parse_qs(urlp.query)
-        rospy.loginfo(
+        self.log.info(
             "<^>{:>3} {:>6}: {:.6f} {}".format(
-                modality, qs.get("eventNum", ["?"])[0], msg.header.stamp.to_sec(), qs
+                modality,
+                qs.get("eventNum", ["?"])[0],
+                stamp_to_sec(msg.header.stamp),
+                qs,
             )
         )
 
@@ -503,30 +438,26 @@ class Nexus(object):
         stat = Stat()
         stat.trace_header = event_msg.header
         stat.node = self.node_name
-        stat.header.stamp = rospy.Time.now()
-        stat.header.seq = self.stat_counter
-        self.stat_counter += 1
+        stat.header.stamp = self.now_msg()
         stat.trace_topic = self.node_name + "/queue/" + modality
 
         self.archiver.disk_check(self.archiver._base, every_nth=4)
-        # rospy.loginfo('<^>{:>3} {:>6}: {:.6f}'.format(modality, event_msg.header.seq, event_msg.header.stamp.to_sec()))
-        #        rospy.loginfo(modality + ': ' + str(image_msg.header))
         with self.image_lock:
-            current_epoch = event_msg.header.stamp
+            current_epoch = stamp_key(event_msg.header.stamp)
             msg_dict = self.epoch_dict.get(current_epoch, {})
             if len(msg_dict):
                 # If there are already entries in the dict, that means they arrived
                 # before this event callback, which is concerning
-                rospy.logwarn("Messages beat event: {}".format(msg_dict.keys()))
+                self.log.warning("Messages beat event: {}".format(msg_dict.keys()))
             msg_dict.update({"evt": event_msg})
             self.epoch_dict[current_epoch] = msg_dict
-            rospy.loginfo(
+            self.log.info(
                 "Starting {: >4}: epoch {}, epochs: {}".format(
-                    event_msg.header.seq, current_epoch, self.epoch_dict.keys()
+                    event_msg.event_num, current_epoch, self.epoch_dict.keys()
                 )
             )
             if current_epoch in self._recent_epochs:
-                rospy.logerr("Duplicate event! {}".format(event_msg.header))
+                self.log.error("Duplicate event! {}".format(event_msg.header))
             else:
                 self._recent_epochs.append(current_epoch)
             self._current_epoch = current_epoch
@@ -539,24 +470,20 @@ class Nexus(object):
         stat = Stat()
         stat.trace_header = image_msg.header
         stat.node = self.node_name
-        stat.header.stamp = rospy.Time.now()
-        stat.header.seq = self.stat_counter
-        self.stat_counter += 1
+        stat.header.stamp = self.now_msg()
         stat.trace_topic = self.node_name + "/queue/" + modality
 
-        # rospy.loginfo('<^>{:>3} {:>6}: {:.6f}'.format(modality, image_msg.header.seq, image_msg.header.stamp.to_sec()))
-        #        rospy.loginfo(modality + ': ' + str(image_msg.header))
         with self.image_lock:
-            epoch = image_msg.header.stamp
+            epoch = stamp_key(image_msg.header.stamp)
             msg_dict = self.epoch_dict.get(epoch, {})
             if "evt" not in msg_dict:
-                rospy.logwarn(
+                self.log.warning(
                     "{} Message beat event: {}, epochs: {}".format(
                         modality, epoch, self.epoch_dict.keys()
                     )
                 )
             if modality in msg_dict:
-                rospy.logerr(
+                self.log.error(
                     "Duplicate message {} in epoch: {}".format(modality, epoch)
                 )
             if modality == "rgb":
@@ -573,108 +500,6 @@ class Nexus(object):
         self.insert_msg(image_msg=image_msg, modality=modality)
         self.end_of_turn()
 
-    def sync_queue_callback2(self, image_msg, modality):
-        # type: (MsgImage, str) -> None
-        """Method that receives messages published on self.image_topic
-
-        :param image_msg: ROS image message.
-        :type image_msg: Image
-
-        :param modality: Which image stream from which to return an image view.
-        :type modality: str {'EVT', 'RGB','IR','UV'}
-
-        """
-        modality = modality.lower()
-        stat = Stat()
-        stat.trace_header = image_msg.header
-        stat.node = self.node_name
-        stat.header.stamp = rospy.Time.now()
-        stat.header.seq = self.stat_counter
-        self.stat_counter += 1
-        stat.trace_topic = self.node_name + "/queue/" + modality
-
-        rospy.loginfo(
-            "{:>3} {:>6}: {:.6f}".format(
-                modality, image_msg.header.seq, image_msg.header.stamp.to_sec()
-            )
-        )
-        #        rospy.loginfo(modality + ': ' + str(image_msg.header))
-        with self.image_lock:
-            header = image_msg.header
-            t = header.stamp.secs + header.stamp.nsecs / 1e9
-            t = datetime.utcfromtimestamp(t)
-            if modality == "evt":
-                raise NotImplementedError("Dead end! shouldn't happen")
-            self.stat_pub.publish(stat)
-
-            if header.stamp != self._current_epoch:
-                if header.stamp in self._recent_epochs:
-                    rospy.logerr("Stale epoch on {}: {}".format(modality, header.stamp))
-                else:
-                    rospy.logerr("Stale epoch on {}: {}".format(modality, header.stamp))
-
-            #            rospy.loginfo('{:>3} {:>6} {}'.format(modality, image_msg.header.seq, t.isoformat()[11:24]))
-
-            #            rospy.logdebug('{:>3} {:>6} {:.3f}'.format(modality, image_msg.header.seq, image_msg.header.stamp.to_sec()))
-
-            if modality == "rgb":
-                image_msg = debayer_image_msg(image_msg)
-
-            if modality == "evt" and modality in self.msg_dict:
-                # oops, we got double event before buffer filled
-                # publish and roll over message
-                raise NotImplementedError("Dead end! shouldn't happen")
-                rospy.logwarn(
-                    "OOPS double event! Missed packet?: {}".format(self.msg_dict.keys())
-                )
-                self.publish()
-                self.msg_dict.update({modality: image_msg})
-                return
-            elif modality == "evt" and "ir" in self.msg_dict:
-                evt_time = image_msg.header.stamp.to_sec()
-                msg_time = self.msg_dict["ir"].header.stamp.to_sec()
-                rospy.logwarn("IR beat event by {}".format(evt_time - msg_time))
-                if (
-                    abs(evt_time - msg_time) < 0.499
-                ):  # empirically determined IR can lead by as much as 650 ms but system capped at 2 Hz
-                    self.msg_dict.update({modality: image_msg})
-                    rospy.logwarn("This is fine")
-                else:
-                    rospy.logerr(
-                        "Publishing incomplete message: {}".format(self.msg_dict.keys())
-                    )
-                    self.publish()
-                    self.msg_dict.update({modality: image_msg})
-            elif modality == "evt" and (
-                "rgb" in self.msg_dict or "uv" in self.msg_dict
-            ):
-                # ok we got event but there is stuff? reset the cycle
-                # assume event always makes it first
-                rospy.logwarn(
-                    "got event but stuff in buffer: {}".format(self.msg_dict.keys())
-                )
-                self.publish()
-                self.msg_dict.update({modality: image_msg})
-            else:
-                self.msg_dict.update({modality: image_msg})
-
-            if self.verbosity > 10:
-                # visual symbols for fast debugging
-                smsg = "{} Rx {: >4} {}".format(
-                    self.symbol_dict.get(modality),
-                    modality,
-                    rostime_to_datetime(image_msg.header.stamp).isoformat(),
-                )
-                rospy.loginfo("sync msg: {}".format(smsg))
-            if self.is_msg_dict_full():
-                self.publish()
-            elif self.pub_timer is None:
-                # Start a new timer to publish after 'max_wait'.
-                self.pub_timer = rospy.Timer(
-                    rospy.Duration(self.max_wait), self.publish, oneshot=True
-                )
-            self.end_of_turn()
-
     def check_success(self, msg_dict):
         # type: (dict) -> Tuple[list, list]
         """Returns list of names of all messages present and non-zero in message buffer
@@ -683,19 +508,19 @@ class Nexus(object):
         fail_list = []
         for chan in self.enabled_list + ["evt", "ins"]:
             if chan not in msg_dict:
-                rospy.logerr("Expecting {} Message, not in msg_dict ".format(chan))
+                self.log.error("Expecting {} Message, not in msg_dict ".format(chan))
                 fail_list.append(chan)
                 continue
 
             if chan in ["evt", "ins"]:
                 result = True
             else:
-                result = check_image_msg(msg_dict[chan], chan)
+                result = check_image_msg(msg_dict[chan], chan, self.log)
 
             if result is not None:
                 success_list.append(chan)
             else:
-                rospy.logerr(f"Registered {chan} as a miss.")
+                self.log.error(f"Registered {chan} as a miss.")
 
         return success_list, fail_list
 
@@ -709,17 +534,13 @@ class Nexus(object):
         with self.image_lock:
             stat.node = self.node_name
             stat.trace_topic = self.node_name + "/" + "sync"
-            stat.header.stamp = rospy.Time.now()
-            stat.header.seq = self.stat_counter
-            self.stat_counter += 1
+            stat.header.stamp = self.now_msg()
             if timer_event is not None:
-                rospy.logerr("Publishing due to timer callback")
+                self.log.error("Publishing due to timer callback")
             msg_dict["ins"] = self.archiver.latch_ins
-            rospy.logdebug("Pub'd: {}".format(msg_dict.keys()))
-
             if not any(msg_dict):
                 # why does this happen?
-                rospy.logerr("Tried to publish, but no data in buffer")
+                self.log.error("Tried to publish, but no data in buffer")
                 return
 
             outmsg = SyncedImageMsg()
@@ -743,16 +564,10 @@ class Nexus(object):
             # keep only good data messages - this also should simplify dump_sync
             msg_dict = {k: msg_dict[k] for k in success_list}
 
-            s = "img_nexus.py:publish() \n"
-            for k, v in msg_dict.items():
-                s += "||{:>3}: {:.3f}\n".format(k, v.header.stamp.to_sec())
-            # rospy.loginfo(s)
-
             # Deal with missing event, we still need a header
             if "evt" not in msg_dict:
-                rospy.loginfo("Exiting because dummy message.")
+                self.log.info("Exiting because dummy message.")
                 return
-                msg_dict["evt"] = self.get_spoof_event()
             event = msg_dict.get("evt")
             stat.meta_json = json.dumps(record)
 
@@ -781,9 +596,9 @@ class Nexus(object):
                 pathdict = self.archiver.dump_sync_image_messages(msg_dict)
                 self.stats_logger.append(record)
                 if self.verbosity > 3:
-                    rospy.loginfo("pathdict: {}".format(pathdict))
+                    self.log.info("pathdict: {}".format(pathdict))
                 else:
-                    rospy.loginfo("archived")
+                    self.log.info("archived")
 
             # Reset all the image buffers.
             msg_dict = dict()
@@ -804,7 +619,7 @@ class Nexus(object):
                     img = cv2.imdecode(cv2.imencode(".jpg", cv_img, encode_param)[1], 1)
                     msg = bridge.cv2_to_imgmsg(img, encoding=encoding)
                     setattr(outmsg, "image_" + mode, msg)
-            rospy.loginfo("All img conversions took %0.3fs." % (time.time() - tic))
+            self.log.info("All img conversions took %0.3fs." % (time.time() - tic))
 
         infostr = "SYN ({} {} {}{}) {: >3.0%}".format(
             "EVT" * record["have_evt"] or "   ",
@@ -824,4 +639,4 @@ class Nexus(object):
         self.pstat_pub.publish(stat)
         self.pub_status.publish(infomsg)
         self.publisher.publish(outmsg)
-        rospy.loginfo(infostr)
+        self.log.info(infostr)

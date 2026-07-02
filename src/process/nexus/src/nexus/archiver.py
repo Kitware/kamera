@@ -40,17 +40,18 @@ class ArchiveManager(ArchiverBase):
     }
 
     def __init__(
-        self, agent_name="ArchiveManager", bytes_halt_archiving=1e9, verbosity=0
+        self, node, agent_name="ArchiveManager", bytes_halt_archiving=1e9, verbosity=0
     ):
         """
         Class for managing the archiving of data coming from the system.
         By convention, paths are '/' terminated.
 
+        :param node: rclpy node owning the ROS interfaces
         :param agent_name:
         :param bytes_halt_archiving: When free bytes drops below this number, halt
         :param verbosity:
         """
-        super(ArchiveManager, self).__init__(agent_name=agent_name, verbosity=verbosity)
+        super(ArchiveManager, self).__init__(node, agent_name=agent_name, verbosity=verbosity)
 
     def dump_image_msg(self, msg, mode, fn_template, ext="tif"):
         # type: (genpy.msg, str, str, str) -> Optional[str]
@@ -82,8 +83,8 @@ class ArchiveManager(ArchiverBase):
         # type: (genpy.msg, str) -> str
         ext = self.image_formats[mode]
         if time is None:
-            secs = msg.header.stamp.secs
-            nsecs = msg.header.stamp.nsecs
+            secs = msg.header.stamp.sec
+            nsecs = msg.header.stamp.nanosec
             usecs = int(nsecs / 1e3)
             fracs = float(usecs / 1e6)
             t = secs + fracs
@@ -109,8 +110,8 @@ class ArchiveManager(ArchiverBase):
 
         # Always round down the last sigfig maintain parity between
         # Python / C++ saving.
-        secs = event.header.stamp.secs
-        nsecs = event.header.stamp.nsecs
+        secs = event.header.stamp.sec
+        nsecs = event.header.stamp.nanosec
         usecs = int(nsecs / 1e3)
         fracs = float(usecs / 1e6)
         t = secs + fracs
