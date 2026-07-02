@@ -10,7 +10,7 @@ services:
       - "${PULSE_TTY}:${PULSE_TTY}"
     environment:
       REDIS_HOST: "${REDIS_HOST}"
-      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
       NODE_HOSTNAME: "${NODE_HOSTNAME}"
       ALLOW_SERIAL_INS_SPOOF: "${ALLOW_SERIAL_INS_SPOOF}"
       SPOOF_INS: "${SPOOF_INS}"

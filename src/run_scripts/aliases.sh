@@ -53,12 +53,12 @@ alias cb-gui="catkin build wxpython_gui"
 # runtime shortcuts
 # core - only on center
 run-core() {
-    roslaunch kamcore kamcore.launch data_mount_point:="$DATA_MOUNT_POINT"
+    ros2 run kamcore seed_redis_config /cfg/${SYSTEM_NAME}/config.yaml
 }
 alias run1-core="run-core"
 
-alias run-daq="roslaunch --wait mcc_daq daq.launch"
-alias run-ins="roslaunch --wait ins_driver ins.launch"
+alias run-daq="ros2 launch mcc_daq daq.launch.xml"
+alias run-ins="ros2 launch ins_driver ins.launch.xml"
 
 # ins & daq
 alias run2-daq="run-daq"
@@ -67,10 +67,10 @@ alias run3-ins="run-ins"
 # todo: put this stuff in the .launch
 # bring up both cams
 run-rgb() {
-    roslaunch --wait prosilica_camera prosilica.launch ip:=${iprgb} system_name:=${NODE_HOSTNAME} trigger_mode:=syncin2
+    ros2 launch prosilica_camera prosilica.launch.xml ip:=${iprgb} system_name:=${NODE_HOSTNAME} trigger_mode:=syncin2
 }
 run-ir() {
-    roslaunch --wait kw_genicam_driver genicam_a6750.launch camera_ipv4:=${ipir} \
+    ros2 launch kw_genicam_driver flir_a6750.launch.xml camera_ipv4:=${ipir} \
         system_name:=${NODE_HOSTNAME} firmware_mode:=mono16 trigger_mode:=External
 }
 

@@ -28,14 +28,14 @@ unset _redis_elapsed
 
 echo "Redis successfully connected at ${REDIS_HOST}, starting."
 
-export ROS_HOSTNAME=$(cq ".master_host")
 export NODE_HOSTNAME=$(hostname)
-export ROS_MASTER_URI="http://${ROS_HOSTNAME}:11311"
+# ROS2: peer discovery via DDS; all hosts must share a domain id
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 export DOCKER_KAMERA_DIR="/root/kamera"
 export DATA_MOUNT_POINT=$(cq .local_ssd_mnt)
 export CAM_FOV=$(cq ".arch.hosts[\"${NODE_HOSTNAME}\"].fov")
 
-export ROS_DISTRO="noetic"
+export ROS_DISTRO="humble"
 export KAMERA_DNS_IP="192.168.88.1"
 export PULSE_TTY=/dev/ttyS0
 export MCC_DAQ="/dev/$(readlink /dev/mcc_daq)"

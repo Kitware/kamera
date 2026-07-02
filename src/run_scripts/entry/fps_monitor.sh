@@ -6,4 +6,4 @@ echo "<=> <=> <=>  FPS MONITOR  <=> <=> <=> "
 source /entry/project.sh
 source /aliases.sh
 
-exec roslaunch --wait kamcore fps_monitor.launch norespawn:=${NORESPAWN:-false}
+exec ros2 launch kamcore fps_monitor.launch.xml

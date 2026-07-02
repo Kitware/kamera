@@ -4,4 +4,4 @@
 
 echo "( ) ( ) ( ) SPOOOOOOF INS ( ) ( ) ( ) "
 source /entry/project.sh
-roslaunch --wait ins_driver spoof_events.launch
+ros2 launch ins_driver spoof_events.launch.xml
