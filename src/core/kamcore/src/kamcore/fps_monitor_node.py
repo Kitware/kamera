@@ -2,20 +2,26 @@
 
 import os
 import socket
-import numpy as np
-from six.moves.queue import deque
+from collections import deque
 
-import rospy
+import numpy as np
+import rclpy
+from rclpy.node import Node
 
 from roskv.impl.redis_envoy import RedisEnvoy
 from sensor_msgs.msg import Image
-from custom_msgs.msg import GSOF_EVT
+from custom_msgs.msg import GsofEvt
 
 hostname = socket.gethostname()
 
 
-class FPSMonitor:
+def stamp_to_sec(stamp):
+    return stamp.sec + stamp.nanosec * 1e-9
+
+
+class FPSMonitor(Node):
     def __init__(self) -> None:
+        super().__init__(f"{hostname}_fps_monitor")
         self.envoy = RedisEnvoy(os.environ["REDIS_HOST"], client_name="fps_monitor")
         self.hostname = hostname
         self.ir_drops = 0
@@ -28,23 +34,27 @@ class FPSMonitor:
         self.processed_times = deque(maxlen=50)
         self.previously_archiving = False
         self.init_ros()
+        self.update_timer = self.create_timer(1.0, self.update)
 
     def init_ros(self):
-        self.event_sub = rospy.Subscriber(
-            "/event", GSOF_EVT, callback=self.ingest_event, queue_size=2
+        self.event_sub = self.create_subscription(
+            GsofEvt, "/event", self.ingest_event, 2
         )
+        self.image_subs = []
         channels = self.envoy.get("/sys/channels").keys()
         for channel in channels:
-            _ = rospy.Subscriber(
-                f"/{hostname}/{channel}/image_raw",
-                Image,
-                callback=self.ingest_image,
-                queue_size=2,
+            self.image_subs.append(
+                self.create_subscription(
+                    Image,
+                    f"/{hostname}/{channel}/image_raw",
+                    self.ingest_image,
+                    2,
+                )
             )
 
     def ingest_event(self, msg):
-        time = msg.gps_time.to_sec()
-        rospy.loginfo("Received event message, time %0.5f." % time)
+        time = stamp_to_sec(msg.gps_time)
+        self.get_logger().info("Received event message, time %0.5f." % time)
         is_archiving = self.envoy.get("/sys/arch/is_archiving") == "1"
         # Skip the first event, so we don't accidentally report drops
         if is_archiving and self.previously_archiving:
@@ -58,7 +68,7 @@ class FPSMonitor:
 
     def ingest_image(self, msg):
         frame_id = msg.header.frame_id
-        time = msg.header.stamp.to_sec()
+        time = stamp_to_sec(msg.header.stamp)
 
         modality = ""
         if "uv" in frame_id:
@@ -71,9 +81,16 @@ class FPSMonitor:
             modality = "ir"
             self.ir_queue.append(time)
         else:
-            rospy.logwarn("No valid modality found in image message!")
+            self.get_logger().warning("No valid modality found in image message!")
 
-        rospy.loginfo("Received %s message, time: %0.5f." % (modality, time))
+        self.get_logger().info("Received %s message, time: %0.5f." % (modality, time))
+
+    @staticmethod
+    def _fps(times):
+        if len(times) < 2:
+            return 0
+        den = np.mean([times[i] - times[i - 1] for i in range(1, len(times))])
+        return round(1 / den, 3) if den != 0 else 0
 
     def update(self):
         # copy over data structures and sort
@@ -82,38 +99,9 @@ class FPSMonitor:
         uv_list = list(self.uv_queue)
         times = list(self.evt_queue)
 
-        # calculate FPS
-        if len(rgb_list) > 1:
-            den = np.mean(
-                [rgb_list[i] - rgb_list[i - 1] for i in range(1, len(rgb_list))]
-            )
-            if den != 0:
-                rgb_fps = 1 / den
-            else:
-                rgb_fps = 0
-        else:
-            rgb_fps = 0
-        if len(ir_list) > 1:
-            den = np.mean([ir_list[i] - ir_list[i - 1] for i in range(1, len(ir_list))])
-            if den != 0:
-                ir_fps = 1 / den
-            else:
-                ir_fps = 0
-        else:
-            ir_fps = 0
-        if len(uv_list) > 1:
-            den = np.mean([uv_list[i] - uv_list[i - 1] for i in range(1, len(uv_list))])
-            if den != 0:
-                uv_fps = 1 / den
-            else:
-                uv_fps = 0
-        else:
-            uv_fps = 0
-
-        # don't need so many sigfigs
-        rgb_fps = round(rgb_fps, 3)
-        ir_fps = round(ir_fps, 3)
-        uv_fps = round(uv_fps, 3)
+        rgb_fps = self._fps(rgb_list)
+        ir_fps = self._fps(ir_list)
+        uv_fps = self._fps(uv_list)
 
         # register missed frames
         # Assume that if we haven't seen this time in the last 5 frames,
@@ -142,14 +130,17 @@ class FPSMonitor:
         self.envoy.set(f"/sys/arch/{hostname}/uv/dropped", self.uv_drops)
 
 
-def main():
-    rospy.init_node(f"{hostname}_fps_monitor")
+def main(args=None):
+    rclpy.init(args=args)
     mon = FPSMonitor()
-    rospy.loginfo("Waiting for incoming image and event messages ...")
-
-    while not rospy.is_shutdown():
-        mon.update()
-        rospy.sleep(1)
+    mon.get_logger().info("Waiting for incoming image and event messages ...")
+    try:
+        rclpy.spin(mon)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        mon.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == "__main__":
