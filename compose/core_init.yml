@@ -1,15 +1,15 @@
 ---
-## Bring up the core nodes
+## Seed Redis with the static system config (formerly also ran roscore)
 services:
   ## =========================== headless nodes =============================
-  roscore:
-    container_name: roscore
+  core_init:
+    container_name: core_init
     image: ${KAMERA_CORE_IMAGE}
     init: true
     tty: true
     network_mode: host
     environment:
-      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
       DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
       SPOOF_RATE: "${SPOOF_RATE}"
       REDIS_HOST: "${REDIS_HOST}"
@@ -21,7 +21,7 @@ services:
     volumes:
       - "/mnt:/mnt"
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
-    command: ["/entry/master.sh"]
+    command: ["/entry/core_init.sh"]
     restart: no
 ...
 

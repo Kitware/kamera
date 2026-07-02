@@ -23,8 +23,6 @@ else
   COMPRESS_IMAGERY="false"
 fi
 
-roslaunch --wait view_server image_view_server.launch \
-    norespawn:="${NORESPAWN}" \
-	system_name:=${NODE_HOSTNAME} \
+exec ros2 launch view_server image_view_server.launch.xml \
 	send_image_data:=${SEND_IMAGE_DATA} \
 	compress_imagery:=${COMPRESS_IMAGERY}

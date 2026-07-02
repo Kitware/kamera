@@ -6,4 +6,4 @@ echo "<=> <=> <=>  CAM PARAM MONITOR  <=> <=> <=> "
 source /entry/project.sh
 source /aliases.sh
 
-exec roslaunch --wait kamcore shapefile_monitor.launch norespawn:=${NORESPAWN:-false}
+exec ros2 launch kamcore shapefile_monitor.launch.xml
