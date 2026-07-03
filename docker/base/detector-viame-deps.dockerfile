@@ -1,11 +1,14 @@
 # Build off the public VIAME docker build (with ITK support)
+# NOTE (ROS2 port): Jazzy requires an Ubuntu 24.04 (noble) base. The VIAME
+# image referenced here must be one built on 24.04; the old focal-based
+# gpu-algorithms-seal tag cannot host Jazzy debs.
 FROM kitware/viame:gpu-algorithms-seal AS vb
 
 WORKDIR /root
 # setup environment
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8
-ENV ROS_DISTRO noetic
+ENV ROS_DISTRO jazzy
 ENV DEBIAN_FRONTEND noninteractive
 
 # install packages
@@ -20,19 +23,18 @@ RUN apt-get update && apt-get install -q -y --no-install-recommends \
     iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
-# setup sources.list
-RUN echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros1-latest.list
-
-# setup keys
-RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
+# setup ROS2 apt source (Jazzy runs on Ubuntu 24.04 / noble)
+RUN curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+        -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu noble main" \
+        > /etc/apt/sources.list.d/ros2-latest.list
 
 # install ros packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ros-noetic-ros-core=1.5.0-1* \
-    ros-noetic-ros-base=1.5.0-1* \
-    ros-noetic-perception=1.5.0-1* \
-    python3-catkin-tools \
-    ros-noetic-rqt-image-view \
+    ros-jazzy-ros-core \
+    ros-jazzy-ros-base \
+    ros-jazzy-perception \
+    python3-colcon-common-extensions \
     && rm -rf /var/lib/apt/lists/*
 
 # Build tools necessary for catkin and roskv

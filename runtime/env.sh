@@ -35,7 +35,7 @@ export DOCKER_KAMERA_DIR="/root/kamera"
 export DATA_MOUNT_POINT=$(cq .local_ssd_mnt)
 export CAM_FOV=$(cq ".arch.hosts[\"${NODE_HOSTNAME}\"].fov")
 
-export ROS_DISTRO="humble"
+export ROS_DISTRO="jazzy"
 export KAMERA_DNS_IP="192.168.88.1"
 export PULSE_TTY=/dev/ttyS0
 export MCC_DAQ="/dev/$(readlink /dev/mcc_daq)"

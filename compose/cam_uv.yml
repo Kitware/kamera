@@ -10,7 +10,7 @@ services:
     environment:
       ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
       REDIS_HOST: "${REDIS_HOST}"
-      ROS_DISTRO: "humble"
+      ROS_DISTRO: "jazzy"
       NODE_HOSTNAME: "${NODE_HOSTNAME}"
       CAM_MODE: "uv"
       CAM_FOV: "${CAM_FOV}"
