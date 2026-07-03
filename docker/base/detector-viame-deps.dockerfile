@@ -1,8 +1,7 @@
-# Build off the public VIAME docker build (with ITK support)
-# NOTE (ROS2 port): Jazzy requires an Ubuntu 24.04 (noble) base. The VIAME
-# image referenced here must be one built on 24.04; the old focal-based
-# gpu-algorithms-seal tag cannot host Jazzy debs.
-FROM kitware/viame:gpu-algorithms-seal AS vb
+# Build off the public VIAME docker build (with ITK support).
+# The current gpu-algorithms tag is built on Ubuntu 24.04 (noble), which is
+# what Jazzy requires.
+FROM kitware/viame:gpu-algorithms AS vb
 
 WORKDIR /root
 # setup environment
