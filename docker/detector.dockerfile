@@ -8,6 +8,6 @@ WORKDIR /root/kamera
 ENV REPO_DIR=/root/kamera
 ENV CMAKE_POLICY_VERSION_MINIMUM=3.5
 
-RUN ["/bin/bash", "-c", "source /entry/project.sh && \
+RUN ["/bin/bash", "-c", "source /opt/ros/${ROS_DISTRO}/setup.bash && \
       source src/run_scripts/setup/setup_viame_build.sh && \
-      catkin build sprokit_adapters"]
+      colcon build --base-paths src --packages-up-to sprokit_adapters --cmake-args -DCMAKE_BUILD_TYPE=Release"]

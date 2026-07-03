@@ -15,7 +15,7 @@
 #include "std_msgs/msg/int8.hpp"
 #include "std_msgs/msg/header.hpp"
 
-#include <cv_bridge/cv_bridge.h>
+#include <cv_bridge/cv_bridge.hpp>
 #include <image_transport/image_transport.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>

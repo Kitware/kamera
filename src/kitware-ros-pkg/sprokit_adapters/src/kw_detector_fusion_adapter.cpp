@@ -2,7 +2,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <std_msgs/msg/string.hpp>
-#include <cv_bridge/cv_bridge.h>
+#include <cv_bridge/cv_bridge.hpp>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>

@@ -8,7 +8,7 @@ services:
     tty: true
     environment:
       ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
-      ROS_DISTRO: "humble"
+      ROS_DISTRO: "jazzy"
       REDIS_HOST: "${REDIS_HOST}"
       NODE_HOSTNAME: "${NODE_HOSTNAME}"
       CAM_MODE: "ir"

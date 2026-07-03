@@ -4,7 +4,7 @@
 #include <string>
 #include <stdexcept>
 #include <map>
-#include <cv_bridge/cv_bridge.h>
+#include <cv_bridge/cv_bridge.hpp>
 
 using std::string;
 using std::map;

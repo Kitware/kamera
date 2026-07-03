@@ -4,17 +4,13 @@
 # devel setup or the base ROS environment setup script.  This cascades down
 # ROS versions when a development environment does not exist.
 
-# may have changed
-MASTER_HOST=$(echo $ROS_MASTER_URI| grep -Po -e '(?<=http:\/\/)([\w\.]+)(?=:)')
-
 rosinfo () {
 printf "=== === === ACTIVATE ROS ${ROS_DISTRO} === === === === ===
 DATA_MOUNT_POINT: ${DATA_MOUNT_POINT}
 CAM_FOV         : ${CAM_FOV}
 HOSTNAME        : `hostname`
 NODE_HOSTNAME   : ${NODE_HOSTNAME}
-ROS_HOST/IP     : ${ROS_HOSTNAME} ${ROS_IP}
-ROS_MASTER_URI  : ${ROS_MASTER_URI}
+ROS_DOMAIN_ID   : ${ROS_DOMAIN_ID}
 REPO_DIR        : ${REPO_DIR}
 "
 }
@@ -24,7 +20,7 @@ rosinfo
 
 echo "Sourcing files and establishing environment"
 ## This presumes ROS_DISTRO is set
-DEVEL_SETUP="${REPO_DIR}/devel/setup.bash"
+DEVEL_SETUP="${REPO_DIR}/install/setup.bash"
 VERSION_SETUP_PATH="/opt/ros/${ROS_DISTRO}/setup.bash"
 if [ -f "${VERSION_SETUP_PATH}" ]
 then
@@ -37,10 +33,10 @@ fi
 
 if [ -f "${DEVEL_SETUP}" ]
 then
-  echo "Sourcing workspace devel setup"
+  echo "Sourcing colcon workspace setup"
   source "${DEVEL_SETUP}"
 else
-  echo "WARNING: Found no ROS devel setup script in workspace: ${DEVEL_SETUP}"
+  echo "WARNING: Found no colcon workspace setup script: ${DEVEL_SETUP}"
 fi
 
 ### ok ros devel/setup.bash does some weird stuff with path so we have to make sure it's still set up correctly
@@ -54,4 +50,4 @@ fi
 echo "activate_ros::PATH: [${PATH}]"
 
 # this sets the logging format
-export ROSCONSOLE_FORMAT='${walltime}: ${message}'
+export RCUTILS_CONSOLE_OUTPUT_FORMAT='{time}: {message}'
