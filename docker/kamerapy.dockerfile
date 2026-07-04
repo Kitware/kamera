@@ -1,5 +1,7 @@
 FROM python:3.10.15-bookworm
 
+COPY --from=ghcr.io/astral-sh/uv:0.6.1 /uv /uvx /bin/
+
 RUN apt-get update && apt-get install -yq \
     libgdal-dev \
     python3-gdal \
@@ -10,11 +12,22 @@ RUN apt-get update && apt-get install -yq \
     dnsutils \
     gdal-bin
 
-RUN pip install --upgrade pip
-RUN pip install setuptools==57.0.0
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
+WORKDIR /src/kamera
+
+# Install dependencies before copying source so this layer caches across
+# code-only changes. uv.lock is gitignored: run `uv lock` before building.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project
 
 COPY ./ /src/kamera
-WORKDIR /src/kamera
-RUN pip install -e .
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen
+
+ENV PATH="/src/kamera/.venv/bin:$PATH"
 
 ENTRYPOINT ["bash"]
