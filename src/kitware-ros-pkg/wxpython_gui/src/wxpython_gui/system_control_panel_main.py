@@ -6,7 +6,6 @@ from __future__ import division, print_function
 import os
 
 import wx
-import rospy
 
 from wxpython_gui.system_control_panel.gui import MainFrame
 from roskv.impl.redis_envoy import RedisEnvoy
@@ -15,7 +14,6 @@ from roskv.util import filter_hosts_by_system
 
 def main():
     node_name = "system_control_panel_node"
-    name_space = rospy.get_namespace()
 
     envoy = RedisEnvoy(os.environ["REDIS_HOST"], client_name=node_name)
     enabled = envoy.get("/sys/enabled")

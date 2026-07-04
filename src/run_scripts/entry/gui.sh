@@ -12,7 +12,7 @@ source ${KAM_REPO_DIR}/src/cfg/cfg-aliases.sh  # get cq - ConfigQuery
 source /entry/project.sh
 source /aliases.sh
 
-for VNAME in CFG_ALIAS_SET ROS_MASTER_URI DATA_MOUNT_POINT
+for VNAME in CFG_ALIAS_SET ROS_DOMAIN_ID DATA_MOUNT_POINT
 do
   if [[ -z "${!VNAME}" ]]
   then
@@ -25,12 +25,9 @@ done
 
 
 NODE_HOSTNAME=${NODE_HOSTNAME:-undefined}
-#pip install --user "src/core/roskv/[redis]"
-#catkin build custom_msgs roskv
-#TODO TESTING CHANGES DON"T SAVE
 
 if [[ -n "${START_IN_SHELL}" ]]; then
   bash
 else
-  exec roslaunch --wait wxpython_gui system_control_panel.launch
+  exec ros2 launch wxpython_gui system_control_panel.launch.xml
 fi

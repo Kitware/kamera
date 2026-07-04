@@ -10,8 +10,6 @@ services:
     environment:
       REDIS_HOST: "${REDIS_HOST}"
       ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
-      ROS_IP: "${ROS_IP:-}"
-      ROS_HOSTNAME: "${ROS_HOSTNAME:-}"
       DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
       GUI_CFG_DIR: "${GUI_CFG_DIR}"
       DISPLAY: "${DISPLAY}"
