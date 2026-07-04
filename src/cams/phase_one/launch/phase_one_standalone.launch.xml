@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <arg name="ip_address"/>
+  <arg name="num_threads" default="28"/>
+  <arg name="trigger_mode" default="manual"/>
+  <arg name="cam_mode" default="rgb"/>
+  <arg name="hostname"/>
+  <arg name="auto_trigger_rate" default="1.0"/>
+  <arg name="system_name" default="cas0"/>
+  <!-- replaces the old ROS_NAMESPACE env plumbing -->
+  <arg name="namespace" default="/$(var hostname)/$(var cam_mode)"/>
+  <arg name="respawn" default="true"/>
+
+  <node pkg="phase_one"
+        exec="phase_one_standalone"
+        name="$(var cam_mode)_driver"
+        namespace="$(var namespace)"
+        output="screen"
+        respawn="$(var respawn)">
+    <param name="ip_address" value="$(var ip_address)"/>
+    <param name="num_threads" value="$(var num_threads)"/>
+    <param name="hostname" value="$(var hostname)"/>
+    <param name="cam_chan" value="$(var cam_mode)"/>
+    <param name="trigger_mode" value="$(var trigger_mode)"/>
+    <param name="auto_trigger_rate" value="$(var auto_trigger_rate)"/>
+  </node>
+</launch>
