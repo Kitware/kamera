@@ -10,36 +10,33 @@
 #include <thread>
 #include <mutex>
 #include <algorithm>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 #include <P1Camera.hpp>
 #include <P1Image.hpp>
 #include <P1ImageJpegWriter.hpp>
 #include <P1ImageTiffWriter.hpp>
 
-#include <ros/ros.h>
-#include <cv_bridge/cv_bridge.h>
-#include <image_transport/image_transport.h>
-#include <pluginlib/class_list_macros.h>
-#include <sensor_msgs/image_encodings.h>
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/CompressedImage.h>
-#include <std_msgs/Header.h>
-#include <diagnostic_updater/diagnostic_updater.h>
-#include <diagnostic_updater/publisher.h>
+#include <rclcpp/rclcpp.hpp>
+#include <cv_bridge/cv_bridge.hpp>
+#include <image_transport/image_transport.hpp>
+#include <sensor_msgs/image_encodings.hpp>
+#include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
+#include <std_msgs/msg/header.hpp>
 
 #include <roskv/envoy.h>
 #include <roskv/archiver.h>
-#include <custom_msgs/GSOF_EVT.h>
-#include <custom_msgs/ImageSpaceDetectionList.h>
-#include <custom_msgs/Stat.h>
-#include <custom_msgs/RequestImageView.h>
+#include <custom_msgs/msg/gsof_evt.hpp>
+#include <custom_msgs/msg/image_space_detection_list.hpp>
+#include <custom_msgs/msg/stat.hpp>
+#include <custom_msgs/srv/request_image_view.hpp>
 
-#include <phase_one/GetPhaseOneParameter.h>
-#include <phase_one/SetPhaseOneParameter.h>
-#include <phase_one/GetCompressedImageView.h>
-#include <phase_one/GetImageView.h>
-#include <phase_one/phase_one_utils.h>
+#include <phase_one/srv/get_phase_one_parameter.hpp>
+#include <phase_one/srv/set_phase_one_parameter.hpp>
+#include <phase_one/srv/get_compressed_image_view.hpp>
+#include <phase_one/srv/get_image_view.hpp>
+#include <cam_utils/event_cache.hpp>
 #include <phase_one/phase_one.h>
 
 #ifdef HAVE_NVJPEG
@@ -48,9 +45,9 @@
 #include <cstring>
 #endif
 
-#ifdef HAVE_NVJPEG
 namespace phase_one
 {
+#ifdef HAVE_NVJPEG
     // Helper function to convert nvjpeg status to string
     const char* nvjpeg_error_string(nvjpegStatus_t s) {
         switch (s) {
@@ -238,8 +235,9 @@ namespace phase_one
     {
     }
 
-    void PhaseOne::init()
+    void PhaseOne::init(rclcpp::Node::SharedPtr node)
     {
+        node_ = node;
         PhaseOne::onInit();
     }
 
@@ -262,20 +260,17 @@ namespace phase_one
     void PhaseOne::onInit() {
         ROS_INFO("PhaseOne Driver: Initialization");
         // ROS initialization
-        ros::NodeHandle nh;
-        ros::NodeHandle pnh("~");
-        image_transport::ImageTransport it(nh);
-        image_pub = it.advertise("image_raw", 1, true);
-        stat_pub_ = nh.advertise<custom_msgs::Stat>("/stat", 3);
+        image_pub = image_transport::create_publisher(node_.get(), "image_raw");
+        stat_pub_ = node_->create_publisher<custom_msgs::msg::Stat>("/stat", 3);
 
         ROS_INFO("Loading ROS parameters.");
-        pnh.param<std::string>("ip_address", ip_address_, "");
-        pnh.param<int>("num_threads", num_threads_, 28);
-        pnh.param<std::string>("trigger_mode", trigger_mode_, "manual"); //manual, auto
-        pnh.param<double>("auto_trigger_rate", auto_trigger_rate_, 1.0);
-        pnh.param<std::string>("cam_chan", cam_channel_, "nochan");
-        pnh.param<std::string>("cam_fov", cam_fov_, "nofov");
-        pnh.param<std::string>("hostname", hostname, "casX");
+        ip_address_ = node_->declare_parameter("ip_address", std::string(""));
+        num_threads_ = node_->declare_parameter("num_threads", 28);
+        trigger_mode_ = node_->declare_parameter("trigger_mode", std::string("manual")); //manual, auto
+        auto_trigger_rate_ = node_->declare_parameter("auto_trigger_rate", 1.0);
+        cam_channel_ = node_->declare_parameter("cam_chan", std::string("nochan"));
+        cam_fov_ = node_->declare_parameter("cam_fov", std::string("nofov"));
+        hostname = node_->declare_parameter("hostname", std::string("casX"));
 
         // connect to redis
         ROS_INFO("Cameratype: %s/%s", cam_fov_.c_str(), cam_channel_.c_str());
@@ -316,7 +311,7 @@ namespace phase_one
 
         static double min_image_delay = 0.95; // should depend on exposure time
         event_cache.set_delay(min_image_delay);
-        event_cache.set_tolerance(ros::Duration(0.49));
+        event_cache.set_tolerance(rclcpp::Duration::from_seconds(0.49));
         to_process_filename_ = base_dir + "/to_process.txt";
         processed_filename_ = base_dir + "/processed.txt";
         std::vector<std::string> to_process_images = loadFile(to_process_filename_);
@@ -372,19 +367,43 @@ namespace phase_one
         capture_thread_ = std::thread(&PhaseOne::capture, this);
         demosaic_thread_ = std::thread(&PhaseOne::demosaic, this);
 
-        get_param_service_ = pnh.advertiseService("get_phaseone_parameter",
-                &PhaseOne::getPhaseOneParameter, this);
-        set_param_service_ = pnh.advertiseService("set_phaseone_parameter",
-                &PhaseOne::setPhaseOneParameter, this);
-        image_view_service_ = pnh.advertiseService("get_image_view",
-                &PhaseOne::getImageView, this);
-        compressed_image_view_service_ = pnh.advertiseService("get_compressed_image_view",
-                &PhaseOne::getCompressedImageView, this);
+        // "~/" services resolve under the node's namespace + name, matching the
+        // ROS1 private-nodehandle layout the GUI and cam_param_monitor call
+        get_param_service_ = node_->create_service<phase_one::srv::GetPhaseOneParameter>(
+                "~/get_phaseone_parameter",
+                [this](const std::shared_ptr<phase_one::srv::GetPhaseOneParameter::Request> req,
+                       std::shared_ptr<phase_one::srv::GetPhaseOneParameter::Response> resp) {
+                    getPhaseOneParameter(req, resp);
+                });
+        set_param_service_ = node_->create_service<phase_one::srv::SetPhaseOneParameter>(
+                "~/set_phaseone_parameter",
+                [this](const std::shared_ptr<phase_one::srv::SetPhaseOneParameter::Request> req,
+                       std::shared_ptr<phase_one::srv::SetPhaseOneParameter::Response> resp) {
+                    setPhaseOneParameter(req, resp);
+                });
+        image_view_service_ = node_->create_service<custom_msgs::srv::RequestImageView>(
+                "~/get_image_view",
+                [this](const std::shared_ptr<custom_msgs::srv::RequestImageView::Request> req,
+                       std::shared_ptr<custom_msgs::srv::RequestImageView::Response> resp) {
+                    getImageView(req, resp);
+                });
+        compressed_image_view_service_ = node_->create_service<phase_one::srv::GetCompressedImageView>(
+                "~/get_compressed_image_view",
+                [this](const std::shared_ptr<phase_one::srv::GetCompressedImageView::Request> req,
+                       std::shared_ptr<phase_one::srv::GetCompressedImageView::Response> resp) {
+                    getCompressedImageView(req, resp);
+                });
 
         // Subscribers
-        event_sub_ = pnh.subscribe("/event", 1, &PhaseOne::eventCallback, this);
+        event_sub_ = node_->create_subscription<custom_msgs::msg::GsofEvt>(
+                "/event", 1,
+                [this](const custom_msgs::msg::GsofEvt::ConstSharedPtr msg) { eventCallback(msg); });
         std::string det_topic = "/" + hostname + "/detections";
-        detection_sub_ = pnh.subscribe(det_topic, 1, &PhaseOne::detectionListCallback, this);
+        detection_sub_ = node_->create_subscription<custom_msgs::msg::ImageSpaceDetectionList>(
+                det_topic, 1,
+                [this](const custom_msgs::msg::ImageSpaceDetectionList::ConstSharedPtr msg) {
+                    detectionListCallback(msg);
+                });
     };
 
     int PhaseOne::connectToIPCamera(std::string ip) {
@@ -451,9 +470,9 @@ namespace phase_one
 
                 // Create stat msg
                 auto nodeName = "/" + hostname + "/rgb/rgb_driver";
-                custom_msgs::Stat stat_msg;
+                custom_msgs::msg::Stat stat_msg;
                 std::stringstream link;
-                stat_msg.header.stamp = ros::Time::now();
+                stat_msg.header.stamp = node_->now();
                 stat_msg.trace_topic = nodeName + "/publishImage";
                 stat_msg.node = nodeName;
 
@@ -467,9 +486,9 @@ namespace phase_one
                 ROS_INFO_STREAM("|CAPTURE| wait time: " << wait_dt.count() / 1e9 << "s");
                 std::shared_ptr<const P1::CameraSdk::IFullImage> iiqImage;
                 P1::ImageSdk::RawImage image;
-                ros::Time frame_recv_time_;
+                rclcpp::Time frame_recv_time_;
                 if ( event && event->Type().id == P1::CameraSdk::EventType::CameraImageReady.id ) {
-                    frame_recv_time_ = ros::Time::now();
+                    frame_recv_time_ = node_->now();
                     ROS_INFO("|CAPTURE| image received!");
                     iiqImage = event->FullImage();
                     P1::ImageSdk::RawImage image(iiqImage->Data(),
@@ -487,25 +506,21 @@ namespace phase_one
                     // mutex locks goes out of scope, should release
                 } else {
                     ROS_WARN("|CAPTURE| No image received within timeout!");
-                    //running_ = false;
                     timed_out = true;
                     break;
-                    //continue;
                 }
-                auto tic3 = std::chrono::high_resolution_clock::now();
 
                 // Sync event cache
-                std_msgs::Header gps_header;
+                std_msgs::msg::Header gps_header;
+                uint64_t event_num = 0;
                 ROS_INFO("|CAPTURE| Searching event cache.");
-                bool success = event_cache.search(frame_recv_time_, gps_header);
+                bool success = event_cache.search(frame_recv_time_, gps_header, event_num);
                 if (success != true) {
                     ROS_WARN("|CAPTURE| Could not find event message to associate image to! Skipping.");
-                    // TODO: sub in current time? seems dangerous
-                    //gps_header.stamp = ros::Time::now();
                     continue;
                 } else {
                     ROS_WARN("|CAPTURE| Found matching event!");
-                    link << nodeName << "/event/" << gps_header.seq; // link this trace to the event trace
+                    link << nodeName << "/event/" << event_num; // link this trace to the event trace
                     stat_msg.link = link.str();
                     stat_msg.note = "success";
                 }
@@ -514,17 +529,16 @@ namespace phase_one
                 if (is_archiving) {
                     // Write raw iiq to file
                     long int sec  = gps_header.stamp.sec;
-                    long int nsec = gps_header.stamp.nsec;
-                    int seq = gps_header.seq;
+                    long int nsec = gps_header.stamp.nanosec;
+                    int seq = (int) event_num;
                     std::string fname = ArchiverHelper::generateFilename(envoy_, arch_opts_, sec, nsec);
                     // Adds an additional dir layer for raw images
                     fname.insert(fname.find(base_dir) + base_dir.size(), "/iiq_buffer");
-                    //std::string fname = "/mnt/data/test/" + iiqImage->FileName();
                     fname.replace(fname.find("jpg"), 3, "IIQ"); // Replaces "jpg" with "IIQ"
                     ROS_INFO_STREAM("|CAPTURE| Write file: " << fname);
-                    boost::filesystem::path path_fname{fname};
+                    std::filesystem::path path_fname{fname};
                     try {
-                        boost::filesystem::create_directories(path_fname.parent_path());
+                        std::filesystem::create_directories(path_fname.parent_path());
                         std::fstream iiqFile(fname, std::ios::binary | std::ios::trunc | std::ios::out);
                         iiqFile.write((char*)iiqImage->Data().get(), iiqImage->DataSizeBytes());
                         iiqFile.close();
@@ -552,27 +566,22 @@ namespace phase_one
                         total_counter++;
                         envoy_->put("/sys/" + hostname + "/p1debayerq/total",
                                     std::to_string(total_counter));
-                    } catch (boost::filesystem::filesystem_error &e) {
+                    } catch (std::filesystem::filesystem_error &e) {
                         ROS_ERROR("|CAPTURE| Archive Failed [%d]: %s", e.code().value(), e.what());
                     } catch (const std::ios_base::failure& e) {
                         ROS_ERROR("|CAPTURE| I/O error writing IIQ file: %s", e.what());
                     }
                 }
 
-                //P1::ImageSdk::ImageTag tag = image.GetTag(ids.DateTime);
-                //ROS_INFO_STREAM("Tag: " << tag.ToString());
                 // seems to want to take from queue, rather than straight `image`
                 P1::ImageSdk::RawImage raw_img;
                 raw_img = image_q_.front();
                 P1::ImageSdk::BitmapImage preview = raw_img.GetPreview();
                 cv::Mat cvImage_raw = cv::Mat(cv::Size(preview.Width(), preview.Height()), CV_8UC3);
                 cvImage_raw.data = preview.Data().get();
-                sensor_msgs::Image output_msg;
+                sensor_msgs::msg::Image output_msg;
                 try {
-                    std_msgs::Header header;
-                    //P1::ImageSdk::TagId ids;
-                    //header.seq = tag.Value();
-                    header.seq = gps_header.seq;
+                    std_msgs::msg::Header header;
                     header.stamp = gps_header.stamp;
                     img_bridge = cv_bridge::CvImage(header,
                             sensor_msgs::image_encodings::RGB8, cvImage_raw);
@@ -617,10 +626,7 @@ namespace phase_one
 
                 output_msg.header.frame_id = frame_id.str();
                 image_pub.publish(output_msg);
-                stat_pub_.publish(stat_msg);
-                //long int sec  = output_msg.header.stamp.sec;
-                //long int nsec = output_msg.header.stamp.nsec;
-                //std::string fname = ArchiverHelper::generateFilename(envoy_, arch_opts_, sec, nsec);
+                stat_pub_->publish(stat_msg);
 
                 auto toc = std::chrono::high_resolution_clock::now();
                 auto dt = toc - tic1;
@@ -642,6 +648,7 @@ namespace phase_one
                 camera.Close();
                 int ret = connectToIPCamera(ip_address_);
                 ret = capture();
+                (void) ret;
             }
         }// catch-all for exceptions during capture
         catch (P1::ImageSdk::SdkException exception)
@@ -838,6 +845,7 @@ namespace phase_one
             return false;
         }
 #else
+        (void) bgr_image; (void) output; (void) quality;
         ROS_ERROR("compressJpegNvjpeg: nvjpeg not available (compiled without HAVE_NVJPEG)");
         return false;
 #endif
@@ -848,10 +856,9 @@ namespace phase_one
                              const std::string &filename,
                              std::string format)
     {
-        auto start_db  = ros::Time::now();
         try {
-            boost::filesystem::path path_filename{filename};
-            boost::filesystem::create_directories(path_filename.parent_path());
+            std::filesystem::path path_filename{filename};
+            std::filesystem::create_directories(path_filename.parent_path());
             if (format == "jpg") {
                 int quality = std::stoi(envoy_->get("/sys/arch/jpg/quality"));
                 jpegConfig.quality = quality;
@@ -901,8 +908,8 @@ namespace phase_one
                   std::vector<int> compression_params;
                   compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
                   compression_params.push_back(quality);
-                  boost::filesystem::path path_filename{filename};
-                  boost::filesystem::create_directories(path_filename.parent_path());
+                  std::filesystem::path path_filename{filename};
+                  std::filesystem::create_directories(path_filename.parent_path());
                   cv::imwrite(filename, cvImage, compression_params);
                 }
                 auto tocj = std::chrono::high_resolution_clock::now();
@@ -939,43 +946,40 @@ namespace phase_one
             P1::CameraSdk::PropertySpecification property = camera.PropertySpec(propertyId);
             std::string name = property.mName;
             property_to_id_[name] = propertyId;
-            property_to_type_[name] = property.mValue;
+            property_to_type[name] = property.mValue;
         }
     };
 
-    bool PhaseOne::getPhaseOneParameter(phase_one::GetPhaseOneParameter::Request& req,
-                                        phase_one::GetPhaseOneParameter::Response& resp)
+    void PhaseOne::getPhaseOneParameter(const std::shared_ptr<phase_one::srv::GetPhaseOneParameter::Request> req,
+                                        std::shared_ptr<phase_one::srv::GetPhaseOneParameter::Response> resp)
     {
         if (property_to_id_.size() > 0)
         {
             try
             {
-                std::string name = req.name.c_str();
+                std::string name = req->name.c_str();
                 int id = property_to_id_[ name ];
                 P1::CameraSdk::PropertyValue pv = camera.Property(id);
-                resp.value = pv.ToString();
-                resp.message = "ok";
-                ROS_INFO_STREAM("|GET| Parameter " << name << " returning value " << resp.value);
+                resp->value = pv.ToString();
+                resp->message = "ok";
+                ROS_INFO_STREAM("|GET| Parameter " << name << " returning value " << resp->value);
             }
             catch (const std::exception& ex)
             {
                 ROS_ERROR_STREAM("Cannot get parameter: " << ex.what());
-                resp.message = ex.what();
+                resp->message = ex.what();
             }
         }
-
-        return true;
-
     };
 
-    bool PhaseOne::setPhaseOneParameter(phase_one::SetPhaseOneParameter::Request& req,
-                                        phase_one::SetPhaseOneParameter::Response& resp)
+    void PhaseOne::setPhaseOneParameter(const std::shared_ptr<phase_one::srv::SetPhaseOneParameter::Request> req,
+                                        std::shared_ptr<phase_one::srv::SetPhaseOneParameter::Response> resp)
     {
         if (property_to_id_.size() > 0)
         {
             try
             {
-                std::string parameters = req.parameters.c_str();
+                std::string parameters = req->parameters.c_str();
                 std::map<std::string, std::string> name_to_value =
                                                     parseParams(parameters);
 
@@ -1010,32 +1014,30 @@ namespace phase_one
             catch (const std::exception& ex)
             {
                 ROS_ERROR_STREAM("Cannot set parameter: " << ex.what());
-                resp.message = ex.what();
-                return false;
+                resp->message = ex.what();
+                return;
             }
-            resp.message = "ok";
+            resp->message = "ok";
         }
-        return true;
     };
 
 
-    bool PhaseOne::getCompressedImageView(phase_one::GetCompressedImageView::Request& req,
-                                            phase_one::GetCompressedImageView::Response& resp) {
+    void PhaseOne::getCompressedImageView(const std::shared_ptr<phase_one::srv::GetCompressedImageView::Request> req,
+                                          std::shared_ptr<phase_one::srv::GetCompressedImageView::Response> resp) {
         // DOES NOT WORK CURRENTLY
-        auto tic = std::chrono::high_resolution_clock::now();
         ROS_INFO("Received Request for Compresssed Image View.");
         P1::ImageSdk::RawImage raw_img;
         std::unique_lock<std::mutex> lock(mtx);
         if ( !image_q_.empty() ) {
             raw_img = image_q_.front();
         } else {
-            resp.success = false;
-            return false;
+            resp->success = false;
+            return;
         }
         // manually release lock early
         lock.unlock();
         // Extract destination points from source image given a generic homography
-        std::vector<double> H = req.homography;
+        std::vector<double> H = req->homography;
         // Construct proper dimensional homography
         cv::Mat warp_matrix;
         warp_matrix = cv::Mat::eye(3, 3, CV_32F);
@@ -1058,13 +1060,13 @@ namespace phase_one
             cv::perspectiveTransform(srcPoints, dstPoints, warp_matrix);
         } catch(...) {
             ROS_ERROR("CV Warp exception in translating homography to points.");
-            resp.success = false;
-            return false;
+            resp->success = false;
+            return;
         }
         int x = dstPoints[0].x;
         int y = dstPoints[0].y;
-        int h = req.output_height;
-        int w = req.output_width;
+        int h = req->output_height;
+        int w = req->output_width;
 
         P1::ImageSdk::ConvertConfig config;
         config.SetCrop(x, y, w, h);
@@ -1080,20 +1082,23 @@ namespace phase_one
             // Exception from ImageSDK
             ROS_ERROR_STREAM("|DEMOSAIC| ImageSDK Exception: " << exception.what() << " Code:"
                             << exception.mCode << std::endl);
-            return false;
+            resp->success = false;
+            return;
         }
         catch (P1::CameraSdk::SdkException exception)
         {
             // Exception from CameraSDK
             ROS_ERROR_STREAM("|DEMOSAIC| CameraSDK Exception: " << exception.what() << " Code:"
                             << exception.mErrorCode << std::endl);
-            return false;
+            resp->success = false;
+            return;
         }
         catch (...)
         {
             // Any other exception - just in case
             ROS_WARN("|DEMOSAIC| Argh - we got an exception in debayering.");
-            return false;
+            resp->success = false;
+            return;
         }
         ROS_INFO_STREAM(bitmap.Height() << " bitmap " << bitmap.Width() << "\n");
         auto toc1 = std::chrono::high_resolution_clock::now();
@@ -1103,12 +1108,11 @@ namespace phase_one
         cvImage_raw.data = bitmap.Data().get();
 
         try {
-            std_msgs::Header header;
-            header.seq = 0;
-            header.stamp = ros::Time::now();
+            std_msgs::msg::Header header;
+            header.stamp = node_->now();
             img_bridge = cv_bridge::CvImage(header,
                     sensor_msgs::image_encodings::RGB8, cvImage_raw);
-            sensor_msgs::CompressedImage output_msg;
+            sensor_msgs::msg::CompressedImage output_msg;
             output_msg.format = "jpg";
             output_msg.header = header;
             int quality = std::stoi(envoy_->get("/sys/arch/jpg/quality"));
@@ -1145,48 +1149,44 @@ namespace phase_one
             ROS_INFO("Calling tocompressimage");
             output_msg.data = buffer;
             img_bridge.toCompressedImageMsg(output_msg);
-            resp.success = true;
-            resp.image = output_msg;
+            resp->success = true;
+            resp->image = output_msg;
         } catch (...) {
             ROS_ERROR("CV Warp exception.");
-            resp.success = false;
-            return false;
+            resp->success = false;
+            return;
         };
-        return true;
-        auto toc = std::chrono::high_resolution_clock::now();
-        auto dt = toc - tic;
-        ROS_INFO_STREAM("View Server: Time to process image request was: " << dt.count() / 1e9 << "s\n");
-        return true;
     };
 
-    bool PhaseOne::getImageView(custom_msgs::RequestImageView::Request& req,
-                                custom_msgs::RequestImageView::Response& resp) {
+    void PhaseOne::getImageView(const std::shared_ptr<custom_msgs::srv::RequestImageView::Request> req,
+                                std::shared_ptr<custom_msgs::srv::RequestImageView::Response> resp) {
         auto tic = std::chrono::high_resolution_clock::now();
         ROS_INFO("|VIEW SERVER| : Received Request for image view.");
         P1::ImageSdk::RawImage raw_img;
         std::unique_lock<std::mutex> lock(mtx);
-        bool staleH = req.homography == lastH;
-        bool staleSat = req.show_saturated_pixels == last_show_sat;
-        lastH = req.homography;
-        last_show_sat = req.show_saturated_pixels;
+        std::vector<double> req_homography(req->homography.begin(), req->homography.end());
+        bool staleH = req_homography == lastH;
+        bool staleSat = req->show_saturated_pixels == last_show_sat;
+        lastH = req_homography;
+        last_show_sat = req->show_saturated_pixels;
         if ( staleH && staleSat && !new_image) {
-            resp.success = true;
-            resp.image = sensor_msgs::Image();
-            return true;
+            resp->success = true;
+            resp->image = sensor_msgs::msg::Image();
+            return;
         }
         if ( !image_q_.empty() ) {
             raw_img = image_q_.front();
         } else {
-            resp.success = false;
-            resp.image = sensor_msgs::Image();
-            return false;
+            resp->success = false;
+            resp->image = sensor_msgs::msg::Image();
+            return;
         }
         // Reset global tracking of a "new image" received
         new_image = false;
         // manually release lock early
         lock.unlock();
         // Extract destination points from source image given a generic homography
-        std::vector<double> H = req.homography;
+        std::vector<double> H = req_homography;
         // Construct proper dimensional homography
         cv::Mat warp_matrix;
         warp_matrix = cv::Mat::eye(3, 3, CV_32F);
@@ -1209,13 +1209,13 @@ namespace phase_one
             cv::perspectiveTransform(srcPoints, dstPoints, warp_matrix);
         } catch(...) {
             ROS_ERROR("|VIEW SERVER| : CV Warp exception in translating homography to points.");
-            resp.success = false;
-            return false;
+            resp->success = false;
+            return;
         }
         int x = dstPoints[0].x;
         int y = dstPoints[0].y;
-        int out_h = req.output_height;
-        int out_w = req.output_width;
+        int out_h = req->output_height;
+        int out_w = req->output_width;
         double scale = H[0];
         double float_h = scale * out_h;
         double float_w = scale * out_w;
@@ -1223,10 +1223,10 @@ namespace phase_one
         int h = (int) float_h;
         int w = (int) float_w;
         // Bounds checking
-        if (x < 0) x = 0; if (x > raw_img.Width()) x = raw_img.Width();
-        if (y < 0) y = 0; if (y > raw_img.Height()) y = raw_img.Height();
-        if (h < 0) h = 0; if (h > raw_img.Height() - y) h = raw_img.Height() - y;
-        if (w < 0) w = 0; if (w > raw_img.Width() - x) w = raw_img.Width() - x;
+        if (x < 0) x = 0; if (x > (int) raw_img.Width()) x = raw_img.Width();
+        if (y < 0) y = 0; if (y > (int) raw_img.Height()) y = raw_img.Height();
+        if (h < 0) h = 0; if (h > (int) raw_img.Height() - y) h = raw_img.Height() - y;
+        if (w < 0) w = 0; if (w > (int) raw_img.Width() - x) w = raw_img.Width() - x;
         // All this gets a nice crop out of the image quite quickly (0.2s at worst)
         P1::ImageSdk::ConvertConfig config;
         config.SetCrop(x, y, w, h);
@@ -1245,23 +1245,23 @@ namespace phase_one
             // Exception from ImageSDK
             ROS_ERROR_STREAM("|VIEW SERVER| ImageSDK Exception: " << exception.what() << " Code:"
                             << exception.mCode << std::endl);
-            resp.success = false;
-            return false;
+            resp->success = false;
+            return;
         }
         catch (P1::CameraSdk::SdkException exception)
         {
             // Exception from CameraSDK
             ROS_ERROR_STREAM("|VIEW SERVER| CameraSDK Exception: " << exception.what() << " Code:"
                             << exception.mErrorCode << std::endl);
-            resp.success = false;
-            return false;
+            resp->success = false;
+            return;
         }
         catch (...)
         {
             // Any other exception - just in case
             ROS_WARN("|VIEW SERVER| Argh - we got an exception in debayering.");
-            resp.success = false;
-            return false;
+            resp->success = false;
+            return;
         }
         auto toc1 = std::chrono::high_resolution_clock::now();
         auto dt1 = toc1 - tic1;
@@ -1269,7 +1269,7 @@ namespace phase_one
         cv::Mat cvImage_raw = cv::Mat(cv::Size(bitmap.Width(), bitmap.Height()), CV_8UC3);
         cvImage_raw.data = bitmap.Data().get();
         try {
-            if (req.show_saturated_pixels) {
+            if (req->show_saturated_pixels) {
                 int maxval = 255;
                 cv::Scalar sat_pix = cv::Scalar(maxval, maxval, maxval);
                 cv::Mat mask;
@@ -1279,52 +1279,49 @@ namespace phase_one
             }
         } catch (const std::exception& e) {
             ROS_ERROR_STREAM("|VIEW SERVER| Caught generic exception in sat pixels: " << e.what());
-            return false;
+            resp->success = false;
+            return;
         }
         try {
-            std_msgs::Header header;
-            header.seq = 0;
-            header.stamp = ros::Time::now();
+            std_msgs::msg::Header header;
+            header.stamp = node_->now();
             img_bridge = cv_bridge::CvImage(header,
                     sensor_msgs::image_encodings::RGB8, cvImage_raw);
-            sensor_msgs::Image output_msg;
+            sensor_msgs::msg::Image output_msg;
             img_bridge.toImageMsg(output_msg);
-            resp.success = true;
-            resp.image = output_msg;
+            resp->success = true;
+            resp->image = output_msg;
         } catch (...) {
             ROS_ERROR("|VIEW SERVER| : CV Warp exception.");
-            resp.success = false;
-            return false;
+            resp->success = false;
+            return;
         };
         auto toc = std::chrono::high_resolution_clock::now();
         auto dt = toc - tic;
         ROS_INFO_STREAM("|VIEW SERVER| : Time to process image request was: " << dt.count() / 1e9 << "s\n");
-        return true;
     };
 
-    void PhaseOne::eventCallback (const boost::shared_ptr<custom_msgs::GSOF_EVT const>& msg) {
-        ROS_INFO("[%d]<1> eventCallback <>         %2.2f", msg->header.seq, msg->header.stamp.toSec());
-        //event_ = *msg;
-        event_cache.push_back(msg->sys_time, msg);
+    void PhaseOne::eventCallback (const custom_msgs::msg::GsofEvt::ConstSharedPtr& msg) {
+        ROS_INFO("[%lu]<1> eventCallback <>         %2.2f", (unsigned long) msg->event_num,
+                 rclcpp::Time(msg->header.stamp).seconds());
+        event_cache.push_back(rclcpp::Time(msg->sys_time), msg);
         // TODO: hardcoded, but is OK for now
         auto nodeName = "/" + hostname + "/rgb/rgb_driver";
-        custom_msgs::Stat stat_msg;
+        custom_msgs::msg::Stat stat_msg;
         std::stringstream link;
-        stat_msg.header.stamp = ros::Time::now();
+        stat_msg.header.stamp = node_->now();
         stat_msg.trace_header = (*msg).header;
         stat_msg.trace_topic = nodeName + "/eventCallback";
         stat_msg.node = nodeName;
-        link << nodeName << "/event/" << msg->header.seq; // link this trace to the event trace
+        link << nodeName << "/event/" << msg->event_num; // link this trace to the event trace
         stat_msg.link = link.str();
-        stat_pub_.publish(stat_msg);
+        stat_pub_->publish(stat_msg);
         event_cache.purge();
-        //watchdog.check();
-        //event_cache.show();
     };
 
-    void PhaseOne::detectionListCallback (const boost::shared_ptr<custom_msgs::ImageSpaceDetectionList const>& msg) {
-    ROS_INFO("[%d]<1> detectionListCallback <> %2.2f",
-             msg->header.seq, msg->header.stamp.toSec());
+    void PhaseOne::detectionListCallback (const custom_msgs::msg::ImageSpaceDetectionList::ConstSharedPtr& msg) {
+    ROS_INFO("<1> detectionListCallback <> %2.2f",
+             rclcpp::Time(msg->header.stamp).seconds());
         // this fname is the RGB jpeg filename (always) of the triplet,
         // even if that file doesn't yet exist
         std::string fname = msg->header.frame_id;
@@ -1341,7 +1338,6 @@ namespace phase_one
         }
         lock.unlock();
         int num_detections = msg->detections.size();
-        std::string effort_topic = "/sys/arch/effort";
         effort = envoy_->get("/sys/arch/effort");
         std::string x_image_topic = "/sys/effort_metadata_dict/" + effort + "/save_every_x_image";
         save_every_x = std::stoi(envoy_->get(x_image_topic));
@@ -1414,13 +1410,15 @@ namespace phase_one
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "phase_one_standalone");
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<rclcpp::Node>("phase_one_standalone");
     phase_one::PhaseOne cls;
-    cls.init();
-    ros::Rate r(10);
-    while (cls.running_) {
-        ros::spinOnce();
-        r.sleep();
+    cls.init(node);
+    rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), 2);
+    executor.add_node(node);
+    while (cls.running_ && rclcpp::ok()) {
+        executor.spin_some(std::chrono::milliseconds(100));
     }
+    rclcpp::shutdown();
     return 0;
 }

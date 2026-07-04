@@ -22,6 +22,7 @@
   <exec_depend>view_server</exec_depend>
   <exec_depend>cam_utils</exec_depend>
   <exec_depend>prosilica_camera</exec_depend>
+  <exec_depend>phase_one</exec_depend>
   <exec_depend>kw_genicam_driver</exec_depend>
 
   <export>

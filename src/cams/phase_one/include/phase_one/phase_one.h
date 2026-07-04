@@ -12,33 +12,42 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <thread>
 #include <mutex>
+#include <queue>
 #include <algorithm>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 #include <P1Camera.hpp>
 #include <P1Image.hpp>
 #include <P1ImageJpegWriter.hpp>
 #include <P1ImageTiffWriter.hpp>
 
-#include <ros/ros.h>
-#include <cv_bridge/cv_bridge.h>
-#include <image_transport/image_transport.h>
-#include <pluginlib/class_list_macros.h>
-#include <sensor_msgs/image_encodings.h>
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/CompressedImage.h>
-#include <std_msgs/Header.h>
-#include <diagnostic_updater/diagnostic_updater.h>
-#include <diagnostic_updater/publisher.h>
+#include <rclcpp/rclcpp.hpp>
+#include <cv_bridge/cv_bridge.hpp>
+#include <image_transport/image_transport.hpp>
+#include <sensor_msgs/image_encodings.hpp>
+#include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
+#include <std_msgs/msg/header.hpp>
 
 #include <roskv/envoy.h>
 #include <roskv/archiver.h>
-#include <custom_msgs/GSOF_EVT.h>
-#include <phase_one/phase_one_utils.h>
-#include <phase_one/GetPhaseOneParameter.h>
-#include <phase_one/SetPhaseOneParameter.h>
-#include <phase_one/GetCompressedImageView.h>
-#include <phase_one/GetImageView.h>
+#include <custom_msgs/msg/gsof_evt.hpp>
+#include <custom_msgs/msg/image_space_detection_list.hpp>
+#include <custom_msgs/msg/stat.hpp>
+#include <custom_msgs/srv/request_image_view.hpp>
+#include <cam_utils/event_cache.hpp>
+#include <phase_one/srv/get_phase_one_parameter.hpp>
+#include <phase_one/srv/set_phase_one_parameter.hpp>
+#include <phase_one/srv/get_compressed_image_view.hpp>
+#include <phase_one/srv/get_image_view.hpp>
+
+// rclcpp logging shims to keep ROS1-style call sites
+#define ROS_INFO(...) RCLCPP_INFO(rclcpp::get_logger("phase_one"), __VA_ARGS__)
+#define ROS_WARN(...) RCLCPP_WARN(rclcpp::get_logger("phase_one"), __VA_ARGS__)
+#define ROS_ERROR(...) RCLCPP_ERROR(rclcpp::get_logger("phase_one"), __VA_ARGS__)
+#define ROS_INFO_STREAM(args) RCLCPP_INFO_STREAM(rclcpp::get_logger("phase_one"), args)
+#define ROS_WARN_STREAM(args) RCLCPP_WARN_STREAM(rclcpp::get_logger("phase_one"), args)
+#define ROS_ERROR_STREAM(args) RCLCPP_ERROR_STREAM(rclcpp::get_logger("phase_one"), args)
 
 
 namespace phase_one
@@ -53,8 +62,8 @@ namespace phase_one
             // Shutdown threads and camera safely
             ~PhaseOne();
 
-            // Init call if thread-based
-            void init();
+            // Init call; the node owns all ROS interfaces
+            void init(rclcpp::Node::SharedPtr node);
 
             // Definition of init call, connect to camera, instantiate threads
             virtual void onInit();
@@ -75,7 +84,7 @@ namespace phase_one
                            std::string format);
 
             // Compress JPEG using nvjpeg (GPU-accelerated)
-            bool compressJpegNvjpeg(const cv::Mat& bgr_image, 
+            bool compressJpegNvjpeg(const cv::Mat& bgr_image,
                                     std::vector<unsigned char>& output,
                                     int quality = 90);
 
@@ -88,31 +97,31 @@ namespace phase_one
 
             // ROS service call, grabs a parameter or lists of parameters from the camera
             // and returns the string values
-            bool getPhaseOneParameter(phase_one::GetPhaseOneParameter::Request& req,
-                                      phase_one::GetPhaseOneParameter::Response& resp);
+            void getPhaseOneParameter(const std::shared_ptr<phase_one::srv::GetPhaseOneParameter::Request> req,
+                                      std::shared_ptr<phase_one::srv::GetPhaseOneParameter::Response> resp);
 
             // ROS service call, sets the list of param=value calls requested on
             // the camera
-            bool setPhaseOneParameter(phase_one::SetPhaseOneParameter::Request& req,
-                                      phase_one::SetPhaseOneParameter::Response& resp);
+            void setPhaseOneParameter(const std::shared_ptr<phase_one::srv::SetPhaseOneParameter::Request> req,
+                                      std::shared_ptr<phase_one::srv::SetPhaseOneParameter::Response> resp);
 
             // ROS service call, given a homography, return the compressed image chip
             // of that warp
-            bool getCompressedImageView(phase_one::GetCompressedImageView::Request& req,
-                                        phase_one::GetCompressedImageView::Response& resp);
+            void getCompressedImageView(const std::shared_ptr<phase_one::srv::GetCompressedImageView::Request> req,
+                                        std::shared_ptr<phase_one::srv::GetCompressedImageView::Response> resp);
 
             // ROS service call, given a homography, return the raw image chip of that
             // warp
-            bool getImageView(custom_msgs::RequestImageView::Request& req,
-                              custom_msgs::RequestImageView::Response& resp);
+            void getImageView(const std::shared_ptr<custom_msgs::srv::RequestImageView::Request> req,
+                              std::shared_ptr<custom_msgs::srv::RequestImageView::Response> resp);
 
             // ROS subscriber, listens for "event" messages published from the INS, and
             // when received, adds those to the current EventCache
-            void eventCallback (const boost::shared_ptr<custom_msgs::GSOF_EVT const>& msg);
+            void eventCallback (const custom_msgs::msg::GsofEvt::ConstSharedPtr& msg);
 
             // ROS subscriber, listens for "detection list" messages published from the detector,
             // and when received, adds these to the detection cache
-            void detectionListCallback (const boost::shared_ptr<custom_msgs::ImageSpaceDetectionList const>& msg);
+            void detectionListCallback (const custom_msgs::msg::ImageSpaceDetectionList::ConstSharedPtr& msg);
         private:
             // Phase One
             P1::CameraSdk::Camera camera;
@@ -121,16 +130,17 @@ namespace phase_one
             P1::ImageSdk::JpegConfig jpegConfig;
             P1::CameraSdk::Listener listener;
             // ROS
-            ros::ServiceServer image_view_service_;
-            ros::ServiceServer compressed_image_view_service_;
-            ros::ServiceServer get_param_service_;
-            ros::ServiceServer set_param_service_;
-            ros::Subscriber event_sub_;
-            ros::Subscriber detection_sub_;
+            rclcpp::Node::SharedPtr node_;
+            rclcpp::Service<custom_msgs::srv::RequestImageView>::SharedPtr image_view_service_;
+            rclcpp::Service<phase_one::srv::GetCompressedImageView>::SharedPtr compressed_image_view_service_;
+            rclcpp::Service<phase_one::srv::GetPhaseOneParameter>::SharedPtr get_param_service_;
+            rclcpp::Service<phase_one::srv::SetPhaseOneParameter>::SharedPtr set_param_service_;
+            rclcpp::Subscription<custom_msgs::msg::GsofEvt>::SharedPtr event_sub_;
+            rclcpp::Subscription<custom_msgs::msg::ImageSpaceDetectionList>::SharedPtr detection_sub_;
             image_transport::Publisher image_pub;
-            ros::Publisher stat_pub_;
+            rclcpp::Publisher<custom_msgs::msg::Stat>::SharedPtr stat_pub_;
             cv_bridge::CvImage img_bridge;
-            ros::Time frame_recv_time_;
+            rclcpp::Time frame_recv_time_;
             // ROS params
             std::string ip_address_;
             std::string trigger_mode_;
@@ -172,14 +182,12 @@ namespace phase_one
             // custom
             ArchiverOpts arch_opts_ = ArchiverOpts::from_env();
             std::shared_ptr<RedisEnvoy> envoy_;
-            custom_msgs::GSOF_EVT event_; // store the last received event
+            custom_msgs::msg::GsofEvt event_; // store the last received event
             // Holds events from the INS in a map to be searched for and matched
             // to incoming images
             EventCache event_cache;
-            // Debugger output
-            diagnostic_updater::Updater updater;
     };
 }
 
 
-#endif //PHASE_ONE_UTILS_H
+#endif //PHASE_ONE_H
