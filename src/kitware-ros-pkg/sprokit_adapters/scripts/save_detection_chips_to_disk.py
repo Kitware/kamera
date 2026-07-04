@@ -6,9 +6,15 @@ import cv2
 import time
 
 # ROS imports
-import rospy
+import rclpy
+import rclpy.logging
+from rclpy.node import Node
 from custom_msgs.msg import ImageSpaceDetectionList
 from cv_bridge import CvBridge, CvBridgeError
+
+
+def _stamp_to_sec(stamp):
+    return stamp.sec + stamp.nanosec * 1e-9
 
 
 # Instantiate CvBridge
@@ -16,13 +22,12 @@ bridge = CvBridge()
 
 
 class ChipSaver(object):
-    def __init__(self, det_topic, image_directory, ext='jpg'):
-        rospy.loginfo('Saving chips for detection topic det_topics: %s' %
-                      det_topic)
+    def __init__(self, node, det_topic, image_directory, ext='jpg'):
+        rclpy.logging.get_logger('save_chips').info(
+            'Saving chips for detection topic det_topics: %s' % det_topic)
         self.image_directory = image_directory
-        self.image_subscriber = rospy.Subscriber(det_topic,
-                                                 ImageSpaceDetectionList,
-                                                 self.callback_ros)
+        self.image_subscriber = node.create_subscription(
+            ImageSpaceDetectionList, det_topic, self.callback_ros, 10)
         self.ext = ext
 
     def callback_ros(self, msg):
@@ -33,7 +38,7 @@ class ChipSaver(object):
 
         """
         frame_id = msg.header.frame_id
-        frame_time = int(np.round(msg.header.stamp.to_sec()*100))
+        frame_time = int(np.round(_stamp_to_sec(msg.header.stamp)*100))
 
         frame_id = frame_id.replace('/','_')
 
@@ -52,31 +57,24 @@ class ChipSaver(object):
             cv2.imwrite(fname, raw_image)
 
 
-def main():
-    # Launch the node.
-    node = 'save_images_to_disk'
-    rospy.init_node(node, anonymous=False)
-
-    node_name = rospy.get_name()
+def main(args=None):
+    rclpy.init(args=args)
+    node = Node('save_detection_chips_to_disk')
 
     # -------------------------- Read Parameters -----------------------------
-    #print('rospy.get_param_names()', rospy.get_param_names())
-
-    # Load in cueing camera details.
     det_topics = []
     i = 1
     while True:
-        try:
-            param_name = '%s/detection_topic%i' % (node_name, i)
-            det_topics.append(rospy.get_param(param_name))
-            i += 1
-        except KeyError:
+        topic = node.declare_parameter('detection_topic%i' % i, '').value
+        if not topic:
             break
+        det_topics.append(topic)
+        i += 1
 
-    image_directory = rospy.get_param('%s/image_directory' % node_name)
-    image_directory = '%s/%i' % (image_directory,int(time.time()))
+    image_directory = node.declare_parameter('image_directory', '.').value
+    image_directory = '%s/%i' % (image_directory, int(time.time()))
 
-    ext = rospy.get_param('%s/image_extension' % node_name)
+    ext = node.declare_parameter('image_extension', 'jpg').value
 
     try:
         os.makedirs(image_directory)
@@ -84,13 +82,11 @@ def main():
         pass
     # ------------------------------------------------------------------------
 
-    for det_topic in det_topics:
-        ChipSaver(det_topic, image_directory, ext)
+    savers = [ChipSaver(node, t, image_directory, ext) for t in det_topics]
+    (void_ref,) = (savers,)
 
-    rospy.spin()
+    rclpy.spin(node)
+
 
 if __name__ == '__main__':
-    try:
-        main()
-    except rospy.ROSInterruptException:
-        pass
+    main()

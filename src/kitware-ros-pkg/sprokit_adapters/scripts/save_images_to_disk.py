@@ -6,9 +6,14 @@ import cv2
 import time
 
 # ROS imports
-import rospy
+import rclpy
+from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
+
+
+def _stamp_to_sec(stamp):
+    return stamp.sec + stamp.nanosec * 1e-9
 
 
 # Instantiate CvBridge
@@ -16,11 +21,11 @@ bridge = CvBridge()
 
 
 class ImageSaver(object):
-    def __init__(self, topic_name, image_directory, ext='jpg'):
+    def __init__(self, node, topic_name, image_directory, ext='jpg'):
         print('Saving images for topic:', topic_name)
         self.image_directory = image_directory
-        self.image_subscriber = rospy.Subscriber(topic_name, Image, 
-                                                 self.image_callback_ros)
+        self.image_subscriber = node.create_subscription(
+            Image, topic_name, self.image_callback_ros, 10)
         self.ext = ext
     
     def image_callback_ros(self, image_msg):
@@ -41,7 +46,7 @@ class ImageSaver(object):
             raw_image = raw_image[...,::-1]
         
         frame_id = image_msg.header.frame_id
-        frame_time = int(np.round(image_msg.header.stamp.to_sec()*100))
+        frame_time = int(np.round(_stamp_to_sec(image_msg.header.stamp)*100))
         
         if raw_image.ndim == 3:
             raw_image = cv2.cvtColor(raw_image, cv2.COLOR_RGB2BGR)
@@ -54,47 +59,37 @@ class ImageSaver(object):
         
 
 
-def main():    
-    # Launch the node.
-    node = 'save_images_to_disk'
-    rospy.init_node(node, anonymous=False)
-    
-    node_name = rospy.get_name()
-    
-    # -------------------------- Read Parameters -----------------------------    
-    #print('rospy.get_param_names()', rospy.get_param_names())
-    
+def main(args=None):
+    rclpy.init(args=args)
+    node = Node('save_images_to_disk')
+
+    # -------------------------- Read Parameters -----------------------------
     # Load in cueing camera details.
     image_topics = []
     i = 1
     while True:
-        try:
-            param_name = ''.join([node_name,'/image_topic',str(i)])
-            image_topics.append(rospy.get_param(param_name))
-            i += 1
-        except:
+        topic = node.declare_parameter('image_topic%i' % i, '').value
+        if not topic:
             break
-        
-    param_name = ''.join([node_name,'/image_directory'])
-    image_directory = rospy.get_param(param_name)
-    image_directory = ''.join([image_directory,'/',str(int(time.time()))])
-    
-    param_name = ''.join([node_name,'/image_extension'])
-    ext = rospy.get_param(param_name)
-    
+        image_topics.append(topic)
+        i += 1
+
+    image_directory = node.declare_parameter('image_directory', '.').value
+    image_directory = ''.join([image_directory, '/', str(int(time.time()))])
+
+    ext = node.declare_parameter('image_extension', 'jpg').value
+
     try:
         os.makedirs(image_directory)
     except OSError:
         pass
     # ------------------------------------------------------------------------
-    
-    for image_topic in image_topics:
-        ImageSaver(image_topic, image_directory, ext)
-    
-    rospy.spin()
-    
+
+    savers = [ImageSaver(node, t, image_directory, ext) for t in image_topics]
+    (void_ref,) = (savers,)
+
+    rclpy.spin(node)
+
+
 if __name__ == '__main__':
-    try:
-        main()
-    except rospy.ROSInterruptException:
-        pass
+    main()

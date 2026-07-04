@@ -6,9 +6,9 @@ if [[ -z "${KAM_REPO_DIR}" ]]; then
     exit 1
 fi
 
-alias cb="catkin build"
-alias nch="roslaunch"
-alias pub="rostopic pub --once"
+alias cb="colcon build --packages-select"
+alias nch="ros2 launch"
+alias pub="ros2 topic pub --once"
 alias arc-off="set-is-archiving 0"
 alias arc-on="set-is-archiving 1"
 alias send-pulse="pub /daq/pulse std_msgs/UInt32 $1"
@@ -18,8 +18,8 @@ alias set-trig-freq="redis-cli -h $REDIS_HOST set /sys/arch/trigger_freq $1"
 alias ips="ip -br addr"
 alias scan="arp-scan 192.168.88.1/24"
 alias tko="tmux kill-session"
-alias rtls="rostopic list"
-alias rnls="rosnode list"
+alias rtls="ros2 topic list"
+alias rnls="ros2 node list"
 
 alias kamwat="docker compose -f ${KAM_REPO_DIR}/compose/nodelist.yml run nodelist /entry/wat.sh"
 
@@ -33,7 +33,7 @@ whoros() {
 
 set-is-archiving() {
 NODENAME=${2:-nuvo0}
-rosservice call "/$NODENAME/set_archiving" "archiving: $1
+ros2 service call "/$NODENAME/set_archiving" custom_msgs/srv/SetArchiving "archiving: $1
 project: 'bench'
 flight: '7'
 effort: 'test-effort'
@@ -41,13 +41,13 @@ notes: ''"
 }
 
 
-# catkin build shortcuts
-alias cb-daq="catkin build custom_msgs mcc_daq"
-alias cb-ins="catkin build custom_msgs ins_driver"
-alias cb-cam="catkin build custom_msgs nexus kw_genicam_driver prosilica_camera"
+# colcon build shortcuts
+alias cb-daq="colcon build --packages-up-to mcc_daq"
+alias cb-ins="colcon build --packages-up-to ins_driver"
+alias cb-cam="colcon build --packages-up-to nexus kw_genicam_driver prosilica_camera"
 
-alias cb-backend="catkin build backend"
-alias cb-gui="catkin build wxpython_gui"
+alias cb-backend="colcon build --packages-up-to backend"
+alias cb-gui="colcon build --packages-up-to wxpython_gui"
 
 
 # runtime shortcuts
@@ -81,22 +81,22 @@ alias run5-ir="run-ir"
 
 # bring up nexus
 run-nexus() {
-    roslaunch --wait nexus nexus.launch system_name:=${NODE_HOSTNAME}
+    ros2 launch view_server image_view_server.launch.xml
 }
 alias run6-nexus="run-nexus"
 
 run-debay() {
-    roslaunch --wait color_processing debayer.launch system_name:=${NODE_HOSTNAME}
+    echo "debayer moved into the phase_one driver; no separate node"
 }
 alias run7-debay="run-debay"
 
 
 run-imageview() {
-    roslaunch --wait wxpython_gui image_view_server.launch system_name:=${NODE_HOSTNAME}
+    ros2 launch view_server image_view_server.launch.xml
 }
 alias run8-imageview="run-imageview"
 
-alias run-gui="roslaunch --wait wxpython_gui system_control_panel.launch"
+alias run-gui="ros2 launch wxpython_gui system_control_panel.launch.xml"
 
 
 
@@ -107,8 +107,8 @@ check-nuvos() {
 }
 
 kill-rgb() {
-    echo "rosnode kill /subsys${1}/rgb_driver"
-    rosnode kill /subsys${1}/rgb/rgb_driver
+    echo "ROS2 has no rosnode kill; stopping the container/process instead"
+    pkill -INT -f rgb_driver || true
 }
 
 kill-rgb-all() {
@@ -119,12 +119,10 @@ kill-rgb-all() {
 
 kill-nodes() {
 
-    nodes=$(rosnode list /subsys${1}/)
-    rosnode kill ${nodes}
+    echo "ROS2 has no rosnode kill; stop the supervisor programs instead"
 }
 
 kill-nodes-all() {
-    nodes=$(rosnode list /)
-    rosnode kill ${nodes}
+    echo "ROS2 has no rosnode kill; stop the supervisor programs instead"
 }
 

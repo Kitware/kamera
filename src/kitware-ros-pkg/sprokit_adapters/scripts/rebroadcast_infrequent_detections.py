@@ -10,9 +10,12 @@ import random
 import string
 
 # ROS imports
-import rospy
-import rospy
+import rclpy
+import rclpy.logging
+from rclpy.node import Node
 from cv_bridge import CvBridge, CvBridgeError
+
+log = rclpy.logging.get_logger("rebroadcast_infrequent_detections")
 
 # Custom Imports
 from sensor_msgs.msg import Image
@@ -32,8 +35,9 @@ def generate_uid(n=20):
 
 
 class DetectionRebroadcast(object):
-    def __init__(self, det_in_topic, det_out_topic, image_topics,
+    def __init__(self, node, det_in_topic, det_out_topic, image_topics,
                  det_transform_service):
+        self.node = node
 
         # Set up locks.
         self.latest_dets_lock = threading.RLock()
@@ -53,18 +57,16 @@ class DetectionRebroadcast(object):
         if det_transform_service is not None:
             self.set_det_tform_service(det_transform_service)
 
-        self.det_pub = rospy.Publisher(det_out_topic,
-                                       ImageSpaceDetectionList,
-                                       queue_size=10)
+        self.det_pub = node.create_publisher(ImageSpaceDetectionList,
+                                             det_out_topic, 10)
 
-        rospy.Subscriber(det_in_topic, ImageSpaceDetectionList,
-                         callback=self.detection_list_callback,
-                         queue_size=10)
+        node.create_subscription(ImageSpaceDetectionList, det_in_topic,
+                                 self.detection_list_callback, 10)
 
-        rospy.loginfo('Rebroadcasting detections from topic: \'%s\' on topic: '
-                      '\'%s\'' % (det_in_topic,det_out_topic))
+        log.info('Rebroadcasting detections from topic: \'%s\' on topic: '
+                 '\'%s\'' % (det_in_topic,det_out_topic))
 
-        rospy.loginfo("Starting image processing thread")
+        log.info("Starting image processing thread")
         self.thread = threading.Thread(target=self.process_images)
         # Entire Python program exits when only daemon threads are left and we
         # want this thread to shutdown as cleanly as possible.
@@ -72,10 +74,10 @@ class DetectionRebroadcast(object):
         self.thread.start()
 
         for image_topic in image_topics:
-            rospy.loginfo('Receiving images on topic: %s' % image_topic)
-            rospy.Subscriber(image_topic, Image,
-                             callback=self.ros_image_callback,
-                             callback_args=image_topic, queue_size=1)
+            log.info('Receiving images on topic: %s' % image_topic)
+            node.create_subscription(
+                Image, image_topic,
+                lambda msg, t=image_topic: self.ros_image_callback(msg, t), 1)
 
     @property
     def lock(self):
@@ -101,12 +103,13 @@ class DetectionRebroadcast(object):
         :type topic: str
 
         """
-        rospy.loginfo('Waiting for detection list transformation service '
-                      '\'%s\' to come alive' % topic)
-        rospy.wait_for_service(topic)
+        log.info('Waiting for detection list transformation service '
+                 '\'%s\' to come alive' % topic)
+        client = self.node.create_client(TransformDetectionList, topic)
+        while not client.wait_for_service(timeout_sec=1.0) and rclpy.ok():
+            pass
         with self._det_tform_serv_lock:
-            self._det_tform_serv = rospy.ServiceProxy(topic,
-                                                      TransformDetectionList)
+            self._det_tform_serv = client
 
     def detection_list_callback(self, msg):
         """Receive a detection list.
@@ -115,7 +118,7 @@ class DetectionRebroadcast(object):
         :type msg: ImageSpaceDetectionList
 
         """
-        rospy.loginfo('Received detection (seq: %i)' % msg.header.seq)
+        log.info('Received detection')
         with self.latest_dets_lock:
             self.latest_dets = msg
             self.tformed_versions_latest_dets = {msg.header.frame_id:msg}
@@ -129,14 +132,12 @@ class DetectionRebroadcast(object):
         """
         # Lock so that only one message can initialize.
         if self.latest_dets is None:
-            rospy.loginfo('Received with image (seq: %i) from message '
-                          'topic \'%s\', but have not received detections, '
-                          'so skipping.' %
-                          (msg.header.seq,topic))
+            log.info('Received image from message '
+                     'topic \'%s\', but have not received detections, '
+                     'so skipping.' % topic)
             return
         else:
-            rospy.loginfo('Received with image (seq: %i) from message '
-                          'topic \'%s\'' % (msg.header.seq,topic))
+            log.info('Received image from message topic \'%s\'' % topic)
 
         with self.image_lock:
             self.image_deque.appendleft(msg)
@@ -144,7 +145,7 @@ class DetectionRebroadcast(object):
                 self.image_deque.pop()
 
     def process_images(self):
-        while True and not rospy.is_shutdown():
+        while rclpy.ok():
             with self.image_lock:
                 if len(self.image_deque) == 0:
                     continue
@@ -164,14 +165,20 @@ class DetectionRebroadcast(object):
                 if fid1 not in self.tformed_versions_latest_dets:
                     try:
                         with self._det_tform_serv_lock:
-                            resp = self._det_tform_serv(self.latest_dets, fid1)
+                            req = TransformDetectionList.Request()
+                            req.src_detections = self.latest_dets
+                            req.dst_frame_id = fid1
+                            future = self._det_tform_serv.call_async(req)
+                            while not future.done() and rclpy.ok():
+                                time.sleep(0.01)
+                            resp = future.result()
                             msg1 = resp.dst_detections
                             self.tformed_versions_latest_dets[fid1] = msg1
-                    except rospy.ServiceException as e:
-                        rospy.logerr('Could not transform detections from '
-                                     'source frame_id \'%s\' to destination '
-                                     '\'%s\' because %s' %
-                                     (self.latest_dets.frame_id,fid1, e))
+                    except Exception as e:
+                        log.error('Could not transform detections from '
+                                  'source frame_id \'%s\' to destination '
+                                  '\'%s\' because %s' %
+                                  (self.latest_dets.header.frame_id, fid1, e))
                         raise e
 
                 msg_tformed = self.tformed_versions_latest_dets[fid1]
@@ -212,50 +219,42 @@ class DetectionRebroadcast(object):
                     det.camera_of_origin = image_msg.header.frame_id
                     msg.detections.append(det)
 
-            rospy.loginfo('Rebroadcasting detection list with %i detections' %
-                          len(msg.detections))
+            log.info('Rebroadcasting detection list with %i detections' %
+                     len(msg.detections))
             self.det_pub.publish(msg)
 
 
-def main():
-    # Launch the node.
-    node = 'rebroadcast_infrequent_detections'
-    rospy.init_node(node, anonymous=False)
-
-    node_name = rospy.get_name()
+def main(args=None):
+    rclpy.init(args=args)
+    node = Node('rebroadcast_infrequent_detections')
 
     # -------------------------- Read Parameters -----------------------------
-    det_in_topic = rospy.get_param('%s/det_in_topic' % node_name)
-    det_out_topic = rospy.get_param('%s/det_out_topic' % node_name)
+    det_in_topic = node.declare_parameter('det_in_topic', '').value
+    det_out_topic = node.declare_parameter('det_out_topic', '').value
 
     image_topics = []
     i = 1
     while True:
-        try:
-            param_name = '%s/image_in%i_topic' % (node_name, i)
-            param = rospy.get_param(param_name)
-            if param != 'unused':
-                image_topics.append(param)
-                i += 1
-            else:
-                break
-        except KeyError:
+        param = node.declare_parameter('image_in%i_topic' % i, 'unused').value
+        if param != 'unused':
+            image_topics.append(param)
+            i += 1
+        else:
             break
 
-    param_name = '%s/detection_transform_service' % node_name
-    det_transform_service = rospy.get_param(param_name, None)
+    det_transform_service = node.declare_parameter(
+        'detection_transform_service', 'none').value
 
     if det_transform_service == 'none':
         det_transform_service = None
     # ------------------------------------------------------------------------
 
-    det_rebroadcast = DetectionRebroadcast(det_in_topic, det_out_topic,
+    det_rebroadcast = DetectionRebroadcast(node, det_in_topic, det_out_topic,
                                            image_topics, det_transform_service)
+    (void_ref,) = (det_rebroadcast,)
 
-    rospy.spin()
+    rclpy.spin(node)
+
 
 if __name__ == '__main__':
-    try:
-        main()
-    except rospy.ROSInterruptException:
-        pass
+    main()

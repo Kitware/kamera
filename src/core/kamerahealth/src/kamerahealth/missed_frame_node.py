@@ -6,9 +6,14 @@ import time
 import json
 import sys
 import numpy as np
-import rospy
+import rclpy
+from rclpy.node import Node
 from std_msgs.msg import Header
 from custom_msgs.msg import Stat
+
+
+def stamp_to_sec(stamp):
+    return stamp.sec + stamp.nanosec * 1e-9
 
 
 
@@ -40,15 +45,18 @@ class LowpassIIR(object):
         return self._state
 
 
-class MissedFrameAgg(object):
+class MissedFrameAgg(Node):
     def __init__(self):
+        super().__init__("missed_listener")
         self.missed_frames = []
         self.intervals = []
         self._last_time = time.time()
         self.period_iir = None
         self.init_latch = True
-        self.sub_missed_frames = rospy.Subscriber("/missed_frames", Header, self.missed_msg_cb)
-        self.sub_errstat = rospy.Subscriber("/errstat", Stat, self.errstat_cb)
+        self.sub_missed_frames = self.create_subscription(
+            Header, "/missed_frames", self.missed_msg_cb, 10)
+        self.sub_errstat = self.create_subscription(
+            Stat, "/errstat", self.errstat_cb, 10)
         now = int(time.time())
         self.out_file = '/mnt/flight_data/miketest/missed_agg/{}.jsonl'.format(now)
 
@@ -68,13 +76,13 @@ class MissedFrameAgg(object):
 
     def errstat_cb(self, msg):
         header = msg.trace_header
-        data = {'type': 'errstat', 'time': str(header.stamp.to_sec()), 'frame_id': header.frame_id, 'note': msg.note,
+        data = {'type': 'errstat', 'time': str(stamp_to_sec(header.stamp)), 'frame_id': header.frame_id, 'note': msg.note,
                 'link': msg.link}
         with open(self.out_file, 'a') as fp:
             json.dump(data, fp)
             fp.write('\n')
 
-        rospy.loginfo('{}: {}'.format(msg.link, msg.note))
+        self.get_logger().info('{}: {}'.format(msg.link, msg.note))
 
     def missed_msg_cb(self, msg):
         self.missed_frames.append(msg)
@@ -84,21 +92,27 @@ class MissedFrameAgg(object):
         hz = 1.0 / iir_s
         med = np.median(self.intervals)
         now = time.time()
-        rospy.loginfo(
+        self.get_logger().info(
             "{: <14}:  last interval: {: >2.3f} iir: {: >2.3f}s iir {: >2.3f}Hz Median: {: 2.3f}s {: 2.3f}Hz".format(
                 msg.frame_id, elapsed, iir_s, hz, med, 1.0/med,
             )
         )
-        data = { 'type': 'missed_frames', 'time': str(msg.stamp.to_sec()), 'frame_id': msg.frame_id, 'elapsed': elapsed, 'iir_s': iir_s, 'med_hz': 1.0/med}
+        data = { 'type': 'missed_frames', 'time': str(stamp_to_sec(msg.stamp)), 'frame_id': msg.frame_id, 'elapsed': elapsed, 'iir_s': iir_s, 'med_hz': 1.0/med}
         with open(self.out_file, 'a') as fp:
             json.dump(data, fp)
             fp.write('\n')
 
 
-def main():
-    rospy.init_node("missed_listener")
+def main(args=None):
+    rclpy.init(args=args)
     app = MissedFrameAgg()
-    rospy.spin()
+    try:
+        rclpy.spin(app)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        app.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == "__main__":

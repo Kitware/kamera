@@ -9,13 +9,15 @@ import cv2
 import time
 
 # ROS imports
-import rospy
-import rospkg
+import rclpy.logging
+from builtin_interfaces.msg import Time as MsgTime
 from sensor_msgs.msg import Image
-import std_msgs.msg
-from sensor_msgs.msg import JointState
-from cv_bridge import CvBridge, CvBridgeError
-import genpy
+from cv_bridge import CvBridge
+
+
+def _time_msg_from_sec(t):
+    sec = int(t)
+    return MsgTime(sec=sec, nanosec=int(round((t - sec) * 1e9)))
 
 
 # Instantiate CvBridge
@@ -26,8 +28,10 @@ class CameraSimulator():
     """Camera that outputs test imagery.
 
     """
-    def __init__(self, res_x, res_y, encoding, image_topic):
+    def __init__(self, node, res_x, res_y, encoding, image_topic):
         """Initialization.
+
+        :param node: rclpy node owning the publisher.
 
         :param res_x: Horizontal resolution (i.e., number of columns).
         :type res_x: int
@@ -58,11 +62,11 @@ class CameraSimulator():
             rand_img = np.random.rand(self.res_y, self.res_x, 3)
             rand_img = np.round(rand_img*65535).astype(np.uint16)
 
+        self._node = node
         self._rand_img = rand_img
         self._encoding = encoding
-        self._image_topic = rospy.resolve_name(image_topic)
-        self._image_publisher = rospy.Publisher(image_topic, Image,
-                                                queue_size=100)
+        self._image_topic = image_topic
+        self._image_publisher = node.create_publisher(Image, image_topic, 100)
         self._seq_ind = 0
 
     @property
@@ -98,8 +102,7 @@ class CameraSimulator():
         image_message = bridge.cv2_to_imgmsg(image, encoding=self.encoding)
 
         image_message.header.frame_id = self.image_topic
-        image_message.header.stamp = genpy.Time.from_sec(t)
-        image_message.header.seq = self._seq_ind
+        image_message.header.stamp = _time_msg_from_sec(t)
         self._image_publisher.publish(image_message)
         self._seq_ind += 1
 
@@ -112,6 +115,7 @@ class CameraSimulator():
         shift = int(np.random.randint(0, L, 1))
         image = np.roll(image, shift)
         self.publish_image(image)
-        rospy.loginfo('Published %i x %i image with encoding \'%s\' on image '
-                      'topic: %s' %  (image.shape[1],image.shape[0],
-                                      self.encoding,self._image_topic))
+        rclpy.logging.get_logger('camera_simulator').info(
+            'Published %i x %i image with encoding \'%s\' on image '
+            'topic: %s' % (image.shape[1], image.shape[0],
+                           self.encoding, self._image_topic))

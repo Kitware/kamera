@@ -49,6 +49,12 @@ target_link_libraries( kw_detector_fusion_adapter_node
 
 install(TARGETS kw_detector_fusion_adapter_node
         DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS
+        scripts/publish_sync_msgs.py
+        scripts/rebroadcast_infrequent_detections.py
+        scripts/save_detection_chips_to_disk.py
+        scripts/save_images_to_disk.py
+        DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY launch
         DESTINATION share/${PROJECT_NAME}
         FILES_MATCHING PATTERN "*.launch.xml")
