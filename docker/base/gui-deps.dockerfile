@@ -1,12 +1,14 @@
-## GUI deps layered on the Noetic core-deps chain.
+## GUI deps layered on the Jazzy core-deps chain.
 FROM kamera/base/core-deps:latest
 
+# libgl1-mesa-glx was dropped in Ubuntu 24.04; libgl1 + libglx-mesa0 replace it
 RUN apt-get update && apt-get install -y --no-install-recommends \
         gdal-bin \
         python3-gdal \
         python3-tk \
         python3-wxgtk4.0 \
-        libgl1-mesa-glx \
+        libgl1 \
+        libglx-mesa0 \
         libqt5x11extras5 \
         locales \
     && rm -rf /var/lib/apt/lists/*
@@ -18,19 +20,17 @@ ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8
 
-RUN pip install --upgrade \
-        pip \
-        Pillow
-
-# numpy/scipy/shapely/pyshp come from core-deps; only GUI-unique deps here.
-# TODO: validate the unpinned pygeodesy already installed by core-deps and drop
-# this <19.12 downgrade (legacy Py2-era pin, untested on Py3).
-RUN pip install --no-cache-dir \
-        'PyGeodesy<19.12' \
+# numpy/scipy/shapely/pyshp/pygeodesy come from core-deps; only GUI-unique deps
+# here. The legacy 'PyGeodesy<19.12' pin is gone: the GUI uses
+# pygeodesy.geoids.GeoidPGM, which the unpinned core-deps install provides
+# (shapefile_monitor already runs against it).
+RUN pip install --break-system-packages --no-cache-dir \
+        Pillow \
         exifread \
         ipython \
         psutil \
         simplekml
 
-COPY src/core/roskv /src/roskv
-RUN pip install --no-cache-dir '/src/roskv[redis]'
+# roskv is no longer pip-installable (its setup.py was removed in the ROS2
+# port); it is built into the colcon workspace by gui.dockerfile via
+# --packages-up-to wxpython_gui, which pulls in roskv as a dependency.
