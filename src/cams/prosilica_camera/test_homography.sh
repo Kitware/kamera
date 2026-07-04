@@ -1,8 +1,8 @@
 #!/bin/bash
 
-export ROS_MASTER_URI=http://nuvo0:11311/
+# ROS2: uses DDS discovery; ensure ROS_DOMAIN_ID matches the system
 
-rosservice call /nuvo2/uv/uv_view_service/get_image_view "homography: [1,0,0,0,1,0,0,0,1]
+ros2 service call /nuvo2/uv/uv_view_service/get_image_view custom_msgs/srv/RequestImageView "homography: [1,0,0,0,1,0,0,0,1]
 output_height: 2
 output_width: 2
 interpolation: 0

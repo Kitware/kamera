@@ -24,11 +24,11 @@ alias rnls="ros2 node list"
 alias kamwat="docker compose -f ${KAM_REPO_DIR}/compose/nodelist.yml run nodelist /entry/wat.sh"
 
 setru() {
-    export ROS_MASTER_URI=http://${1}:11311/
+    export ROS_DOMAIN_ID=${1}
 }
 
 whoros() {
-    echo $ROS_MASTER_URI
+    echo $ROS_DOMAIN_ID
 }
 
 set-is-archiving() {
