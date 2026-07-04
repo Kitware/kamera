@@ -10,8 +10,18 @@ import collections
 import cv2
 import numpy as np
 
-import rospy
+import rclpy
+import rclpy.logging
+from rclpy.node import Node
+from builtin_interfaces.msg import Time as MsgTime
 from cv_bridge import CvBridge, CvBridgeError
+
+log = rclpy.logging.get_logger("publish_sync_msgs")
+
+
+def _time_msg_from_sec(t):
+    sec = int(t)
+    return MsgTime(sec=sec, nanosec=int(round((t - sec) * 1e9)))
 
 # KAMERA imports.
 from custom_msgs.msg import SynchronizedImages
@@ -38,15 +48,15 @@ def get_fov_dirs(flight_dir):
     return actual_dirs
 
 class ROSPublishSyncMsgs(object):
-    def __init__(self, flight_dir, rate, out_sync_image_topic):
+    def __init__(self, node, flight_dir, rate, out_sync_image_topic):
+        self.node = node
         self.flight_dir = flight_dir
         self.rate = rate
-        self.pub = rospy.Publisher(out_sync_image_topic,
-                                   SynchronizedImages,
-                                   queue_size=1)
+        self.pub = node.create_publisher(SynchronizedImages,
+                                         out_sync_image_topic, 1)
 
     def start_publishing(self):
-        ros_rate = rospy.Rate(self.rate)
+        period = 1.0 / self.rate
 
         fov_dirs = get_fov_dirs(self.flight_dir)
         if len(fov_dirs) == 0:
@@ -74,7 +84,7 @@ class ROSPublishSyncMsgs(object):
                     fnames[dirname][t] = {}
                 cam = f.split('_')[-1].split('.')[0]
                 fnames[dirname][t][cam] = f
-        rospy.loginfo("Total time to organize: %s" % (time.time() - tic))
+        log.info("Total time to organize: %s" % (time.time() - tic))
 
         # Sort by t
 
@@ -84,8 +94,7 @@ class ROSPublishSyncMsgs(object):
             seq = 0
             for t in fnames[d]:
                 sync_msg = SynchronizedImages()
-                sync_msg.header.stamp = rospy.Time(t)
-                sync_msg.header.seq = seq
+                sync_msg.header.stamp = _time_msg_from_sec(t)
                 seq += 1
                 for cam in fnames[d][t]:
                     fname = fnames[d][t][cam]
@@ -101,7 +110,7 @@ class ROSPublishSyncMsgs(object):
                     try:
                         msg = bridge.cv2_to_imgmsg(im, encoding=encoding)
                     except CvBridgeError as e:
-                        rospy.logerr(e)
+                        log.error(str(e))
                         break
                     if cam == 'rgb':
                         sync_msg.image_rgb = msg
@@ -112,28 +121,27 @@ class ROSPublishSyncMsgs(object):
                     elif cam == 'ir':
                         sync_msg.image_ir = msg
                         sync_msg.file_path_ir = fname
-                rospy.loginfo("Publishing sync image for time %s" % t)
+                log.info("Publishing sync image for time %s" % t)
                 self.pub.publish(sync_msg)
-                if rospy.is_shutdown():
+                if not rclpy.ok():
                     raise SystemExit
-                ros_rate.sleep()
+                time.sleep(period)
 
 
-def main():
-    rospy.init_node("publish_sync_msgs", anonymous=True)
+def main(args=None):
+    rclpy.init(args=args)
+    node = Node("publish_sync_msgs")
 
-    flight_dir = rospy.get_param("~flight_dir")
-    rate = rospy.get_param("~publish_rate")
-    out_sync_image_topic = rospy.get_param("~out_topic")
+    flight_dir = node.declare_parameter("flight_dir", "").value
+    rate = node.declare_parameter("publish_rate", 1.0).value
+    out_sync_image_topic = node.declare_parameter("out_topic", "/synched").value
 
-    PSM = ROSPublishSyncMsgs(flight_dir, rate, out_sync_image_topic)
+    PSM = ROSPublishSyncMsgs(node, flight_dir, rate, out_sync_image_topic)
 
     PSM.start_publishing()
 
-    rospy.spin()
+    rclpy.spin(node)
+
 
 if __name__ == "__main__":
-    try:
-        main()
-    except rospy.ROSInterruptException:
-        raise SystemExit
+    main()

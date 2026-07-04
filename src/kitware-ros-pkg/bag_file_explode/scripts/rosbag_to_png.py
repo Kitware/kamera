@@ -1,128 +1,80 @@
 #! /usr/bin/python
+"""Explode image/odometry topics from a bag file into PNGs + nav yaml.
+
+ROS2 port: reads bags via the `rosbags` library (pip install rosbags), which
+understands both ROS1 .bag files (the legacy data this tool exists for) and
+ROS2 bag directories, without needing a ROS environment at all.
+"""
 from __future__ import print_function
 
 import argparse
 import logging
-import multiprocessing as mp
 import os
-from kamera.sensor_models import euler_from_quaternion
-from kamera.sensor_models.nav_conversions import enu_quat_to_ned_quat
 
 import cv2
-from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
-import rosbag
-import rospy
 import yaml
-import time
 
+from rosbags.highlevel import AnyReader
+from rosbags.image import message_to_cvimage
+
+from kamera.sensor_models import euler_from_quaternion
+from kamera.sensor_models.nav_conversions import enu_quat_to_ned_quat
 
 logging.basicConfig()
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
-# First hard-coded mapping of ROS topic to output filename suffix part.
-to_save = {
-    '/ros/topic': 'fname1',
-}
 
-save_dir = 'output'
-filename = 'bagfile'
-# Multiple shared memory objects to prevent mp errors
-count = mp.Manager().list()
-ids = mp.Manager().list()
-check_dir = mp.Manager().list()
+def stamp_to_sec(stamp):
+    # rosbags exposes ROS1 stamps as .sec/.nanosec too
+    return stamp.sec + stamp.nanosec * 1e-9
 
-def save_times(args):
-    start = rospy.Time.from_sec(args[0])
-    end = rospy.Time.from_sec(args[1])
-
-    with rosbag.Bag(filename, 'r') as bag:
-        map(topic_wrapper, bag.read_messages(topics=to_save.keys(),
-                                                  start_time=start,
-                                                  end_time=end))
 
 def odom_to_yaml(msg, directory):
-    """Process INS Odometry message.
-
-    :param msg: Odometry message.
-    :type msg: Odometry
-
-    """
-
+    """Process INS Odometry message."""
     pose = msg.pose.pose
     lat = pose.position.y
     lon = pose.position.x
-    alt  = pose.position.z
-
+    alt = pose.position.z
 
     # ENU quaternion
     quat = np.array([pose.orientation.x, pose.orientation.y,
-		pose.orientation.z, pose.orientation.w])
+                     pose.orientation.z, pose.orientation.w])
     yaw = euler_from_quaternion(enu_quat_to_ned_quat(quat),
-			axes='rzyx')[0]*180/np.pi
+                                axes='rzyx')[0] * 180 / np.pi
 
     # Saves navigation info into a yaml file to be dynamically loaded later
-    yaml_lat = ('lat: ' + str(lat) + '\n')
-    yaml_lon = ('lon: ' + str(lon) + '\n')
-    yaml_alt = ('alt: ' + str(alt) + '\n')
-    yaml_yaw = ('yaw: ' + str(yaw) + '\n')
-    LOG.info("Logging Nav info into %s/nav_odom.yaml"%directory)
-    odom_yaml = open(os.path.join(directory, "nav_odom.yaml"), "w+")
-    odom_yaml.write(yaml_lat + yaml_lon + yaml_alt + yaml_yaw)
-    odom_yaml.close()
+    LOG.info("Logging Nav info into %s/nav_odom.yaml" % directory)
+    with open(os.path.join(directory, "nav_odom.yaml"), "w+") as odom_yaml:
+        odom_yaml.write('lat: %s\n' % lat)
+        odom_yaml.write('lon: %s\n' % lon)
+        odom_yaml.write('alt: %s\n' % alt)
+        odom_yaml.write('yaw: %s\n' % yaw)
 
 
-def topic_wrapper(args):
-    topic, msg, t = args
-    # Ensure nav yaml is only written once
-    if to_save[topic] == 'nav' and len(count) == 0:
-        odom_to_yaml(msg, str(save_dir))
-	count.append(0)
-    elif to_save[topic] == 'nav' and len(count) != 0:
-        pass
-    else:
-        save_image(msg, to_save[topic], str(save_dir))
-
-
-def save_image(msg, name, directory):
+def save_image(msg, name, directory, ids):
     image_dir = os.path.join(directory, name)
+    os.makedirs(image_dir, exist_ok=True)
 
-    # Ensure makedirs is only called once to prevent error
-    if not os.path.isdir(image_dir):
-        if image_dir not in check_dir:
-            try:
-                os.makedirs(image_dir)
-            except OSError as e:
-               if e.errno!=os.errno.EEXIST:
-                   raise
-               pass
-            check_dir.append(image_dir)
-
-    frame_id = name + ": \"" + msg.header.frame_id + '\"\n'
+    frame_id = name + ': "' + msg.header.frame_id + '"\n'
     if frame_id not in ids:
         ids.append(frame_id)
 
-    # Use a CvBridge to convert ROS images to OpenCV images so they can be
-    # saved.
-    bridge = CvBridge()
-
     try:
-        if msg.encoding == "bgr8":
-            cv_image = bridge.imgmsg_to_cv2(msg, "bgr8")
-        elif msg.encoding == "rgb8":
-            cv_image = bridge.imgmsg_to_cv2(msg, "bgr8")
+        if msg.encoding in ("bgr8", "rgb8"):
+            cv_image = message_to_cvimage(msg, "bgr8")
         elif msg.encoding == "32FC1":
             # Depth image.
             # NOTE: Assuming Zed camera properties.
-            raw_image = bridge.imgmsg_to_cv2(msg, "32FC1")
+            raw_image = message_to_cvimage(msg, "32FC1")
 
             # Make sense of nan/inf values
             raw_image[np.isnan(raw_image)] = 0
             raw_image[np.isinf(raw_image)] = 0  # maybe 20?
             # Zed max range should only be 20 (meters)
             assert not (raw_image > 20).any(), \
-                "Zed sensor is no supposed to report values over 20! " \
+                "Zed sensor is not supposed to report values over 20! " \
                 "(found some...)"
             # Scale remaining non-zero values to 8-bit range,
             # cast to 8-bit image.
@@ -131,75 +83,55 @@ def save_image(msg, name, directory):
             raise RuntimeError("Unexpected image format/encoding: '%s'"
                                % msg.encoding)
 
-        timestr = "%.6f" % msg.header.stamp.to_sec()
-        image_name = str(image_dir)+"/"+timestr+"_"+name+".png"
+        timestr = "%.6f" % stamp_to_sec(msg.header.stamp)
+        image_name = os.path.join(image_dir, "%s_%s.png" % (timestr, name))
         LOG.info("Saving image: %s" % image_name)
         cv2.imwrite(image_name, cv_image)
-    except CvBridgeError as e:
+    except Exception as e:
         LOG.error(str(e))
 
 
-class ImageCreator (object):
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('yaml_config',
+                        help="YAML config file mapping topics to extract "
+                             "with the output subdirectories to extract to.")
+    parser.add_argument('output_dir',
+                        help="Directory to output image sub-directories to.")
+    parser.add_argument('bag_filepath',
+                        help="Filesystem path to the bag file to explode.")
+    args, unknown = parser.parse_known_args()
 
-    def __init__(self):
-        global save_dir
-        global filename
-        global to_save
+    with open(args.yaml_config) as fp:
+        to_save = yaml.safe_load(fp)
+    save_dir = args.output_dir
+    filename = args.bag_filepath
 
-        # Get parameters as arguments to 'rosrun my_package bag_to_images.py
-        # <save_dir> <filename>', where save_dir and filename exist relative to
-        # this executable file.
-        parser = argparse.ArgumentParser()
-        parser.add_argument('yaml_config',
-                            help="YAML config file mapping topics to extract "
-                                 "with the output subdirectories to extract "
-                                 "to.")
-        parser.add_argument('output_dir',
-                            help="Directory to output image sub-directories "
-                                 "to.")
-        parser.add_argument('bag_filepath',
-                            help="Filesystem path to the bag file to explode.")
-        args, unknown = parser.parse_known_args()
+    LOG.info("to-save map: %s" % to_save)
+    LOG.info("Output directory = %s" % save_dir)
+    LOG.info("Bag filename = %s" % filename)
 
-        to_save = yaml.load(open(args.yaml_config))
-        save_dir = args.output_dir
-        filename = args.bag_filepath
+    os.makedirs(save_dir, exist_ok=True)
+    ids = []
+    wrote_nav = False
 
+    from pathlib import Path
+    with AnyReader([Path(filename)]) as reader:
+        connections = [c for c in reader.connections if c.topic in to_save]
+        for connection, timestamp, rawdata in reader.messages(connections=connections):
+            msg = reader.deserialize(rawdata, connection.msgtype)
+            name = to_save[connection.topic]
+            if name == 'nav':
+                if not wrote_nav:
+                    odom_to_yaml(msg, str(save_dir))
+                    wrote_nav = True
+            else:
+                save_image(msg, name, str(save_dir), ids)
 
-        LOG.info("to-save map: %s" % to_save)
-        LOG.info("Output directory = %s" % save_dir)
-        LOG.info("Bag filename = %s" % filename)
-
-        self.run_multiprocess()
-
-    def run_multiprocess(self):
-        num_processors = mp.cpu_count()
-        pool = mp.Pool(num_processors)
-
-        with rosbag.Bag(filename, 'r') as bag:
-            starttime = bag.get_start_time()
-            endtime = bag.get_end_time()
-        LOG.info("Bag start time and end time: %f -> %f" % (starttime, endtime))
-
-        step = (endtime - starttime) / float(num_processors)
-        times = [(starttime + (step*i), starttime + (step * (i + 1)))
-                 for i in range(num_processors)]
-        LOG.info("Time slices:")
-        for T in times:
-            LOG.info("  %s" % (T,))
-        assert times[-1][1] == endtime, \
-            "Expected end time to be %f, got %f" % (endtime, times[-1][1])
-        pool.map(save_times, times)
-        pool.close()
-        pool.join()
-
-        ids_text = open(os.path.join(save_dir, "frame_ids.yaml"), "w+")
- 	for _id in ids:
+    with open(os.path.join(save_dir, "frame_ids.yaml"), "w+") as ids_text:
+        for _id in ids:
             ids_text.write(_id)
-        ids_text.close()
-
 
 
 if __name__ == '__main__':
-    # Go to class functions that do all the heavy lifting. Do error checking.
-    image_creator = ImageCreator()
+    main()

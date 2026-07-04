@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Diagnostics 
+# Diagnostics
 
 errcho() {
     (>&2 echo -e "\e[31m$1\e[0m")
@@ -10,39 +10,26 @@ echo "[?] [?] [?]  WAT. [?] [?] [?]  "
 
 source /entry/project_env.sh
 
-MASTER_HOST=$(echo $ROS_MASTER_URI| grep -Po -e '(?<=http:\/\/)([\w\.]+)(?=:)')
-echo "MASTER_HOST: "
-
 # Expected exit code from a Ctrl-C when in explicit docker run mode.
 trap "errcho 'Caught SIGINT'; cleanup" SIGINT
 # Expected exit code from docker stop command.
 trap "errcho 'Caught SIGTERM'; cleanup" SIGTERM
 
-echo "=== === === === Looking for ROS_MASTER === === === === "
+echo "=== === === === ROS2 environment === === === === "
+echo "ROS_DISTRO      : ${ROS_DISTRO}"
+echo "ROS_DOMAIN_ID   : ${ROS_DOMAIN_ID}"
+echo "RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-default}"
+
 echo "=== === === === /etc/hosts: === === === === "
 cat /etc/hosts
 
 echo "=== === === === /etc/resolv.conf: === === === === "
 cat /etc/resolv.conf
 
-echo "=== === === === ping ${MASTER_HOST} === === === === "
-ping -c1 -W1 "${MASTER_HOST}"
+echo "=== === === === visible nodes === === === === "
+ros2 node list || true
 
-echo "=== === === === nslookup ${MASTER_HOST} === === === === "
-nslookup "${MASTER_HOST}"
+echo "=== === === === visible topics === === === === "
+ros2 topic list || true
 
-echo "=== === === === dig ${MASTER_HOST} === === === === "
-dig ${MASTER_HOST}
-MASTER_IP=$(dig +short ${MASTER_HOST})
-echo $MASTER_IP
-
-if [[ -z $MASTER_IP ]]; then
-    errcho "FATAL. Cannot resolve to master IP. This is a nonstarter \n :( :( :("
-    exit 1
-fi
-
-echo "=== === === === dig MASTER_IP (${MASTER_IP}) === === === === "
-nslookup $MASTER_IP
-
-exec roswtf
-
+exec ros2 doctor --report

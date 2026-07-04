@@ -5,8 +5,5 @@
 echo "<> <> <> SysCall <> <> <> "
 source /entry/project.sh
 
-ROSWAIT="--wait"
-
-exec roslaunch "${ROSWAIT}" sysinfo syscall.launch \
-    system_name:=`hostname` \
-    verbosity:=$(/cfg/get ".verbosity")
+exec ros2 launch sysinfo syscall.launch.xml \
+    system_name:=`hostname`

@@ -3,9 +3,8 @@
 ## Diagnostics for ros networking
 
 ## From satellite
-# bare minimum - if this fails, you can't see the rosmaster at all
-rostopic list
+# bare minimum - if this fails, DDS discovery is broken
+ros2 topic list
 
 # Should be able to get basic info
-rosnode info ${node}
-
+ros2 node info ${node}
