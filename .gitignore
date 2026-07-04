@@ -8,3 +8,4 @@ build
 devel
 provision/ansible/.password
 .catkin_tools
+.venv
