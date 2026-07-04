@@ -9,7 +9,6 @@ import yaml
 from collections import OrderedDict
 from functools import reduce
 
-import rospy
 from cv_bridge import CvBridge, CvBridgeError
 
 from roskv.impl.redis_envoy import RedisEnvoy as ImplEnvoy
@@ -241,8 +240,6 @@ def save_config_settings():
 
 
 # =================== DEFINE GLOBALS ===============================
-# Need a vanilla one for binary insert
-ros_immediate = rospy.Duration(nsecs=1)
 # Instantiate CvBridge
 bridge = CvBridge()
 

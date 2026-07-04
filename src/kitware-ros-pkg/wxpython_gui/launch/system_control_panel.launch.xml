@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <node pkg="wxpython_gui" exec="system_control_panel" name="system_gui" output="screen"/>
+</launch>

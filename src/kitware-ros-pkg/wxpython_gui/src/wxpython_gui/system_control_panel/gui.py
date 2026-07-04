@@ -39,9 +39,9 @@ import shapely.geometry
 import shapefile
 
 # ROS imports
-import rospy
+from wxpython_gui import rosnode as ros
 import std_msgs.msg
-from custom_msgs.msg import GSOF_INS
+from custom_msgs.msg import GsofIns
 from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 
@@ -318,7 +318,7 @@ class MainFrame(form_builder_output.MainFrame):
         self.update_show_hide()
 
         # Set up ROS connections.
-        rospy.init_node(node_name, anonymous=True)
+        ros.init_node(node_name, anonymous=True)
 
         # --------------------------- Image Streams --------------------------
         # These will all be compressed images fit to the panel.
@@ -440,25 +440,25 @@ class MainFrame(form_builder_output.MainFrame):
         self.lat0 = None
         self.lon0 = None
         self.h0 = None
-        self.ins_state_sub = rospy.Subscriber(
-            topic_names["nav_odom_topic"], GSOF_INS, self.ins_state_ros, queue_size=1
+        self.ins_state_sub = ros.Subscriber(
+            topic_names["nav_odom_topic"], GsofIns, self.ins_state_ros, queue_size=1
         )
 
-        self.raw_msg_sub = rospy.Subscriber(
+        self.raw_msg_sub = ros.Subscriber(
             "/rawmsg", std_msgs.msg.String, self.cb_raw_message_popup, queue_size=1
         )
         # --------------------------------------------------------------------
 
         # ------------------------- Add To Event Log--------------------------
-        self._left_sys_event_log_srv = rospy.ServiceProxy(
+        self._left_sys_event_log_srv = ros.ServiceProxy(
             topic_names["left_sys_event_log_srv"], AddToEventLog, persistent=False
         )
 
-        self._center_sys_event_log_srv = rospy.ServiceProxy(
+        self._center_sys_event_log_srv = ros.ServiceProxy(
             topic_names["center_sys_event_log_srv"], AddToEventLog, persistent=False
         )
 
-        self._right_sys_event_log_srv = rospy.ServiceProxy(
+        self._right_sys_event_log_srv = ros.ServiceProxy(
             topic_names["right_sys_event_log_srv"], AddToEventLog, persistent=False
         )
         # --------------------------------------------------------------------
@@ -557,7 +557,7 @@ class MainFrame(form_builder_output.MainFrame):
 
         # --------------------------------------------------------------------
 
-        # rospy.add_client_shutdown_hook(self.on_close_button)
+        # ros shutdown hook handled in on_close_button
         self.system = SystemCommands(self.hosts)
 
         self.Bind(wx.EVT_CLOSE, self.when_closed)
@@ -656,7 +656,7 @@ class MainFrame(form_builder_output.MainFrame):
                         entry["ssd_err"] = True
                         unmounts.append(host)
                 except (requests.exceptions.RequestException, ValueError, KeyError):
-                    rospy.logwarn(
+                    ros.logwarn(
                         "Could not access disk info from system %s." % host
                     )
                     results[host] = entry
@@ -678,7 +678,7 @@ class MainFrame(form_builder_output.MainFrame):
 
             # Attempt to remount any host that responded but wasn't mounted.
             if unmounts:
-                rospy.logerr(
+                ros.logerr(
                     "ERROR: One or more hosts has an ssd mount issue: {}".format(
                         unmounts
                     )
@@ -693,7 +693,7 @@ class MainFrame(form_builder_output.MainFrame):
                     except requests.exceptions.RequestException:
                         pass
             if nas_unmounts:
-                rospy.logerr(
+                ros.logerr(
                     "ERROR: One or more hosts has a NAS mount issue: {}".format(
                         nas_unmounts
                     )
@@ -1698,7 +1698,7 @@ class MainFrame(form_builder_output.MainFrame):
     def on_timer(self, event):
         """Manages all updates that should happen at fixed rate."""
         tic = time.time()
-        if rospy.is_shutdown():
+        if ros.is_shutdown():
             self.on_close_button(None)
 
         # The startup unclip runs before GTK finalizes panel sizes, so labels
@@ -1741,7 +1741,7 @@ class MainFrame(form_builder_output.MainFrame):
                     zoom.update_all_if_needed()
                     fit.update_all_if_needed()
                 except AttributeError as e:
-                    rospy.logwarn(e)
+                    ros.logwarn(e)
                     # self._image_inspection_frame.Close()
                     # self._image_inspection_frame = None
                     pass
@@ -1971,7 +1971,7 @@ class MainFrame(form_builder_output.MainFrame):
             "base": SYS_CFG["arch"]["base"],
         }
         if collecting is not None:
-            rospy.set_param("/sys/arch/is_archiving", int(collecting))
+            kv.put("/sys/arch/is_archiving", int(collecting))
             redis_dict.update({"is_archiving": int(collecting)})
         sysdir = get_arch_path()
         SYS_CFG["syscfg_dir"] = sysdir
@@ -2236,7 +2236,7 @@ class MainFrame(form_builder_output.MainFrame):
             td_throttle = datetime.timedelta(seconds=throttle)
             dt = now - self.last_popup
             if dt < td_throttle:
-                rospy.logwarn("suppressed, dt too short: {} : {}".format(dt, txt))
+                ros.logwarn("suppressed, dt too short: {} : {}".format(dt, txt))
                 return
         icon = wx.ICON_ERROR if "error" in txt.lower() else wx.ICON_INFORMATION
         dlg = wx.MessageDialog(self, txt, "Info", wx.OK | icon)
@@ -2246,20 +2246,20 @@ class MainFrame(form_builder_output.MainFrame):
 
     def ins_state_ros(self, msg):
         """
-        :param msg: INS POSAVX message.
-        :type msg: POSAVX
+        :param msg: INS GsofIns message.
+        :type msg: GsofIns
 
         """
         # Throttle to 10hz
-        if msg.header.stamp.to_sec() - self.last_ins_time < 0.1:
+        if ros.stamp_to_sec(msg.header.stamp) - self.last_ins_time < 0.1:
             return
-        self.last_ins_time = msg.header.stamp.to_sec()
+        self.last_ins_time = ros.stamp_to_sec(msg.header.stamp)
         wx.CallAfter(self.ins_state, msg)
 
     def ins_state(self, msg):
         """
         :param msg: INS message.
-        :type msg: POSAVX
+        :type msg: GsofIns
 
         """
         if self._spoof_gps:
@@ -2835,20 +2835,20 @@ class MainFrame(form_builder_output.MainFrame):
         """Request that the IR cameras execute NUC."""
         for host in self.hosts:
             topic = os.path.join("/", host, "ir", "nuc")
-            service = rospy.ServiceProxy(topic, CamSetAttr, persistent=False)
+            service = ros.ServiceProxy(topic, CamSetAttr, persistent=False)
             # These values aren't used currently, just an overload to trigger nuc
             msg = "/{}/{}/{}:={}".format(host, "ir", "nuc", "manual")
             try:
                 resp = service.call(name="nuc", value="manual")
-            except rospy.service.ServiceException:
+            except ros.ServiceException:
                 errmsg = "Attempted to set `{}`, but system did not respond".format(msg)
-                rospy.logerr(errmsg)
+                ros.logerr(errmsg)
                 continue
             if not resp:
                 errmsg = "Attempted to set `{}`, but it failed".format(msg)
-                rospy.logerr(errmsg)
+                ros.logerr(errmsg)
                 continue
-            rospy.loginfo(msg)
+            ros.loginfo(msg)
             self.add_to_event_log(
                 "command sent: Request to manual NUC cameras {}. ".format(msg)
             )
@@ -2920,7 +2920,7 @@ class MainFrame(form_builder_output.MainFrame):
         # self.on_resize.Unbind(wx.EVT_SIZE)
         save_config_settings()
         self.timer.Unbind(wx.EVT_TIMER)
-        self.ins_state_sub.unregister()
+        ros.node().destroy_subscription(self.ins_state_sub)
         try:
             self._metadata_entry_frame.Close()
         except:
@@ -2931,6 +2931,7 @@ class MainFrame(form_builder_output.MainFrame):
         except:
             pass
 
+        ros.shutdown()
         event.Skip()
 
 
