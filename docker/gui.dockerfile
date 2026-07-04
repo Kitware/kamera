@@ -39,8 +39,10 @@ RUN find /home/user -not -user user -execdir chown user {} \+
 # Install kamera for wxpython_gui imports (e.g. colmap_processing.camera_models).
 # Use --no-deps: base images already provide runtime deps, and a full install
 # fails trying to replace distutils-installed PyYAML from ROS/Noetic.
+# --ignore-requires-python: the package targets >=3.10 but ROS Noetic pins
+# this image to Python 3.8; the modules the GUI imports still run there.
 RUN pip install --no-cache-dir matplotlib \
-    && pip install --no-cache-dir --no-deps -e $REPO_DIR
+    && pip install --no-cache-dir --no-deps --ignore-requires-python -e $REPO_DIR
 
 # use the exec form of run because we need bash syntax
 USER user
