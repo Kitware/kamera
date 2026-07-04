@@ -125,7 +125,7 @@ services:
 
 ## ========================== GUI chain ========================================
 
-  # GUI deps layered on the Noetic core-deps image.
+  # GUI deps layered on the Jazzy core-deps image.
   gui-deps:
     build:
       context: .
