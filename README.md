@@ -26,7 +26,8 @@ KAMERA, or the **K**nowledge-guided Image **A**cquisition **M**anag**ER** and **
 git clone https://github.com/Kitware/kamera.git
 cd kamera
 # For the pure post-processing and generating flight summary, you can install
-# the requirements in requirements.txt, or use the provided dockerfile
+# the package with uv (https://docs.astral.sh/uv/), or use the provided dockerfile
+uv sync
 make postflight
 # Builds the core docker images for use in the onboard sytems
 make nuvo

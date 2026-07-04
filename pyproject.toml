@@ -1,39 +1,46 @@
-[tool.poetry]
+[project]
 name = "kamera"
 version = "0.1.0"
 description = "KAMERA: Kitware's Image Acquisition ManagER and Archiver"
-authors = ["Adam Romlein <adam.romlein@kitware.com>"]
+authors = [
+    { name = "Adam Romlein", email = "adam.romlein@kitware.com" },
+]
 license = "Apache-2.0"
 readme = "README.md"
-
-[tool.poetry.dependencies]
-python = ">=3.8,<4"
-numpy = {version = "^2.1.1", markers = "python_version >= '3.10'"}
-scipy = {version = "^1.14.1", markers = "python_version >= '3.10'"}
-matplotlib = {version = "^3.9.2", markers = "python_version >= '3.10'"}
-opencv-python = {version = "^4.10.0.84", markers = "python_version >= '3.10'"}
-pillow = {version = "^10.4.0", markers = "python_version >= '3.10'"}
-pyyaml = {version = "^6.0.2", markers = "python_version >= '3.10'"}
-datetime = {version = "^5.5", markers = "python_version >= '3.10'"}
-exifread = {version = "^3.0.0", markers = "python_version >= '3.10'"}
-pygeodesy = {version = "^24.9.29", markers = "python_version >= '3.10'"}
-pyshp = {version = "^2.3.1", markers = "python_version >= '3.10'"}
-simplekml = {version = "^1.3.6", markers = "python_version >= '3.10'"}
-shapely = {version = "^2.0.6", markers = "python_version >= '3.10'"}
-transformations = {version = "^2024.5.24", markers = "python_version >= '3.9'"}
-scriptconfig = {version = "^0.8.0", markers = "python_version >= '3.10'"}
-ubelt = {version = "^1.3.6", markers = "python_version >= '3.10'"}
-rich = {version = "^13.9.1", markers = "python_version >= '3.10'"}
-gdal = [
-    { url = "https://github.com/girder/large_image_wheels/raw/wheelhouse/GDAL-3.10.1-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl#sha256=8c150cc85623d136734eb2fad91036933cbb2d6ba58a76095b82ddf53d9bf961", markers = "python_version >= '3.8' and python_version < '3.9'" },
-    { url = "https://github.com/girder/large_image_wheels/raw/wheelhouse/GDAL-3.10.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl#sha256=7894fddd09d31530d764d5f5e52faafa3585b906c2e49c79fe593af8c6a34c24", markers = "python_version >= '3.9' and python_version < '3.10'" },
-    { url = "https://github.com/girder/large_image_wheels/raw/wheelhouse/GDAL-3.10.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl#sha256=4a09086631d81808a97c8c7a605aa6230ca045874aa688863cf91794e94880c7", markers = "python_version >= '3.10' and python_version < '3.11'" },
-    { url = "https://github.com/girder/large_image_wheels/raw/wheelhouse/GDAL-3.10.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl#sha256=aee8c49c3528b8613ad3fe14a9d0066ad6990e143f277aff5be1143f371258a2", markers = "python_version >= '3.11' and python_version < '3.12'" },
-    { url = "https://github.com/girder/large_image_wheels/raw/wheelhouse/GDAL-3.10.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl#sha256=19cd80ad4bd684e8c7a3f712e5a1c284cce59e5750155f0db0c31d875d3c6321", markers = "python_version >= '3.12' and python_version < '3.13'" },
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=2.1.1",
+    "scipy>=1.14.1",
+    "matplotlib>=3.9.2",
+    "opencv-python>=4.10.0.84",
+    "pillow>=10.4.0",
+    "pyyaml>=6.0.2",
+    "datetime>=5.5",
+    "exifread>=3.0.0",
+    "pygeodesy>=24.9.29",
+    "pyshp>=2.3.1",
+    "simplekml>=1.3.6",
+    "shapely>=2.0.6",
+    "transformations>=2024.5.24",
+    "scriptconfig>=0.8.0",
+    "ubelt>=1.3.6",
+    "rich>=13.9.1",
+    "gdal @ https://github.com/girder/large_image_wheels/raw/wheelhouse/GDAL-3.10.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl#sha256=4a09086631d81808a97c8c7a605aa6230ca045874aa688863cf91794e94880c7 ; python_version >= '3.10' and python_version < '3.11'",
+    "gdal @ https://github.com/girder/large_image_wheels/raw/wheelhouse/GDAL-3.10.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl#sha256=aee8c49c3528b8613ad3fe14a9d0066ad6990e143f277aff5be1143f371258a2 ; python_version >= '3.11' and python_version < '3.12'",
+    "gdal @ https://github.com/girder/large_image_wheels/raw/wheelhouse/GDAL-3.10.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl#sha256=19cd80ad4bd684e8c7a3f712e5a1c284cce59e5750155f0db0c31d875d3c6321 ; python_version >= '3.12' and python_version < '3.13'",
 ]
-ipdb = {version = "^0.13.13", markers = "python_version >= '3.10'"}
 
+[dependency-groups]
+dev = [
+    "ipdb>=0.13.13",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["kamera"]
