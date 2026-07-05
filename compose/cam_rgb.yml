@@ -25,7 +25,7 @@ services:
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     command: ["/entry/cam_phaseone.sh"]
         #command: ["bash"]
-    restart: unless-stopped
+    restart: no
     deploy:
       resources:
         reservations:

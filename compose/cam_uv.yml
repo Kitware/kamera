@@ -25,5 +25,5 @@ services:
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
         #    command: ["bash"]
     command: ["/entry/cam_prosilica.sh", "uv"]
-    restart: unless-stopped
+    restart: no
 ...

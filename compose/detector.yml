@@ -26,7 +26,7 @@ services:
       - "/mnt:/mnt"
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     command: ["/entry/viame.sh"]
-    restart: unless-stopped
+    restart: no
     deploy:
       resources:
         reservations:

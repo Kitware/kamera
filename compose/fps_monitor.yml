@@ -19,5 +19,5 @@ services:
     volumes:
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     command: ["/entry/fps_monitor.sh"]
-    restart: unless-stopped
+    restart: no
 ...

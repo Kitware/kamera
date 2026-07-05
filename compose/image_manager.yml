@@ -21,5 +21,5 @@ services:
       - "/mnt:/mnt"
       - "${PWD}/src:$DOCKER_KAMERA_DIR/src:ro"
     command: ["/entry/data_migration.sh"]
-    restart: unless-stopped
+    restart: no
 ...
