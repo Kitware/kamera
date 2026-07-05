@@ -298,8 +298,8 @@ class MainFrame(form_builder_output.MainFrame):
         self._debug = kv.get_dict("/debug", {})
         # print("Debug state: {}".format(self._debug))
         self._debug_enable = int(self._debug.get("enable", False))
-        self._spoof_gps = int(self._debug.get("spoof_gps", False)) and self._debug_enable
-        self._spoof_events = int(self._debug.get("spoof_events", False))
+        self._spoof_gps = int(kv.get("/debug/spoof_gps", False)) and self._debug_enable
+        self._spoof_events = int(kv.get("/debug/spoof_events", 0))
         self.last_ins_time = 0.0
         self._collect_health_ssd_ok = True
         self._collect_health_nas_ok = True

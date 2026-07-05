@@ -1127,9 +1127,9 @@ class MainFrame ( wx.Frame ):
 
         self.m_menu81 = wx.Menu()
         self.m_menuItem24 = wx.MenuItem( self.m_menu81, wx.ID_ANY, u"System Control Panel", wx.EmptyString, wx.ITEM_NORMAL )
-        self.m_menu81.Append( self.m_menuItem24 )
+        #self.m_menu81.Append( self.m_menuItem24 )
 
-        self.m_menubar1.Append( self.m_menu81, u"System-Control" )
+        #self.m_menubar1.Append( self.m_menu81, u"System-Control" )
 
         self.m_menu8 = wx.Menu()
         self.m_menuItem281 = wx.MenuItem( self.m_menu8, wx.ID_ANY, u"Create Flight Summary", wx.EmptyString, wx.ITEM_NORMAL )
