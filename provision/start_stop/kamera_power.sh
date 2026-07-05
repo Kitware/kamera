@@ -35,6 +35,7 @@ kamera_power() {
 		return 1
 	}
 	echo "OK: ${action} requested on ${host}"
+    sleep 3
 }
 
 case "${TARGET}" in
