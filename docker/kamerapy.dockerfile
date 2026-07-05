@@ -22,11 +22,11 @@ WORKDIR /src/kamera
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-install-project
+    uv sync --frozen --no-install-project --extra gdal
 
 COPY ./ /src/kamera
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen
+    uv sync --frozen --extra gdal
 
 ENV PATH="/src/kamera/.venv/bin:$PATH"
 

@@ -1,0 +1,12 @@
+# Conda environment providing the binary geo stack (GDAL) that has no
+# reliable cross-platform wheels. The project itself is installed by uv into
+# a venv created on top of this env with --system-site-packages, so python
+# here must satisfy requires-python in pyproject.toml.
+# Setup: scripts/setup_postproc.sh (Linux/macOS) or setup_postproc.ps1 (Windows)
+name: kamera
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.10
+  - gdal>=3.10
+  - uv
