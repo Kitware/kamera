@@ -17,7 +17,7 @@ The reconstruction must be in the same ENU frame as the nav provider
 
 import os
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 import pycolmap
@@ -38,7 +38,11 @@ __all__ = [
 
 @dataclass
 class BoresightEstimate:
-    rig_from_ins: np.ndarray  # quaternion (x, y, z, w)
+    # Quaternion (x, y, z, w) mapping rig coordinates into the INS body
+    # frame. This is the reference sensor's StandardCamera mount directly:
+    # StandardCamera's camera_quaternion maps camera->INS (see unproject in
+    # camera_models.py), and the reference sensor is the rig frame.
+    ins_from_rig: np.ndarray
     lever_arm_ins: np.ndarray  # rig origin relative to INS, in the INS frame (m)
     num_frames: int  # frames used (inliers)
     num_rejected: int  # frames rejected as outliers
@@ -68,9 +72,9 @@ def _frame_time(
     times: Dict[str, float],
 ) -> Optional[float]:
     for data_id in frame.data_ids:
-        image = reconstruction.images.get(data_id.id)
-        if image is None:
+        if data_id.id not in reconstruction.images:
             continue
+        image = reconstruction.images[data_id.id]
         try:
             return times[KameraImageName.parse(image.name).base_name]
         except (ValueError, KeyError):
@@ -85,8 +89,18 @@ def solve_rig_boresight(
     outlier_threshold_deg: float = 2.0,
     max_iterations: int = 5,
 ) -> BoresightEstimate:
-    """Estimate rig_from_ins by robust rotation averaging over all
+    """Estimate ins_from_rig by robust rotation averaging over all
     registered frames of an ENU-registered reconstruction.
+
+    Per frame the boresight is
+
+        ins_from_rig = (enu_from_ins)^-1 . (rig_from_world)^-1
+
+    which is constant across frames because the rig is rigidly mounted to
+    the INS. The reconstruction must share the nav provider's ENU frame
+    (which prior-position mapping yields); an arbitrary-gauge model, e.g.
+    from the global mapper which ignores priors, gives a non-constant
+    per-frame estimate (large residual spread) and must not be used here.
 
     `times` maps image base names to exposure times (see
     `kamera.postflight.rig.basename_to_time`).
@@ -104,7 +118,8 @@ def solve_rig_boresight(
         R_enu_from_ins = Rotation.from_quat(ins_quat)
         rig_from_world = frame.rig_from_world
         R_rig_from_enu = Rotation.from_quat(rig_from_world.rotation.quat)
-        rel_quats.append((R_rig_from_enu * R_enu_from_ins).as_quat())
+        # ins_from_rig = (enu_from_ins)^-1 . (rig_from_enu)^-1
+        rel_quats.append((R_enu_from_ins.inv() * R_rig_from_enu.inv()).as_quat())
         # Rig origin in ENU, then expressed in the INS body frame.
         R = rig_from_world.rotation.matrix()
         rig_pos_enu = -R.T @ rig_from_world.translation
@@ -137,7 +152,7 @@ def solve_rig_boresight(
         (Rotation.from_quat(quats[inliers]) * mean_rot.inv()).magnitude()
     )
     estimate = BoresightEstimate(
-        rig_from_ins=mean,
+        ins_from_rig=mean,
         lever_arm_ins=np.median(levers[inliers], axis=0),
         num_frames=int(inliers.sum()),
         num_rejected=int((~inliers).sum()),
@@ -171,11 +186,19 @@ def export_rig_camera_models(
     use_lever_arm: bool = False,
     suffix: str = "_v3",
 ) -> Dict[str, StandardCamera]:
-    """Compose mount = sensor_from_rig o rig_from_ins for every rig
-    sensor and write a StandardCamera yaml per camera."""
+    """Compose the StandardCamera mount for every rig sensor and write a
+    yaml per camera.
+
+    The mount (StandardCamera.camera_quaternion, camera->INS) is
+
+        cam_quat(sensor) = ins_from_rig . rig_from_sensor
+
+    For the reference sensor rig_from_sensor is identity, so its mount is
+    the boresight itself.
+    """
     os.makedirs(save_dir, exist_ok=True)
     folders = _camera_folder_names(reconstruction)
-    rig_from_ins = Rotation.from_quat(estimate.rig_from_ins)
+    ins_from_rig = Rotation.from_quat(estimate.ins_from_rig)
     position = estimate.lever_arm_ins if use_lever_arm else np.zeros(3)
     models: Dict[str, StandardCamera] = {}
     for rig in reconstruction.rigs.values():
@@ -188,14 +211,14 @@ def export_rig_camera_models(
                 print(f"[yellow]Sensor {sensor_id} has no camera/images, skipping.")
                 continue
             if rig.is_ref_sensor(sensor_id):
-                cam_from_rig = Rotation.identity()
+                rig_from_sensor = Rotation.identity()
                 cam_offset_rig = np.zeros(3)
             else:
                 sensor_from_rig = rig.sensor_from_rig(sensor_id)
-                cam_from_rig = Rotation.from_quat(sensor_from_rig.rotation.quat)
+                rig_from_sensor = Rotation.from_quat(sensor_from_rig.rotation.quat).inv()
                 R = sensor_from_rig.rotation.matrix()
                 cam_offset_rig = -R.T @ sensor_from_rig.translation
-            mount = cam_from_rig * rig_from_ins
+            mount = ins_from_rig * rig_from_sensor
             if camera.model.name == "OPENCV":
                 fx, fy, cx, cy, d1, d2, d3, d4 = camera.params
                 dist = np.array([d1, d2, d3, d4])
@@ -205,7 +228,9 @@ def export_rig_camera_models(
             else:
                 raise SystemError(f"Unexpected camera model {camera.model.name}")
             K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
-            cam_position = position + rig_from_ins.inv().apply(cam_offset_rig)
+            # cam_offset_rig is in rig coords; the mount position is in the
+            # INS frame, so rotate rig->INS via ins_from_rig.
+            cam_position = position + ins_from_rig.apply(cam_offset_rig)
             model = StandardCamera(
                 camera.width,
                 camera.height,
