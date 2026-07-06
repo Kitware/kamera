@@ -1,12 +1,14 @@
 ROS_DISTRO ?= noetic
-PYTHON_VERSION ?= 3.10
 
 .PHONY: install build core viame gui postflight follower leader all clean
 
-# Build .venv on top of an activated conda env from environment.yml
+# Build .venv on top of an activated conda env from environment.yml.
+# The interpreter is taken from the active env, so any python version
+# the env provides works (3.10, 3.11, ...).
 install:
-	@echo "🚀 Creating virtual environment using uv"
-	@uv venv --system-site-packages --python=$(PYTHON_VERSION)
+	@test -n "$$CONDA_PREFIX" || { echo "No active conda env — run 'micromamba activate kamera' first."; exit 1; }
+	@echo "🚀 Creating virtual environment using uv ($$("$$CONDA_PREFIX/bin/python" --version) from $$CONDA_PREFIX)"
+	@uv venv --system-site-packages --python="$$CONDA_PREFIX/bin/python"
 	@uv sync --frozen --no-cache
 
 build:
