@@ -710,11 +710,19 @@ def transfer_alignment(
         or len(colocated_im_pts) < minimum_pts_required
     ):
         print("[ERROR] Not enough matching 2D image points were found for camera.")
-        return
+        return None, None
 
-    # Treat as co-located cameras (they are) and unproject out of RGB and into
-    # the other camera.
-    ray_pos, ray_dir = calibrated_camera_model.unproject(colocated_im_pts.T)
+    # Treat as co-located cameras (they are) and unproject out of the
+    # calibrated camera and into the other camera. The unprojection must
+    # happen in the platform (INS) frame: with a live nav provider and no
+    # explicit time, unproject() evaluates the INS attitude at the current
+    # wall clock (clamped to the nearest nav sample), which bakes an
+    # arbitrary aircraft attitude into the solved mount quaternion and can
+    # push the optimization into mirrored (negative focal) minima.
+    nav_state_fixed = NavStateFixed(np.zeros(3), [0, 0, 0, 1])
+    calibrated_fixed = copy.copy(calibrated_camera_model)
+    calibrated_fixed.platform_pose_provider = nav_state_fixed
+    ray_pos, ray_dir = calibrated_fixed.unproject(colocated_im_pts.T, 0)
     wrld_pts = ray_dir.T * 1e4
     assert np.all(np.isfinite(wrld_pts)), "World points contain non-finite values."
 
@@ -773,8 +781,6 @@ def transfer_alignment(
     cam_quat = np.asarray(cam_quat)
     cam_quat /= np.linalg.norm(cam_quat)
     x0 = cam_quat[dynamic_quat_ind].copy()  # [x, y, z]
-
-    nav_state_fixed = NavStateFixed(np.zeros(3), [0, 0, 0, 1])
 
     def get_cm(x):
         """
@@ -841,6 +847,18 @@ def transfer_alignment(
 
     def error(x):
         try:
+            # Reject non-physical or runaway intrinsics. COLMAP's bundle
+            # adjustment already solved them jointly from the same imagery;
+            # the transfer refines the rotation and, at most, small
+            # focal/distortion corrections. Without this wall a mirrored
+            # solution (negative fy) fits the trimmed objective just as well
+            # as the true one.
+            if len(x) > 4 and not (
+                0.7 * fx < x[3] < 1.3 * fx and 0.7 * fy < x[4] < 1.3 * fy
+            ):
+                return 1e8
+            if len(x) > 5 and np.any(np.abs(np.asarray(x[5:]) - dist) > 0.5):
+                return 1e8
             cm = get_cm(x)
             projected = cm.project(wrld_pts.T).T  # Shape: (N, 2)
 

@@ -1,4 +1,5 @@
 import os
+import copy
 import json
 import pathlib
 import cv2
@@ -11,7 +12,7 @@ from rich import print
 import pycolmap as pc
 from dataclasses import dataclass
 from typing import Optional, Tuple, List, Dict
-from kamera.sensor_models.nav_state import NavStateINSJson
+from kamera.sensor_models.nav_state import NavStateFixed, NavStateINSJson
 from kamera.colmap_processing.camera_models import StandardCamera
 from kamera.colmap_processing.image_renderer import render_view
 from kamera.postflight.alignment import (
@@ -338,6 +339,17 @@ class ColmapCalibration(object):
             f"and {colocated_camera_name}."
         )
         ub.ensuredir(gif_dir)
+
+        # Warp in the platform frame for both cameras. The models may arrive
+        # with different pose providers (a freshly solved camera carries the
+        # live INS provider, a loaded/transferred one an identity provider);
+        # mixing them injects an arbitrary INS attitude into the warp even
+        # when both mount quaternions are correct.
+        nav_state_fixed = NavStateFixed(np.zeros(3), np.array([0, 0, 0, 1]))
+        camera_model = copy.copy(camera_model)
+        camera_model.platform_pose_provider = nav_state_fixed
+        colocated_camera_model = copy.copy(colocated_camera_model)
+        colocated_camera_model.platform_pose_provider = nav_state_fixed
 
         images_root = osp.join(self.colmap_dir, "images0")
         # The colocated modality may live in a different colmap workspace
