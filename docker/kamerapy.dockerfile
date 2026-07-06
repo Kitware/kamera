@@ -22,7 +22,7 @@ RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/${MAMBA_VERSION} \
 ENV MAMBA_ROOT_PREFIX=/opt/conda
 
 # The conda env supplies python + GDAL + uv; uv layers everything else into
-# .venv on top of it (same flow as the native setup_postproc scripts).
+# .venv on top of it (same flow as the native install in the README).
 COPY environment.yml /tmp/environment.yml
 RUN micromamba create -y -n kamera -f /tmp/environment.yml \
  && micromamba clean --all -y
