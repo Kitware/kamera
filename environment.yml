@@ -6,6 +6,6 @@ channels:
 dependencies:
   - python=3.10  # must match PYTHON_VERSION in the Makefile
   - gdal>=3.10
-  - pycolmap>=4.0
+  - pycolmap>=4.1  # COLMAP 3.14 bindings; postflight calibration is tested against 4.1
   - pip
   - uv
