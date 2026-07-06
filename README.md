@@ -22,50 +22,41 @@ KAMERA, or the **K**nowledge-guided Image **A**cquisition **M**anag**ER** and **
 
 ## Installation
 
-### Post-processing / flight summaries (native, Windows or Linux)
+### Post-processing (native, Windows or Linux)
 
-The binary geo/SfM stack (GDAL, pycolmap) comes from conda-forge
-(`environment.yml`); [uv](https://docs.astral.sh/uv/) layers the rest of the
-environment into `.venv` on top of it. The only prerequisite is conda
-(e.g. [miniforge](https://conda-forge.org/download/)) on your PATH.
+GDAL and pycolmap come from conda-forge; [uv](https://docs.astral.sh/uv/)
+installs the rest into `.venv`. Requires
+[conda](https://conda-forge.org/download/).
 
 Linux/macOS:
 
 ```bash
 git clone https://github.com/Kitware/kamera.git
 cd kamera
-conda env create -f environment.yml   # later: conda env update -f environment.yml
+conda env create -f environment.yml
 conda activate kamera
 make install
 source .venv/bin/activate
 ```
 
-Windows (PowerShell) — identical, except `make` usually isn't available, so
-run the two commands from the Makefile's `install` target directly:
+Windows (PowerShell or Anaconda Prompt):
 
 ```powershell
 git clone https://github.com/Kitware/kamera.git
 cd kamera
-conda env create -f environment.yml   # later: conda env update -f environment.yml
+conda env create -f environment.yml
 conda activate kamera
-uv venv --system-site-packages --python=3.10
-uv sync --frozen --no-cache
-.\.venv\Scripts\Activate.ps1
+pip install -e .
 ```
 
-Note for Windows: keep the conda env activated alongside `.venv` so GDAL's
-DLLs resolve.
-
-Note on GPU support: conda picks the CUDA build of pycolmap automatically if
-your NVIDIA driver supports CUDA >=12.9 (driver 575+); otherwise it silently
-falls back to the CPU build. GPU acceleration is only needed for full camera
-model calibration — routine post-processing and flight summaries are fine on
-the CPU build.
+Afterwards, `conda activate kamera` is all you need. Conda installs the CUDA
+build of pycolmap automatically with NVIDIA driver 575+ (CUDA 12.9),
+otherwise the CPU build; GPU only matters for full camera model calibration.
 
 ### Docker images
 
 ```bash
-# Post-processing image (same conda + uv flow as above, containerized):
+# post-processing / flight summary image
 make postflight
 # Builds the core docker images for use in the onboard sytems
 make nuvo

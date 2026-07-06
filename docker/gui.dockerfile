@@ -36,11 +36,9 @@ RUN mkdir -p /home/user/.config/kamera && \
 RUN ln -sv /usr/bin/python3 /usr/bin/python || true
 RUN find /home/user -not -user user -execdir chown user {} \+
 
-# Install kamera for wxpython_gui imports (e.g. colmap_processing.camera_models).
-# Use --no-deps: base images already provide runtime deps, and a full install
-# fails trying to replace distutils-installed PyYAML from ROS/Noetic.
-# --ignore-requires-python: the package targets >=3.10 but ROS Noetic pins
-# this image to Python 3.8; the modules the GUI imports still run there.
+# Install kamera for wxpython_gui imports. --no-deps: deps come from the base
+# image (a full install trips on ROS's distutils PyYAML).
+# --ignore-requires-python: ROS Noetic pins python 3.8, below our 3.10 floor.
 RUN pip install --no-cache-dir matplotlib \
     && pip install --no-cache-dir --no-deps --ignore-requires-python -e $REPO_DIR
 

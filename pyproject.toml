@@ -27,10 +27,8 @@ dependencies = [
     "rich>=13.9.1",
 ]
 
-# GDAL is intentionally not a dependency: there are no reliable
-# cross-platform wheels. It comes from conda-forge (environment.yml), and the
-# uv venv is built on top of the conda env with --system-site-packages so the
-# conda GDAL is importable (see `make install` and the README).
+# GDAL has no reliable cross-platform wheels; it comes from conda-forge
+# (environment.yml) and reaches .venv via --system-site-packages.
 
 [dependency-groups]
 dev = [
@@ -38,9 +36,8 @@ dev = [
 ]
 
 [tool.uv]
-# Never let uv substitute its own managed python: .venv must be built on the
-# active conda env's interpreter or --system-site-packages won't see the
-# conda GDAL.
+# Build .venv on the conda python, never a uv-managed one, so
+# --system-site-packages sees the conda GDAL.
 python-preference = "only-system"
 
 [build-system]
