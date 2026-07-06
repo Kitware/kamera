@@ -479,7 +479,7 @@ def iterative_alignment(
     sfm_quats: List[np.ndarray],
     ins_quats: List[np.ndarray],
     points_per_image: List[List[VisiblePoint]],
-    colmap_camera: pycolmap._core.Camera,
+    colmap_camera: pycolmap.Camera,
     nav_state_provider: NavStateINSJson,
 ) -> tuple[StandardCamera, float]:
     # Both quaternions are of the form (x, y, z, w) and represent a coordinate
@@ -627,7 +627,7 @@ def iterative_alignment(
 
 
 def transfer_alignment(
-    colmap_camera: pycolmap._core.Camera,
+    colmap_camera: pycolmap.Camera,
     calibrated_camera_model: StandardCamera,
     points_per_image: List[List[VisiblePoint]],
     colocated_points_per_image: List[List[VisiblePoint]],
@@ -639,7 +639,7 @@ def transfer_alignment(
     already found by unprojecting the matching 3D features.
 
     Args:
-        colmap_camera (pycolmap._core.Camera): The camera to calibrate.
+        colmap_camera (pycolmap.Camera): The camera to calibrate.
         calibrated_camera_model (StandardCamera): The colocated, already calibrated camera.
         points_per_image (List[List[VisiblePoint]]): The 2D and 3D correspondences found
             in each image in the camera to calibrate.
