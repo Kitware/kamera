@@ -30,7 +30,7 @@ dependencies = [
 # GDAL is intentionally not a dependency: there are no reliable
 # cross-platform wheels. It comes from conda-forge (environment.yml), and the
 # uv venv is built on top of the conda env with --system-site-packages so the
-# conda GDAL is importable (see `make install` and scripts/setup_postproc.*).
+# conda GDAL is importable (see `make install` and the README).
 
 [dependency-groups]
 dev = [
