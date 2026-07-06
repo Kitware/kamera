@@ -2,8 +2,8 @@
 # Set up the native post-processing environment (Linux/macOS).
 #
 # GDAL comes from conda-forge (environment.yml); everything else is installed
-# by uv into .venv, which is created from the conda python with
-# --system-site-packages so the conda GDAL is importable.
+# by `make install`, which runs uv to create .venv on top of the conda env
+# with --system-site-packages so the conda GDAL is importable.
 #
 # Requires conda, mamba, or micromamba on PATH. Usage:
 #   ./scripts/setup_postproc.sh
@@ -40,11 +40,7 @@ else
     "$CONDA_TOOL" env create -n "$ENV_NAME" -f environment.yml $YES
 fi
 
-CONDA_PY=$("$CONDA_TOOL" run -n "$ENV_NAME" python -c 'import sys; print(sys.executable)')
-echo "Conda python: $CONDA_PY"
-
-"$CONDA_TOOL" run -n "$ENV_NAME" uv venv --clear --python "$CONDA_PY" --system-site-packages .venv
-"$CONDA_TOOL" run -n "$ENV_NAME" uv sync --python "$CONDA_PY"
+"$CONDA_TOOL" run -n "$ENV_NAME" make install
 
 .venv/bin/python -c 'from osgeo import gdal; print(f"GDAL {gdal.__version__} OK")'
 echo

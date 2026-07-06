@@ -26,12 +26,14 @@ KAMERA, or the **K**nowledge-guided Image **A**cquisition **M**anag**ER** and **
 git clone https://github.com/Kitware/kamera.git
 cd kamera
 # For the pure post-processing and generating flight summary, install natively
-# (works on Windows and Linux): GDAL comes from conda-forge, and uv
-# (https://docs.astral.sh/uv/) layers the rest of the environment on top.
-# Requires conda (e.g. miniforge) on PATH.
+# (works on Windows and Linux): GDAL comes from conda-forge (environment.yml),
+# and uv (https://docs.astral.sh/uv/) layers the rest of the environment into
+# .venv on top of it. Requires conda (e.g. miniforge) on PATH.
 ./scripts/setup_postproc.sh     # Linux/macOS
 # .\scripts\setup_postproc.ps1  # Windows (PowerShell)
 conda activate kamera && source .venv/bin/activate
+# (If you already have a conda env from environment.yml activated, the
+# scripts are equivalent to just running: make install)
 # Or build the post-processing docker image instead:
 make postflight
 # Builds the core docker images for use in the onboard sytems

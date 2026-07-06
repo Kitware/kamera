@@ -1,8 +1,9 @@
 # Set up the native post-processing environment (Windows).
 #
 # GDAL comes from conda-forge (environment.yml); everything else is installed
-# by uv into .venv, which is created from the conda python with
-# --system-site-packages so the conda GDAL is importable.
+# by uv into .venv, created on top of the conda env with
+# --system-site-packages so the conda GDAL is importable. These are the same
+# steps as `make install` (make usually isn't available on Windows).
 #
 # Requires conda, mamba, or micromamba on PATH. Usage (PowerShell):
 #   .\scripts\setup_postproc.ps1
@@ -10,6 +11,8 @@
 # Afterwards (conda activation is required on Windows so GDAL's DLLs resolve):
 #   conda activate kamera; .\.venv\Scripts\Activate.ps1
 $ErrorActionPreference = "Stop"
+
+$PythonVersion = "3.10"  # must match PYTHON_VERSION in the Makefile
 
 Set-Location (Join-Path $PSScriptRoot "..")
 
@@ -40,12 +43,11 @@ if ($envExists) {
 }
 if ($LASTEXITCODE -ne 0) { throw "$CondaTool env setup failed" }
 
-$CondaPy = (& $CondaTool run -n $EnvName python -c "import sys; print(sys.executable)").Trim()
-Write-Host "Conda python: $CondaPy"
-
-& $CondaTool run -n $EnvName uv venv --clear --python $CondaPy --system-site-packages .venv
+# Same steps as `make install`
+Write-Host "🚀 Creating virtual environment using uv"
+& $CondaTool run -n $EnvName uv venv --system-site-packages --python=$PythonVersion
 if ($LASTEXITCODE -ne 0) { throw "uv venv failed" }
-& $CondaTool run -n $EnvName uv sync --python $CondaPy
+& $CondaTool run -n $EnvName uv sync --frozen --no-cache
 if ($LASTEXITCODE -ne 0) { throw "uv sync failed" }
 
 & $CondaTool run -n $EnvName .venv\Scripts\python.exe -c "from osgeo import gdal; print(f'GDAL {gdal.__version__} OK')"
