@@ -1,33 +1,42 @@
-FROM python:3.10.15-bookworm
+FROM debian:bookworm-slim
 
-COPY --from=ghcr.io/astral-sh/uv:0.6.1 /uv /uvx /bin/
+SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update && apt-get install -yq \
-    libgdal-dev \
-    python3-gdal \
-    libgl1-mesa-glx \
+    curl \
+    bzip2 \
+    ca-certificates \
+    make \
+    libgl1 \
+    libglib2.0-0 \
     libsm6 \
     libxext6 \
     redis \
     dnsutils \
-    gdal-bin
+ && rm -rf /var/lib/apt/lists/*
+
+# Install micromamba
+ARG MAMBA_VERSION=2.3.3
+RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/${MAMBA_VERSION} \
+  | tar -xvj -C /usr/local/bin --strip-components=1 bin/micromamba
+ENV MAMBA_ROOT_PREFIX=/opt/conda
+
+# The conda env supplies python + GDAL + uv; uv layers everything else into
+# .venv on top of it (same flow as the native setup_postproc scripts).
+COPY environment.yml /tmp/environment.yml
+RUN micromamba create -y -n kamera -f /tmp/environment.yml \
+ && micromamba clean --all -y
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
+COPY ./ /src/kamera
 WORKDIR /src/kamera
 
-# Install dependencies before copying source so this layer caches across
-# code-only changes. uv.lock is gitignored: run `uv lock` before building.
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-install-project --extra gdal
+RUN eval "$(micromamba shell hook --shell bash)" \
+ && micromamba activate kamera \
+ && make install
 
-COPY ./ /src/kamera
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --extra gdal
-
-ENV PATH="/src/kamera/.venv/bin:$PATH"
+ENV PATH="/src/kamera/.venv/bin:/opt/conda/envs/kamera/bin:$PATH"
 
 ENTRYPOINT ["bash"]
