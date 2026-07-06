@@ -18,6 +18,15 @@ wheels = [
 ]
 
 [[package]]
+name = "bottle"
+version = "0.13.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7a/71/cca6167c06d00c81375fd668719df245864076d284f7cb46a694cbeb5454/bottle-0.13.4.tar.gz", hash = "sha256:787e78327e12b227938de02248333d788cfe45987edca735f8f88e03472c3f47", size = 98717 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/83/f6/b55ec74cfe68c6584163faa311503c20b0da4c09883a41e8e00d6726c954/bottle-0.13.4-py2.py3-none-any.whl", hash = "sha256:045684fbd2764eac9cdeb824861d1551d113e8b683d8d26e296898d3dd99a12e", size = 103807 },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -399,6 +408,7 @@ name = "kamera"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "bottle" },
     { name = "datetime" },
     { name = "exifread" },
     { name = "matplotlib", version = "3.10.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -430,6 +440,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "bottle", specifier = ">=0.13.2" },
     { name = "datetime", specifier = ">=5.5" },
     { name = "exifread", specifier = ">=3.0.0" },
     { name = "matplotlib", specifier = ">=3.9.2" },
