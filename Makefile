@@ -1,6 +1,15 @@
 ROS_DISTRO ?= noetic
+PYTHON_VERSION ?= 3.10
 
-.PHONY: build core viame gui postflight follower leader all clean
+.PHONY: install build core viame gui postflight follower leader all clean
+
+# Install the post-processing environment into .venv. Run inside an activated
+# conda env built from environment.yml, which supplies python + GDAL + uv;
+# --system-site-packages makes the conda GDAL importable from the venv.
+install:
+	@echo "🚀 Creating virtual environment using uv"
+	@uv venv --system-site-packages --python=$(PYTHON_VERSION)
+	@uv sync --frozen --no-cache
 
 build:
 	docker compose build
