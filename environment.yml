@@ -2,7 +2,8 @@
 # has no reliable cross-platform wheels. The project itself is installed by uv into
 # a venv created on top of this env with --system-site-packages, so python
 # here must satisfy requires-python in pyproject.toml.
-# Setup: scripts/setup_postproc.sh (Linux/macOS) or setup_postproc.ps1 (Windows)
+# Setup: `conda env create -f environment.yml && conda activate kamera`,
+# then `make install` (see README.md for the Windows equivalent).
 name: kamera
 channels:
   - conda-forge
