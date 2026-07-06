@@ -1,5 +1,5 @@
-# Conda environment providing the binary geo stack (GDAL) that has no
-# reliable cross-platform wheels. The project itself is installed by uv into
+# Conda environment providing the binary geo/SfM stack (GDAL, pycolmap) that
+# has no reliable cross-platform wheels. The project itself is installed by uv into
 # a venv created on top of this env with --system-site-packages, so python
 # here must satisfy requires-python in pyproject.toml.
 # Setup: scripts/setup_postproc.sh (Linux/macOS) or setup_postproc.ps1 (Windows)
@@ -9,5 +9,6 @@ channels:
 dependencies:
   - python=3.10  # must match PYTHON_VERSION in the Makefile
   - gdal>=3.10
+  - pycolmap>=4.0
   - pip
   - uv
