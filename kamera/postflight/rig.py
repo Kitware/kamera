@@ -27,11 +27,12 @@ import json
 import os
 import pathlib
 from collections import defaultdict
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pycolmap
 from rich import print
+from scipy.spatial.transform import Rotation
 
 from kamera.postflight.naming import KameraCameraName, KameraImageName
 from kamera.sensor_models.nav_state import NavStateINSJson
@@ -39,6 +40,8 @@ from kamera.sensor_models.nav_state import NavStateINSJson
 __all__ = [
     "basename_to_time",
     "configure_rig_and_frames",
+    "derive_sensor_from_rig",
+    "write_frames",
     "write_pose_priors",
     "run_rig_mapping",
 ]
@@ -67,22 +70,8 @@ def _frame_key(image_name: str) -> str:
     return f"{n.date}_{n.time}"
 
 
-def configure_rig_and_frames(
-    db: "pycolmap.Database", ref_modality: str = "rgb"
-) -> Tuple[int, int]:
-    """Replace the database's (auto-generated, trivial) rigs and frames
-    with a single rig of all cameras and one frame per trigger event.
-
-    The reference sensor is the first (sorted) camera folder of
-    `ref_modality`, falling back to the first folder overall.
-
-    Returns (rig_id, num_frames).
-    """
-    images = db.read_all_images()
-    if not images:
-        raise SystemError("Database contains no images.")
-
-    # Each images0 subfolder is one physical camera (single_camera_per_folder).
+def _folder_to_camera(images) -> Dict[str, int]:
+    """Map each images0 subfolder to its (single) camera id."""
     folder_to_cam: Dict[str, int] = {}
     for im in images:
         folder = im.name.rsplit("/", 1)[0] if "/" in im.name else ""
@@ -92,16 +81,80 @@ def configure_rig_and_frames(
                 f"Folder {folder} maps to multiple cameras ({prev}, "
                 f"{im.camera_id}); expected one camera per folder."
             )
+    return folder_to_cam
 
-    def _ref_rank(folder: str) -> Tuple[int, str]:
+
+def _order_by_ref(folders, ref_modality: str) -> List[str]:
+    """Sorted camera folders with the reference-modality cameras first."""
+
+    def rank(folder: str) -> Tuple[int, str]:
         try:
             is_ref = KameraCameraName.parse(folder).modality != ref_modality
         except ValueError:
             is_ref = True
         return (is_ref, folder)
 
-    ordered = sorted(folder_to_cam, key=_ref_rank)
-    print(f"Rig sensors ({len(ordered)}), ref = {ordered[0]}:")
+    return sorted(folders, key=rank)
+
+
+def write_frames(db: "pycolmap.Database", rig_id: int) -> int:
+    """(Re)write one frame per trigger event, grouping the database's
+    images by the date/time fields of their basenames. Returns the frame
+    count."""
+    groups = defaultdict(list)
+    skipped = 0
+    for im in db.read_all_images():
+        try:
+            groups[_frame_key(im.name)].append(im)
+        except ValueError:
+            skipped += 1
+    if skipped:
+        print(f"[yellow]{skipped} images had unparseable names; not in any frame.")
+
+    db.clear_frames()
+    for key in sorted(groups):
+        frame = pycolmap.Frame()
+        frame.rig_id = rig_id
+        for im in groups[key]:
+            frame.add_data_id(pycolmap.data_t(_camera_sensor(im.camera_id), im.image_id))
+        db.write_frame(frame)
+    sizes = [len(g) for g in groups.values()]
+    print(
+        f"Wrote {len(groups)} frames ({min(sizes)}-{max(sizes)} images/frame)."
+    )
+    return len(groups)
+
+
+def configure_rig_and_frames(
+    db: "pycolmap.Database",
+    ref_modality: str = "rgb",
+    sensor_from_rig: Optional[Dict[str, "pycolmap.Rigid3d"]] = None,
+) -> Tuple[int, int]:
+    """Replace the database's (auto-generated, trivial) rigs and frames
+    with a single rig of all cameras and one frame per trigger event.
+
+    The reference sensor is the first (sorted) camera folder of
+    `ref_modality`, falling back to the first folder overall.
+
+    `sensor_from_rig` optionally supplies the rig extrinsics per camera
+    folder (from `derive_sensor_from_rig` on an initial reconstruction).
+    When omitted the poses are left unset, which only the global mapper
+    accepts; the incremental mapper requires them (run a first pass
+    without a multi-sensor rig, derive, then re-map).
+
+    Returns (rig_id, num_frames).
+    """
+    images = db.read_all_images()
+    if not images:
+        raise SystemError("Database contains no images.")
+
+    folder_to_cam = _folder_to_camera(images)
+    ordered = _order_by_ref(folder_to_cam, ref_modality)
+    have_poses = sensor_from_rig is not None
+    print(
+        f"Rig sensors ({len(ordered)}), ref = {ordered[0]}, "
+        f"extrinsics {'provided' if have_poses else 'unset'}:"
+    )
     for f in ordered:
         print(f"  camera {folder_to_cam[f]}: {f}")
 
@@ -111,33 +164,77 @@ def configure_rig_and_frames(
     rig = pycolmap.Rig()
     rig.add_ref_sensor(_camera_sensor(folder_to_cam[ordered[0]]))
     for folder in ordered[1:]:
-        # sensor_from_rig left unset; solved by rig-aware bundle adjustment
-        rig.add_sensor(_camera_sensor(folder_to_cam[folder]), None)
+        pose = sensor_from_rig.get(folder) if sensor_from_rig else None
+        rig.add_sensor(_camera_sensor(folder_to_cam[folder]), pose)
     rig_id = db.write_rig(rig)
 
-    groups = defaultdict(list)
-    skipped = 0
-    for im in images:
+    n_frames = write_frames(db, rig_id)
+    print(f"Wrote rig {rig_id}.")
+    return rig_id, n_frames
+
+
+def derive_sensor_from_rig(
+    reconstruction: "pycolmap.Reconstruction",
+    ref_modality: str = "rgb",
+    min_frames: int = 5,
+) -> Dict[str, "pycolmap.Rigid3d"]:
+    """Estimate each camera's sensor_from_rig from an initial (rigless)
+    reconstruction, by robustly averaging, over synchronized frames,
+
+        sensor_from_rig = sensor_cam_from_world . (ref_cam_from_world)^-1
+
+    Rotations are averaged as unit quaternions; translations by median.
+    Returns a map from camera folder to Rigid3d, excluding the reference.
+    """
+    from kamera.postflight.boresight import average_quaternions
+
+    # group images by camera folder and by frame key
+    by_folder: Dict[str, Dict[str, "pycolmap.Image"]] = defaultdict(dict)
+    folders_present = set()
+    for im in reconstruction.images.values():
+        if not im.has_pose or "/" not in im.name:
+            continue
+        folder = im.name.rsplit("/", 1)[0]
+        folders_present.add(folder)
         try:
-            groups[_frame_key(im.name)].append(im)
+            by_folder[folder][_frame_key(im.name)] = im
         except ValueError:
-            skipped += 1
-    if skipped:
-        print(f"[yellow]{skipped} images had unparseable names; not in any frame.")
+            continue
 
-    for key in sorted(groups):
-        frame = pycolmap.Frame()
-        frame.rig_id = rig_id
-        for im in groups[key]:
-            frame.add_data_id(pycolmap.data_t(_camera_sensor(im.camera_id), im.image_id))
-        db.write_frame(frame)
+    ordered = _order_by_ref(folders_present, ref_modality)
+    ref_folder = ordered[0]
+    ref_by_key = by_folder[ref_folder]
 
-    sizes = [len(g) for g in groups.values()]
-    print(
-        f"Wrote rig {rig_id} and {len(groups)} frames "
-        f"({min(sizes)}-{max(sizes)} images/frame)."
-    )
-    return rig_id, len(groups)
+    out: Dict[str, "pycolmap.Rigid3d"] = {}
+    for folder in ordered[1:]:
+        quats, trans = [], []
+        for key, im in by_folder[folder].items():
+            ref = ref_by_key.get(key)
+            if ref is None:
+                continue
+            # sensor_from_rig = sensor_cam_from_world . world_from_ref
+            rel = im.cam_from_world() * ref.cam_from_world().inverse()
+            quats.append(rel.rotation.quat)
+            trans.append(rel.translation)
+        if len(quats) < min_frames:
+            print(
+                f"[yellow]Only {len(quats)} synchronized frames for {folder}; "
+                "skipping (its extrinsics stay unset)."
+            )
+            continue
+        q = average_quaternions(np.asarray(quats))
+        t = np.median(np.asarray(trans), axis=0)
+        spread = np.degrees(
+            (
+                Rotation.from_quat(np.asarray(quats)) * Rotation.from_quat(q).inv()
+            ).magnitude()
+        )
+        print(
+            f"  {folder}: sensor_from_rig from {len(quats)} frames, "
+            f"rot spread {np.median(spread):.3f} deg"
+        )
+        out[folder] = pycolmap.Rigid3d(pycolmap.Rotation3d(q), t)
+    return out
 
 
 def write_pose_priors(
@@ -175,27 +272,76 @@ def write_pose_priors(
     return written
 
 
+def _incremental_options(use_priors: bool) -> "pycolmap.IncrementalPipelineOptions":
+    options = pycolmap.IncrementalPipelineOptions()
+    options.use_prior_position = use_priors
+    options.use_robust_loss_on_prior_position = True
+    options.ba_refine_sensor_from_rig = True
+    return options
+
+
+def _best_reconstruction(
+    recs: Dict[int, "pycolmap.Reconstruction"],
+) -> "pycolmap.Reconstruction":
+    return max(recs.values(), key=lambda r: r.num_reg_frames)
+
+
 def run_rig_mapping(
     database_path: str | os.PathLike,
     image_path: str | os.PathLike,
     output_path: str | os.PathLike,
     use_priors: bool = True,
     mapper: str = "incremental",
+    ref_modality: str = "rgb",
 ) -> Dict[int, "pycolmap.Reconstruction"]:
-    """Run mapping on a rig/prior-configured database.
+    """Map a rig/prior-configured database.
 
-    "incremental" honors both the rig constraints and the position
-    priors. "global" (COLMAP's built-in GLOMAP-style mapper) is much
-    faster but currently ignores priors -- use it for quick iteration,
-    then refine with the incremental path or a prior-position bundle
-    adjustment.
+    "global" (COLMAP's GLOMAP-style mapper) is fast but ignores both the
+    rig extrinsics and the priors, so its output is in an arbitrary gauge
+    -- useful only as a quick sanity/seed. "incremental" runs the
+    two-pass rig workflow: a first pass with priors but no multi-sensor
+    rig produces an ENU per-image model, from which sensor_from_rig is
+    derived; the database is reconfigured with those extrinsics and a
+    second, rig-constrained pass produces the final model in
+    `output_path`.
     """
     os.makedirs(output_path, exist_ok=True)
     if mapper == "global":
         options = pycolmap.GlobalPipelineOptions()
         return pycolmap.global_mapping(database_path, image_path, output_path, options)
-    options = pycolmap.IncrementalPipelineOptions()
-    options.use_prior_position = use_priors
-    options.use_robust_loss_on_prior_position = True
-    options.ba_refine_sensor_from_rig = True
-    return pycolmap.incremental_mapping(database_path, image_path, output_path, options)
+
+    # Pass 1: priors only (trivial per-camera rigs), yields an ENU model.
+    db = pycolmap.Database.open(database_path)
+    try:
+        db.clear_rigs()
+        db.clear_frames()
+    finally:
+        db.close()
+    pass1_dir = os.path.join(output_path, "pass1")
+    os.makedirs(pass1_dir, exist_ok=True)
+    print("[blue]Rig mapping pass 1: prior-position, rigless.[/blue]")
+    recs1 = pycolmap.incremental_mapping(
+        database_path, image_path, pass1_dir, _incremental_options(use_priors)
+    )
+    if not recs1:
+        raise SystemError("Pass 1 produced no reconstruction.")
+    rec1 = _best_reconstruction(recs1)
+    print(f"Pass 1 best model: {rec1.num_reg_frames} frames.")
+
+    # Derive extrinsics and reconfigure the database with a real rig.
+    sensor_from_rig = derive_sensor_from_rig(rec1, ref_modality=ref_modality)
+    db = pycolmap.Database.open(database_path)
+    try:
+        configure_rig_and_frames(
+            db, ref_modality=ref_modality, sensor_from_rig=sensor_from_rig
+        )
+    finally:
+        db.close()
+
+    # Pass 2: rig-constrained, prior-position.
+    pass2_dir = os.path.join(output_path, "sparse")
+    os.makedirs(pass2_dir, exist_ok=True)
+    print("[blue]Rig mapping pass 2: rig-constrained, prior-position.[/blue]")
+    return pycolmap.incremental_mapping(
+        database_path, image_path, pass2_dir, _incremental_options(use_priors)
+    )
