@@ -34,6 +34,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "ipdb>=0.13.13",
+    "pytest>=8.0",
 ]
 
 [tool.uv]
