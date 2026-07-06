@@ -7,6 +7,7 @@ from rich import print
 
 from kamera.colmap_processing.camera_models import load_from_file
 from kamera.postflight.colmap import ColmapCalibration, find_best_sparse_model
+from kamera.postflight.naming import KameraCameraName
 
 
 def align_model(
@@ -14,20 +15,29 @@ def align_model(
     colmap_dir: os.PathLike | str,
     align_dir: os.PathLike | str,
 ) -> ColmapCalibration:
-    if os.path.exists(align_dir) and len(os.listdir(align_dir)) == 1:
+    aligned_models = []
+    if os.path.isdir(align_dir):
+        aligned_models = sorted(
+            d
+            for d in os.listdir(align_dir)
+            if os.path.isdir(os.path.join(align_dir, d))
+        )
+    if len(aligned_models) == 1:
         print(
             f"The directory {align_dir} exists and is not empty,"
             " assuming model is aligned."
         )
-        aligned_sparse_dir = os.path.join(align_dir, os.listdir(align_dir)[0])
+        aligned_sparse_dir = os.path.join(align_dir, aligned_models[0])
         cc = ColmapCalibration(flight_dir, aligned_sparse_dir, colmap_dir)
-    elif os.path.exists(align_dir) and len(os.listdir(align_dir) > 1):
+    elif len(aligned_models) > 1:
         raise SystemError(
-            f"{len(os.listdir(align_dir))} aligned models are present, only 1 should exist in {align_dir}."
+            f"{len(aligned_models)} aligned models are present, only 1 "
+            f"should exist in {align_dir}."
         )
-    elif not os.path.exists(align_dir) or len(os.listdir(align_dir) == 0):
+    else:
         print(
-            f"The directory {align_dir} does not exist, or is empty, selecting and aligning the best sparse model."
+            f"The directory {align_dir} does not exist, or is empty, "
+            "selecting and aligning the best sparse model."
         )
         # location of sparsely constructed colmap models (always sparse if using default colmap options)
         sparse_dir = os.path.join(colmap_dir, "sparse")
@@ -72,24 +82,28 @@ def main():
 
     # We now have an aligned 3-D model, so we can calibrate the cameras
     print("Preparing calibration data...")
-    cc.prepare_calibration_data()
+    ccd = cc.prepare_calibration_data()
     ub.ensuredir(save_dir)
     cameras = ub.AutoDict()
     errors = ub.AutoDict()
-    camera_strs = list(cc.ccd.best_cameras.keys())
-    modalities = [cs.split("_")[3] for cs in camera_strs]
+    # image-folder name of each camera, keyed like `cameras`
+    camera_names = ub.AutoDict()
+    camera_strs = list(ccd.best_cameras.keys())
+    modalities = {KameraCameraName.parse(cs).modality for cs in camera_strs}
     num_cameras_loaded = 0
     num_cameras_calibrated = 0
-    if len(modalities) < 1:
+    if len(modalities) < 2:
         print(
-            "Warning: only 1 modality found in this 3D model, not joinly calibrating."
+            "Warning: only 1 modality found in this 3D model, not jointly calibrating."
         )
         joint_calibration = False
-    for camera_str in cc.ccd.best_cameras.keys():
-        channel, modality = camera_str.split("_")[-2:]
+    for camera_str in camera_strs:
+        cam_name = KameraCameraName.parse(camera_str)
+        channel, modality = cam_name.channel, cam_name.modality
         # skip all modalities except the "main" ones
         if joint_calibration and modality != main_modality:
             continue
+        camera_names[channel][modality] = camera_str
         out_path = os.path.join(save_dir, f"{camera_str}_v2.yaml")
         # skip compute if we don't have to recompute
         if os.path.exists(out_path) and not force_calibrate:
@@ -101,9 +115,9 @@ def main():
             num_cameras_loaded += 1
         else:
             print(f"Calibrating camera {camera_str}.")
-            tic = time.time()
+            tic = time.perf_counter()
             camera_model, error = cc.calibrate_camera(camera_str)
-            toc = time.time()
+            toc = time.perf_counter()
             if camera_model is not None:
                 print(f"Saving camera model to {out_path}")
                 camera_model.save_to_file(out_path)
@@ -111,18 +125,20 @@ def main():
                 print(camera_model)
                 cameras[channel][modality] = camera_model
                 errors[channel][modality] = error
+                num_cameras_calibrated += 1
             else:
                 print(f"Calibrating camera {camera_str} failed.")
-            num_cameras_calibrated += 1
 
     # If we have multiple cameras within one model, we can utilize the fact that these cameras
     # are colocated to use 3D points obtained from one to project into the other
     if joint_calibration:
-        for camera_str in cc.ccd.best_cameras.keys():
-            channel, modality = camera_str.split("_")[-2:]
+        for camera_str in camera_strs:
+            cam_name = KameraCameraName.parse(camera_str)
+            channel, modality = cam_name.channel, cam_name.modality
             # now calibrate all other modalities
             if modality == main_modality:
                 continue
+            camera_names[channel][modality] = camera_str
             out_path = os.path.join(save_dir, f"{camera_str}_v2.yaml")
             if os.path.exists(out_path) and not force_calibrate:
                 print(
@@ -132,11 +148,18 @@ def main():
                 cameras[channel][modality] = camera_model
                 num_cameras_loaded += 1
             else:
+                main_model = cameras[channel].get(main_modality)
+                if main_model is None:
+                    print(
+                        f"No calibrated {main_modality} model for channel "
+                        f"{channel}, cannot transfer calibration to {camera_str}."
+                    )
+                    continue
                 print(f"Calibrating camera {camera_str}.")
                 tic = time.perf_counter()
                 camera_model, error = cc.transfer_calibration(
                     camera_str,
-                    cameras[channel][main_modality],
+                    main_model,
                     calibrated_modality=main_modality,
                 )
                 toc = time.perf_counter()
@@ -156,16 +179,19 @@ def main():
     # IR calibration generally happens in a separate model, since SIFT has a hard
     # time matching between EO and long-wave IR
     ir_cameras_refined = 0
+    ir_cc = None
     if calibrate_ir:
         ir_colmap_dir = os.path.join(flight_dir, "colmap_ir")
         ir_align_dir = os.path.join(ir_colmap_dir, "aligned")
         print("[blue] Loading 3D IR Model.[/blue]")
         ir_cc = align_model(flight_dir, ir_colmap_dir, ir_align_dir)
         print("Preparing IR calibration data...")
-        ir_cc.prepare_calibration_data()
-        camera_strs = list(ir_cc.ccd.best_cameras.keys())
-        for camera_str in ir_cc.ccd.best_cameras.keys():
-            channel, modality = camera_str.split("_")[-2:]
+        ir_ccd = ir_cc.prepare_calibration_data()
+        ir_camera_strs = list(ir_ccd.best_cameras.keys())
+        for camera_str in ir_camera_strs:
+            cam_name = KameraCameraName.parse(camera_str)
+            channel, modality = cam_name.channel, cam_name.modality
+            camera_names[channel][modality] = camera_str
             out_path = os.path.join(save_dir, f"{camera_str}_v2.yaml")
             if os.path.exists(out_path) and not force_calibrate:
                 print(
@@ -191,8 +217,16 @@ def main():
                     num_cameras_calibrated += 1
                 else:
                     print(f"Calibrating camera {camera_str} failed.")
+                    continue
 
             if refine_ir:
+                main_model = cameras[channel].get(main_modality)
+                if main_model is None:
+                    print(
+                        f"No calibrated {main_modality} model for channel "
+                        f"{channel}, cannot refine {camera_str}."
+                    )
+                    continue
                 # need to define a points per modality/view pair
                 ir_points_json = pathlib.Path(
                     os.path.join(
@@ -224,42 +258,38 @@ def main():
                     with open(ir_points_json, "r") as f:
                         points = json.load(f)
                 refined_camera_model, error = ir_cc.manual_calibration(
-                    camera_model, cameras[channel][main_modality], points
+                    camera_model, main_model, points
                 )
                 cameras[channel][modality] = refined_camera_model
                 errors[channel][modality] = error
                 ir_cameras_refined += 1
 
-    aircraft, angle = camera_str.split("_")[0:2]
     gif_dir = os.path.join(save_dir, "registration_gifs_v2")
     ub.ensuredir(gif_dir)
 
-    # Write UV GIFs
+    # Flip between each calibrated camera and its colocated main-modality
+    # camera as a visual registration check. IR gifs come from the IR model,
+    # everything else from the EO model.
     for channel in cameras.keys():
-        rgb_model = cameras[channel]["rgb"]
-        uv_model = cameras[channel]["uv"]
-        uv_name = "_".join([aircraft, angle, channel, "uv"])
-        cc.write_gifs(
-            gif_dir,
-            camera_name=uv_name,
-            colocated_modality="rgb",
-            camera_model=uv_model,
-            colocated_camera_model=rgb_model,
-            num_gifs=5,
-        )
-
-    # Write IR GIFs
-    if calibrate_ir:
-        for channel in cameras.keys():
-            rgb_model = cameras[channel]["rgb"]
-            ir_model = cameras[channel]["ir"]
-            ir_name = "_".join([aircraft, angle, channel, "ir"])
-            ir_cc.write_gifs(
+        main_model = cameras[channel].get(main_modality)
+        if main_model is None:
+            print(
+                f"[yellow]No {main_modality} model for channel {channel}, "
+                "skipping registration gifs.[/yellow]"
+            )
+            continue
+        for modality, camera_model in cameras[channel].items():
+            if modality == main_modality:
+                continue
+            gif_cc = ir_cc if modality == "ir" else cc
+            if gif_cc is None:
+                continue
+            gif_cc.write_gifs(
                 gif_dir,
-                camera_name=ir_name,
-                colocated_modality="rgb",
-                camera_model=ir_model,
-                colocated_camera_model=rgb_model,
+                camera_name=camera_names[channel][modality],
+                colocated_modality=main_modality,
+                camera_model=camera_model,
+                colocated_camera_model=main_model,
                 num_gifs=5,
             )
 

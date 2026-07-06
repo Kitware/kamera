@@ -654,7 +654,7 @@ def transfer_alignment(
     """
     im_pts = []
     colocated_im_pts = []
-    skipped = 0
+    matched_pairs = 0
     total = 0
 
     for i, pts in enumerate(points_per_image):
@@ -691,12 +691,13 @@ def transfer_alignment(
 
         im_pts += temp_pts
         colocated_im_pts += temp_colocated_pts
+        matched_pairs += 1
 
         # Since both are equal, can take the total of either
         total += np.sum(colocated_match_idx)
     print(
-        f"Matched {i-skipped}/{i} image pairs, resulting in "
-        f"{total} matching 2D points."
+        f"Matched {matched_pairs}/{len(points_per_image)} image pairs, "
+        f"resulting in {total} matching 2D points."
     )
 
     im_pts = np.array(im_pts)
@@ -724,7 +725,7 @@ def transfer_alignment(
         f, cx, cy, d1 = colmap_camera.params
         fx = fy = f
         d2 = d3 = d4 = 0
-    elif colmap_camera.model == "PINHOLE":
+    elif colmap_camera.model.name == "PINHOLE":
         fx, fy, cx, cy = colmap_camera.params
         d1 = d2 = d3 = d4 = 0
     else:

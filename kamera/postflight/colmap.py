@@ -6,14 +6,11 @@ import PIL.Image
 import numpy as np
 import os.path as osp
 import ubelt as ub
-from posixpath import basename
-from re import I
 from rich import print
 
-from shapely import points
 import pycolmap as pc
 from dataclasses import dataclass
-from typing import Tuple, List, Dict
+from typing import Optional, Tuple, List, Dict
 from kamera.sensor_models.nav_state import NavStateINSJson
 from kamera.colmap_processing.camera_models import StandardCamera
 from kamera.colmap_processing.image_renderer import render_view
@@ -23,19 +20,25 @@ from kamera.postflight.alignment import (
     manual_alignment,
     transfer_alignment,
 )
+from kamera.postflight.naming import (
+    KameraCameraName,
+    KameraImageName,
+    swap_image_name_modality,
+)
 
 
 @dataclass(frozen=True)
 class ColmapCalibrationData:
-    sfm_poses: List[np.ndarray]
+    # each sfm pose is a [position (3,), quaternion (4,)] pair
+    sfm_poses: List[list]
     ins_poses: List[np.ndarray]
-    img_fnames: List[np.ndarray]
-    img_times: List[np.ndarray]
+    img_fnames: List[str]
+    img_times: List[float]
     llhs: List[np.ndarray]
     points_per_image: List[List[VisiblePoint]]
     basename_to_time: Dict[str, float]
-    fname_to_time_channel_modality: Dict[float, Dict[str, str]]
-    best_cameras: Dict[str, pc._core.Camera]
+    fname_to_time_channel_modality: Dict[float, Dict[str, Dict[str, str]]]
+    best_cameras: Dict[str, pc.Camera]
 
 
 class ColmapCalibration(object):
@@ -49,7 +52,8 @@ class ColmapCalibration(object):
         self.colmap_dir = colmap_dir
         # contains the images, 3D points, and cameras of the colmap database
         self.R = pc.Reconstruction(self.recon_dir)
-        self.ccd = ColmapCalibrationData
+        # populated by prepare_calibration_data()
+        self.ccd: Optional[ColmapCalibrationData] = None
         self.nav_state_provider = self.load_nav_state_provider()
         print(self.R.summary())
 
@@ -67,37 +71,20 @@ class ColmapCalibration(object):
         extract the portion of the filename that is just the time, flight,
         machine (C, L, R), and effort name.
         """
-        # get base
-        base = osp.basename(fname)
-        # get it without an extension and modality
-        modality_agnostic = "_".join(base.split("_")[:-1])
-        return modality_agnostic
+        return KameraImageName.parse(fname).base_name
 
     def get_modality(self, fname: str | os.PathLike) -> str:
         """Extract image modality (e.g. ir/meta) from a given kamera filename."""
-        base = osp.basename(fname)
-        modality = base.split("_")[-1].split(".")[0]
-        return modality
+        return KameraImageName.parse(fname).modality
 
     def get_channel(self, fname: str | os.PathLike) -> str:
         """Extract channel (e.g. L/R/C) from a given kamera filename."""
-        base = osp.basename(fname)
-        channel = base.split("_")[3]
-        return channel
+        return KameraImageName.parse(fname).channel
 
     def get_view(self, fname: str | os.PathLike) -> str:
         """Extract view (e.g. left_view, right_view, center_view) from
         a given kamera filename"""
-        base = osp.basename(fname)
-        channel = base.split("_")
-        view = "null"
-        if "C" in channel:
-            view = "center_view"
-        elif "L" in channel:
-            view = "left_view"
-        elif "R" in channel:
-            view = "right_view"
-        return view
+        return KameraImageName.parse(fname).view
 
     def get_basename_to_time(self, flight_dir: str | os.PathLike) -> dict:
         # Establish correspondence between real-world exposure times base of file
@@ -110,7 +97,7 @@ class ColmapCalibration(object):
                     # Time that the image was taken.
                     basename = self.get_base_name(json_fname)
                     basename_to_time[basename] = float(d["evt"]["time"])
-            except (OSError, IOError):
+            except (OSError, ValueError):
                 pass
         return basename_to_time
 
@@ -125,12 +112,12 @@ class ColmapCalibration(object):
         best_cameras = {}
         most_points = {}
         for image_num, image in self.R.images.items():
-            base_name = self.get_base_name(image.name)
             try:
+                base_name = self.get_base_name(image.name)
                 t = basename_to_time[base_name]
-            except KeyError:
+            except (KeyError, ValueError):
                 print(
-                    "Couldn't find a _meta.json file associated with '%s'" % base_name
+                    "Couldn't find a _meta.json file associated with '%s'" % image.name
                 )
                 continue
 
@@ -208,7 +195,10 @@ class ColmapCalibration(object):
         self.ccd = ccd
         return ccd
 
-    def calibrate_camera(self, camera_name: str) -> tuple[StandardCamera, float]:
+    def calibrate_camera(
+        self, camera_name: str
+    ) -> Tuple[Optional[StandardCamera], Optional[float]]:
+        assert self.ccd is not None, "call prepare_calibration_data() first"
         sfm_quats = np.array([pose[1] for pose in self.ccd.sfm_poses])
         ins_quats = np.array([pose[1] for pose in self.ccd.ins_poses])
         # Find all valid indices of current camera
@@ -225,6 +215,7 @@ class ColmapCalibration(object):
         cam_ins_quats = [q for i, q in enumerate(ins_quats) if cam_idxs[i] == 1]
         if len(observations) < 10:
             print(f"Only {len(observations)} seen for camera {camera_name}, skipping.")
+            return None, None
         cam = self.ccd.best_cameras[camera_name]
         camera_model, error = iterative_alignment(
             cam_sfm_quats, cam_ins_quats, observations, cam, self.nav_state_provider
@@ -236,22 +227,19 @@ class ColmapCalibration(object):
         camera_name: str,
         calibrated_camera_model: StandardCamera,
         calibrated_modality: str,
-    ) -> tuple[StandardCamera, float]:
+    ) -> Tuple[Optional[StandardCamera], Optional[float]]:
         """
         Use the quaternion already solved of a colocated, calibrated camera
         to bootstrap the calibration process.
         """
+        assert self.ccd is not None, "call prepare_calibration_data() first"
         # Find all valid indices of current cameras
-        channel, modality = camera_name.split("_")[-2:]
         cam_idxs = [
             1 if camera_name == os.path.basename(os.path.dirname(im)) else 0
             for im in self.ccd.img_fnames
         ]
         print(f"Number of images in camera {camera_name}.")
         print(np.sum(cam_idxs))
-        observations = [
-            pts for i, pts in enumerate(self.ccd.points_per_image) if cam_idxs[i] == 1
-        ]
 
         # Now we have to find the overlapping observations on a per-frame basis between
         # the camera to calibrate, and the colocated, calibrated, camera.
@@ -259,11 +247,11 @@ class ColmapCalibration(object):
         observations = []
         for i, fname in enumerate(self.ccd.img_fnames):
             if cam_idxs[i] == 1:
-                # Replace with the modality of the already calibrated modality
-                calibrated_fname = fname.replace(modality, calibrated_modality)
+                # Swap in the modality of the already calibrated camera
+                calibrated_fname = swap_image_name_modality(fname, calibrated_modality)
                 try:
                     ii = self.ccd.img_fnames.index(calibrated_fname)
-                except:
+                except ValueError:
                     print(f"Missing {calibrated_fname} from calibrated index.")
                     continue
                 colocated_observations.append(self.ccd.points_per_image[ii])
@@ -274,7 +262,7 @@ class ColmapCalibration(object):
                 f" only {len(colocated_observations)} found for the calibrated camera, "
                 " skipping."
             )
-            return
+            return None, None
 
         cam = self.ccd.best_cameras[camera_name]
         camera_model, error = transfer_alignment(
@@ -296,7 +284,7 @@ class ColmapCalibration(object):
 
     def create_fname_to_time_channel_modality(
         self, img_fnames, basename_to_time
-    ) -> Dict[float, Dict[str, str]]:
+    ) -> Dict[float, Dict[str, Dict[str, str]]]:
         print("Creating mapping between RGB and UV images...")
         time_to_modality = ub.AutoDict()
         for fname in img_fnames:
@@ -312,6 +300,24 @@ class ColmapCalibration(object):
             time_to_modality[t][channel][modality] = fname
         return time_to_modality
 
+    def _find_image_file(
+        self,
+        images_roots: List[str],
+        cam_dir: str,
+        bname: str,
+    ) -> Optional[str]:
+        """Find an image under any of the given images roots, trying common
+        extensions if the exact basename is not present."""
+        for root in images_roots:
+            path = pathlib.Path(root) / cam_dir / bname
+            candidates = [path] + [
+                path.with_suffix(ext) for ext in (".jpg", ".jpeg", ".png", ".tiff")
+            ]
+            for candidate in candidates:
+                if candidate.is_file():
+                    return str(candidate)
+        return None
+
     def write_gifs(
         self,
         gif_dir: str | os.PathLike,
@@ -321,60 +327,73 @@ class ColmapCalibration(object):
         colocated_camera_model: StandardCamera,
         num_gifs: int = 5,
     ) -> None:
-        channel, modality = camera_name.split("_")[-2:]
-        colocated_camera_name = camera_name.replace(modality, colocated_modality)
+        """Write registration gifs flipping between images of `camera_name`
+        (its image-folder name, e.g. "85mm_25_5deg_center_uv") and the
+        colocated camera's image warped into its view."""
+        assert self.ccd is not None, "call prepare_calibration_data() first"
+        cam_name = KameraCameraName.parse(camera_name)
+        colocated_camera_name = cam_name.with_modality(colocated_modality).name
         print(
             f"Writing registration gifs for cameras {camera_name} "
             f"and {colocated_camera_name}."
         )
         ub.ensuredir(gif_dir)
 
+        images_root = osp.join(self.colmap_dir, "images0")
+        # The colocated modality may live in a different colmap workspace
+        # (e.g. the rgb images paired with an ir model live under colmap_rgb).
+        colocated_roots = [
+            images_root,
+            osp.join(self.flight_dir, f"colmap_{colocated_modality}", "images0"),
+        ]
+
         img_fnames = self.ccd.img_fnames
         for k in range(num_gifs):
             inds = list(range(len(img_fnames)))
             np.random.shuffle(inds)
-            for i in range(len(img_fnames)):
-                colocated_img = img = None
-                fname = img_fnames[inds[i]]
-                base_fname = osp.basename(osp.dirname(fname))
-                chan_mode = "_".join(osp.basename(osp.dirname(fname)).split("_")[-2:])
-                cam_chan_mode = "_".join(camera_name.split("_")[-2:])
-                if chan_mode != cam_chan_mode:
+            img = colocated_img = None
+            bname = colocated_bname = None
+            for i in inds:
+                fname = img_fnames[i]
+                cam_dir = osp.basename(osp.dirname(fname))
+                if cam_dir != camera_name:
                     continue
-                try:
-                    bname = osp.basename(fname)
-                    abs_fname = osp.join(self.colmap_dir, "images0", base_fname, bname)
-                    img = cv2.imread(abs_fname, cv2.IMREAD_COLOR)[:, :, ::-1]
-                except Exception as e:
-                    print(f"No {modality} image found at path {abs_fname}")
+                bname = osp.basename(fname)
+                abs_fname = self._find_image_file([images_root], cam_dir, bname)
+                if abs_fname is None:
+                    print(f"No {cam_name.modality} image found for {bname}")
                     continue
-                try:
-                    # get colocated image from the same time
-                    abs_colocated_bname = pathlib.Path(
-                        abs_fname.replace(modality, colocated_modality)
-                    )
-                    abs_colocated_fname = None
-                    if not abs_colocated_bname.is_file():
-                        # can't find file, check other extensions
-                        for ext in [".jpg", ".jpeg", ".png", ".tiff"]:
-                            if abs_colocated_bname.with_suffix(ext).is_file():
-                                abs_colocated_fname = str(
-                                    abs_colocated_bname.with_suffix(ext)
-                                )
-                                break
-                    else:
-                        abs_colocated_fname = str(abs_colocated_bname)
-                    colocated_bname = osp.basename(abs_colocated_fname)
-                    colocated_img = cv2.imread(abs_colocated_fname, cv2.IMREAD_COLOR)[
-                        :, :, ::-1
-                    ]
-                    # Once we find a matching pair, break
-                    break
-                except Exception as e:
-                    print(
-                        f"No {colocated_modality} image found at filepath {abs_colocated_bname}"
-                    )
+                img = cv2.imread(abs_fname, cv2.IMREAD_COLOR)
+                if img is None:
+                    print(f"Could not read image at {abs_fname}")
                     continue
+                img = img[:, :, ::-1]
+
+                # get the colocated image from the same time
+                colocated_dir = (
+                    KameraCameraName.parse(cam_dir)
+                    .with_modality(colocated_modality)
+                    .name
+                )
+                colocated_bname = (
+                    KameraImageName.parse(bname)
+                    .with_modality(colocated_modality)
+                    .name
+                )
+                abs_colocated_fname = self._find_image_file(
+                    colocated_roots, colocated_dir, colocated_bname
+                )
+                if abs_colocated_fname is None:
+                    print(f"No {colocated_modality} image found for {bname}")
+                    continue
+                colocated_img = cv2.imread(abs_colocated_fname, cv2.IMREAD_COLOR)
+                if colocated_img is None:
+                    print(f"Could not read image at {abs_colocated_fname}")
+                    continue
+                colocated_img = colocated_img[:, :, ::-1]
+                colocated_bname = osp.basename(abs_colocated_fname)
+                # Once we find a matching pair, break
+                break
 
             if img is None or colocated_img is None:
                 print("Failed to find matching image pair, skipping.")
@@ -390,17 +409,10 @@ class ColmapCalibration(object):
                 f"{camera_name}_to_{colocated_camera_name}_registration_{k}.gif",
             )
             print(f"Writing gif to {fname_out}.")
-            # ds_warped_rgb_img = PIL.Image.fromarray(
-            #    cv2.pyrDown(cv2.pyrDown(cv2.pyrDown(warped_rgb_img)))
-            # )
-            # ds_uv_img = PIL.Image.fromarray(
-            #    cv2.pyrDown(cv2.pyrDown(cv2.pyrDown(colocated_img)))
-            # )
             # Make sure gifs are reasonable size
-            w, h, _ = img.shape
-            ratio = w / h
+            h, w, _ = img.shape
             new_w = 1280
-            new_h = int(new_w * ratio)
+            new_h = int(new_w * h / w)
             pil_img = PIL.Image.fromarray(img).resize((new_w, new_h))
             pil_colocated_img = PIL.Image.fromarray(warped_colocated_img).resize(
                 (new_w, new_h)
@@ -414,6 +426,7 @@ class ColmapCalibration(object):
             )
 
     def align_model(self, output_dir: str | os.PathLike) -> None:
+        assert self.ccd is not None, "call prepare_calibration_data() first"
         img_fnames = [im.name for im in self.R.images.values()]
         points = []
         ins_poses = []
@@ -467,6 +480,7 @@ class ColmapCalibration(object):
             image_fnames.append(img_fname.strip())
             points.append((float(x), float(y), float(z)))
         points = np.array(points)
+        return image_fnames, points
 
     def write_image_locations(
         self,
@@ -483,12 +497,8 @@ class ColmapCalibration(object):
                 fo.write("%s %0.8f %0.8f %0.8f\n" % (name, pos[0], pos[1], pos[2]))
 
 
-def find_best_sparse_model(sparse_dir: str | os.PathLike):
-    if os.listdir(sparse_dir) == 0:
-        raise SystemError(
-            f"Sparse directory given ({sparse_dir}) is empty, please verify your model built correctly."
-        )
-    all_models = sorted(os.listdir(sparse_dir))
+def find_best_sparse_model(sparse_dir: str | os.PathLike) -> str:
+    all_models = sorted(os.listdir(sparse_dir)) if os.path.isdir(sparse_dir) else []
     print(f"All Models: {all_models}")
     best_model = ""
     most_images_aligned = 0
@@ -504,21 +514,10 @@ def find_best_sparse_model(sparse_dir: str | os.PathLike):
         if num_images > most_images_aligned:
             most_images_aligned = num_images
             best_model = dir
+    if not best_model:
+        raise SystemError(
+            f"No valid sparse models found in {sparse_dir}, please verify "
+            "your model built correctly."
+        )
     print(f"Selecting {best_model} as the best model.")
     return best_model
-
-
-def main():
-    flight_dir = "/home/local/KHQ/adam.romlein/noaa/data/2024_AOC_AK_Calibration/fl09"
-    colmap_dir = (
-        "/home/local/KHQ/adam.romlein/noaa/data/2024_AOC_AK_Calibration/fl09/colmap_ir"
-    )
-    recon_dir = (
-        "/home/local/KHQ/adam.romlein/noaa/data/2024_AOC_AK_Calibration/fl09/colmap_ir/aligned/0"
-    )
-    cc = ColmapCalibration(flight_dir, recon_dir, colmap_dir)
-    cc.calibrate_ir()
-
-
-if __name__ == "__main__":
-    main()
