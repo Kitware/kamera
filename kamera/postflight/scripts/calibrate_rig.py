@@ -30,6 +30,7 @@ from kamera.postflight.boresight import (
     solve_rig_boresight,
 )
 from kamera.postflight.registration_gifs import write_registration_gifs
+from kamera.postflight.registration_homography import write_registration_homographies
 from kamera.postflight.rig import (
     _order_by_ref,
     basename_to_time,
@@ -201,6 +202,13 @@ def main():
         rig = build_rig_model(identity_rec, nav, rig_groups, rig_cameras)
         rig_path = write_rig_json(save_dir, rig)
         print(f"Wrote complete rig model: {rig_path}")
+
+    if all_models:
+        cal_paths = write_registration_homographies(all_models, save_dir)
+        if cal_paths:
+            print(f"Wrote {len(cal_paths)} DIVE calibration.json files:")
+            for path in cal_paths:
+                print(f"  {path}")
 
     if not args.no_gifs and all_models:
         print("\n[bold blue]=== Writing registration gifs ===")
