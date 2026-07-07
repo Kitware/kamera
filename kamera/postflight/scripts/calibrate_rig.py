@@ -1,17 +1,26 @@
-"""Calibrate a KAMERA rig from a flight: rig+prior mapping, one boresight
-solve, and per-camera StandardCamera export.
+"""Calibrate a KAMERA rig from a flight: prior mapping, one boresight
+solve per modality group, and per-camera StandardCamera export.
 
-Assumes an existing feature-extracted and matched COLMAP database (from
-the feature_extractor / matcher steps) under ``<flight>/colmap_rgb``.
+Each modality group is an independently reconstructed COLMAP workspace
+(EO = rgb+uv under ``colmap_rgb``; IR under ``colmap_ir``, since SIFT
+cannot match long-wave IR to visible). A group's boresight is solved
+against the INS, so every camera's exported mount is camera->INS in the
+same physical INS frame -- EO and IR mounts are mutually consistent
+without any cross-modal matching or transfer calibration.
 
-Example:
+Examples:
+    # EO + IR, mapping each workspace fresh
     python calibrate_rig.py /data/fl09_85mm_25_5deg
+
+    # reuse existing ENU (sim3-aligned or prior-mapped) models, no remap
+    python calibrate_rig.py /data/fl09_85mm_25_5deg --reuse-aligned
 """
 
 import argparse
 import os
 import pathlib
 import shutil
+from typing import Dict, Optional
 
 import pycolmap
 from rich import print
@@ -28,60 +37,116 @@ from kamera.postflight.rig import (
 )
 from kamera.sensor_models.nav_state import NavStateINSJson
 
+# (reference modality, colmap workspace subdirectory) per group.
+DEFAULT_GROUPS = [("rgb", "colmap_rgb"), ("ir", "colmap_ir")]
+
+
+def _largest_aligned_model(colmap_dir: str) -> Optional[str]:
+    """Path to the aligned/ submodel with the most images, if any."""
+    aligned = os.path.join(colmap_dir, "aligned")
+    if not os.path.isdir(aligned):
+        return None
+    best, best_n = None, -1
+    for name in os.listdir(aligned):
+        path = os.path.join(aligned, name)
+        try:
+            n = int(pycolmap.Reconstruction(path).num_images())
+        except Exception:
+            continue
+        if n > best_n:
+            best, best_n = path, n
+    return best
+
+
+def _resolve_model(
+    flight_dir: str,
+    colmap_dir: str,
+    workspace: str,
+    nav: NavStateINSJson,
+    prior_std: float,
+    reuse_aligned: bool,
+) -> "pycolmap.Reconstruction":
+    """Get an ENU reconstruction for a group: reuse an existing aligned
+    model if asked, else prior-map the workspace database."""
+    if reuse_aligned:
+        model = _largest_aligned_model(colmap_dir)
+        if model is not None:
+            print(f"Reusing aligned model {model}")
+            return pycolmap.Reconstruction(model)
+        print(f"[yellow]No aligned model under {colmap_dir}; mapping instead.")
+
+    os.makedirs(workspace, exist_ok=True)
+    dst_db = os.path.join(workspace, "database.db")
+    if not os.path.exists(dst_db):
+        print(f"Copying database into {dst_db}")
+        shutil.copyfile(os.path.join(colmap_dir, "database.db"), dst_db)
+    db = pycolmap.Database.open(dst_db)
+    try:
+        write_pose_priors(db, flight_dir, nav, position_std=prior_std)
+    finally:
+        db.close()
+    recs = run_rig_mapping(
+        dst_db, os.path.join(colmap_dir, "images0"), os.path.join(workspace, "sparse")
+    )
+    if not recs:
+        raise SystemError(f"Mapping produced no reconstruction for {colmap_dir}.")
+    rec = best_reconstruction(recs)
+    print(f"Best model: {int(rec.num_reg_images())} images.")
+    return rec
+
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("flight_dir")
-    p.add_argument("--colmap-dir", default=None)
-    p.add_argument("--workspace", default=None)
     p.add_argument("--save-dir", default=None)
-    p.add_argument("--ref-modality", default="rgb")
     p.add_argument("--prior-std", type=float, default=2.0)
     p.add_argument(
-        "--reuse-model",
+        "--reuse-aligned",
+        action="store_true",
+        help="Use each workspace's existing aligned/ model instead of "
+        "re-mapping (the boresight is gauge-independent).",
+    )
+    p.add_argument(
+        "--groups",
+        nargs="+",
         default=None,
-        help="Path to an existing rig-constrained, ENU sparse model; "
-        "skips mapping and only runs the boresight + export.",
+        metavar="MODALITY:SUBDIR",
+        help="Override modality groups, e.g. rgb:colmap_rgb ir:colmap_ir.",
     )
     args = p.parse_args()
 
     flight_dir = args.flight_dir
-    colmap_dir = args.colmap_dir or os.path.join(flight_dir, "colmap_rgb")
-    workspace = args.workspace or os.path.join(flight_dir, "colmap_rig")
     save_dir = args.save_dir or os.path.join(flight_dir, "kamera_models")
-    image_path = os.path.join(colmap_dir, "images0")
+    groups = (
+        [tuple(g.split(":", 1)) for g in args.groups]
+        if args.groups
+        else DEFAULT_GROUPS
+    )
 
     nav = NavStateINSJson(pathlib.Path(flight_dir).rglob("*_meta.json"))
     times = basename_to_time(flight_dir)
 
-    if args.reuse_model:
-        reconstruction = pycolmap.Reconstruction(args.reuse_model)
-    else:
-        os.makedirs(workspace, exist_ok=True)
-        dst_db = os.path.join(workspace, "database.db")
-        if not os.path.exists(dst_db):
-            print(f"Copying database into {dst_db}")
-            shutil.copyfile(os.path.join(colmap_dir, "database.db"), dst_db)
+    all_models: Dict[str, object] = {}
+    for ref_modality, subdir in groups:
+        colmap_dir = os.path.join(flight_dir, subdir)
+        if not os.path.isdir(colmap_dir):
+            print(f"[yellow]Skipping {ref_modality}: {colmap_dir} not found.")
+            continue
+        print(f"\n[bold blue]=== Calibrating {ref_modality} group ({subdir}) ===")
+        workspace = os.path.join(flight_dir, f"colmap_rig_{ref_modality}")
+        rec = _resolve_model(
+            flight_dir, colmap_dir, workspace, nav, args.prior_std, args.reuse_aligned
+        )
+        estimate = solve_rig_boresight(rec, nav, times, ref_modality=ref_modality)
+        models = export_rig_camera_models(
+            rec, estimate, nav, save_dir, ref_modality=ref_modality
+        )
+        all_models.update(models)
 
-        db = pycolmap.Database.open(dst_db)
-        try:
-            write_pose_priors(db, flight_dir, nav, position_std=args.prior_std)
-        finally:
-            db.close()
-
-        sparse_dir = os.path.join(workspace, "sparse")
-        recs = run_rig_mapping(dst_db, image_path, sparse_dir)
-        if not recs:
-            raise SystemError("Mapping produced no reconstruction.")
-        reconstruction = best_reconstruction(recs)
-        print(f"Best model: {int(reconstruction.num_reg_images())} images.")
-
-    estimate = solve_rig_boresight(
-        reconstruction, nav, times, ref_modality=args.ref_modality
-    )
-    export_rig_camera_models(
-        reconstruction, estimate, nav, save_dir, ref_modality=args.ref_modality
-    )
+    print("\n[bold green]=== Calibration complete ===")
+    print(f"Wrote {len(all_models)} camera models to {save_dir}:")
+    for folder in sorted(all_models):
+        print(f"  {folder}")
 
 
 if __name__ == "__main__":
