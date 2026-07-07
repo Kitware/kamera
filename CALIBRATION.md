@@ -18,26 +18,6 @@ registration QC gifs.
 
 ---
 
-## TL;DR
-
-```bash
-conda activate kamera        # see Installation below for first-time setup
-
-# 1. Stage raw imagery into the images0 layout (symlinks, keeps all frames)
-python kamera/postflight/scripts/prepare_flight.py \
-    /Volumes/extreme2tb/TO26Su1_RicesWhale_calibration/fl004/images_21deg_N56RF \
-    /Volumes/extreme2tb/TO26Su1_RicesWhale_calibration/fl004
-
-# 2. Calibrate: build database, map with INS priors, boresight, export
-python kamera/postflight/scripts/calibrate_rig.py \
-    /Volumes/extreme2tb/TO26Su1_RicesWhale_calibration/fl004
-```
-
-Outputs land in `<flight_dir>/kamera_models/`. Step 2 is GPU-heavy for a
-from-scratch flight — run it on a machine with a CUDA GPU.
-
----
-
 ## Installation
 
 Same native post-processing install as the main
@@ -79,6 +59,26 @@ just slowly.
 - The `kamera` env, installed and activated as above.
 - The raw flight must contain the INS `*_meta.json` files (one per
   image); everything reads the INS from those, not the `.dat`.
+
+---
+
+## TL;DR
+
+```bash
+conda activate kamera
+
+# 1. Stage raw imagery into the images0 layout (symlinks, keeps all frames)
+python kamera/postflight/scripts/prepare_flight.py \
+    /Volumes/extreme2tb/TO26Su1_RicesWhale_calibration/fl004/images_21deg_N56RF \
+    /Volumes/extreme2tb/TO26Su1_RicesWhale_calibration/fl004
+
+# 2. Calibrate: build database, map with INS priors, boresight, export
+python kamera/postflight/scripts/calibrate_rig.py \
+    /Volumes/extreme2tb/TO26Su1_RicesWhale_calibration/fl004
+```
+
+Outputs land in `<flight_dir>/kamera_models/`. Step 2 is GPU-heavy for a
+from-scratch flight — run it on a machine with a CUDA GPU.
 
 ---
 
