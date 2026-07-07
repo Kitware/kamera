@@ -22,7 +22,7 @@ from kamera.postflight.boresight import (
 )
 from kamera.postflight.rig import (
     basename_to_time,
-    configure_rig_and_frames,
+    best_reconstruction,
     run_rig_mapping,
     write_pose_priors,
 )
@@ -65,23 +65,23 @@ def main():
 
         db = pycolmap.Database.open(dst_db)
         try:
-            # priors first; mapping's pass 1 clears the (multi-sensor) rig
-            # but leaves priors in place.
-            configure_rig_and_frames(db, ref_modality=args.ref_modality)
             write_pose_priors(db, flight_dir, nav, position_std=args.prior_std)
         finally:
             db.close()
 
-        recs = run_rig_mapping(
-            dst_db, image_path, workspace, ref_modality=args.ref_modality
-        )
+        sparse_dir = os.path.join(workspace, "sparse")
+        recs = run_rig_mapping(dst_db, image_path, sparse_dir)
         if not recs:
-            raise SystemError("Rig mapping produced no reconstruction.")
-        reconstruction = max(recs.values(), key=lambda r: r.num_reg_frames)
-        print(f"Final model: {reconstruction.num_reg_frames} frames.")
+            raise SystemError("Mapping produced no reconstruction.")
+        reconstruction = best_reconstruction(recs)
+        print(f"Best model: {int(reconstruction.num_reg_images())} images.")
 
-    estimate = solve_rig_boresight(reconstruction, nav, times)
-    export_rig_camera_models(reconstruction, estimate, nav, save_dir)
+    estimate = solve_rig_boresight(
+        reconstruction, nav, times, ref_modality=args.ref_modality
+    )
+    export_rig_camera_models(
+        reconstruction, estimate, nav, save_dir, ref_modality=args.ref_modality
+    )
 
 
 if __name__ == "__main__":

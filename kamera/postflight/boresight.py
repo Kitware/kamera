@@ -1,18 +1,20 @@
-"""Solve the rig-to-INS boresight from a rig-constrained reconstruction.
+"""Solve the rig-to-INS boresight from a prior-mapped ENU reconstruction.
 
-With rigs in the COLMAP model, bundle adjustment has already solved each
-camera's pose relative to the rig (``sensor_from_rig``). The only
-remaining unknown between the reconstruction and the aircraft is a
-single rigid transform: the rotation of the rig relative to the INS
-(the boresight) and, optionally, the lever arm. One robust estimate
-over every registered frame replaces the per-camera quaternion searches
-of the legacy pipeline, and makes all camera mounts mutually consistent
-by construction:
+The reference sensor defines the rig frame, so its per-frame pose is the
+rig pose. The only unknown between the reconstruction and the aircraft
+is then a single rigid transform: the rotation of the rig relative to
+the INS (the boresight) and, optionally, the lever arm. One robust
+estimate over every synchronized frame replaces the per-camera
+quaternion searches of the legacy pipeline, and -- combined with the
+`sensor_from_rig` extrinsics from `rig.derive_sensor_from_rig` -- makes
+all camera mounts mutually consistent by construction:
 
-    mount(cam) = sensor_from_rig(cam) o rig_from_ins
+    mount(cam) = ins_from_rig o rig_from_sensor(cam)
 
-The reconstruction must be in the same ENU frame as the nav provider
-(which prior-position mapping yields directly).
+This works directly on the single rigless ENU model that prior-position
+mapping produces (grouping images into frames by trigger time); it does
+NOT need a rig-constrained reconstruction, which fragments badly to
+build. The reconstruction must share the nav provider's ENU frame.
 """
 
 import os
@@ -26,6 +28,7 @@ from scipy.spatial.transform import Rotation
 
 from kamera.colmap_processing.camera_models import StandardCamera
 from kamera.postflight.naming import KameraImageName
+from kamera.postflight.rig import _order_by_ref, derive_sensor_from_rig
 from kamera.sensor_models.nav_state import NavStateINSJson
 
 __all__ = [
@@ -66,35 +69,22 @@ def average_quaternions(
     return mean / np.linalg.norm(mean)
 
 
-def _frame_time(
-    reconstruction: "pycolmap.Reconstruction",
-    frame: "pycolmap.Frame",
-    times: Dict[str, float],
-) -> Optional[float]:
-    for data_id in frame.data_ids:
-        if data_id.id not in reconstruction.images:
-            continue
-        image = reconstruction.images[data_id.id]
-        try:
-            return times[KameraImageName.parse(image.name).base_name]
-        except (ValueError, KeyError):
-            continue
-    return None
-
-
 def solve_rig_boresight(
     reconstruction: "pycolmap.Reconstruction",
     nav_state_provider: NavStateINSJson,
     times: Dict[str, float],
+    ref_modality: str = "rgb",
     outlier_threshold_deg: float = 2.0,
     max_iterations: int = 5,
 ) -> BoresightEstimate:
-    """Estimate ins_from_rig by robust rotation averaging over all
-    registered frames of an ENU-registered reconstruction.
+    """Estimate ins_from_rig by robust rotation averaging over the
+    reference sensor's images of an ENU-registered reconstruction.
 
-    Per frame the boresight is
+    The reference sensor (first camera folder of `ref_modality`) defines
+    the rig frame, so its per-image pose is the rig pose. Per frame the
+    boresight is
 
-        ins_from_rig = (enu_from_ins)^-1 . (rig_from_world)^-1
+        ins_from_rig = (enu_from_ins)^-1 . (rig_from_enu)^-1
 
     which is constant across frames because the rig is rigidly mounted to
     the INS. The reconstruction must share the nav provider's ENU frame
@@ -105,18 +95,28 @@ def solve_rig_boresight(
     `times` maps image base names to exposure times (see
     `kamera.postflight.rig.basename_to_time`).
     """
+    folders = {
+        im.name.rsplit("/", 1)[0]
+        for im in reconstruction.images.values()
+        if im.has_pose and "/" in im.name
+    }
+    if not folders:
+        raise SystemError("Reconstruction has no posed, folder-qualified images.")
+    ref_folder = _order_by_ref(folders, ref_modality)[0]
+
     rel_quats: List[np.ndarray] = []
     lever_arms: List[np.ndarray] = []
-    for frame in reconstruction.frames.values():
-        if not frame.has_pose:
+    for im in reconstruction.images.values():
+        if not im.has_pose or im.name.rsplit("/", 1)[0] != ref_folder:
             continue
-        t = _frame_time(reconstruction, frame, times)
-        if t is None:
+        try:
+            t = times[KameraImageName.parse(im.name).base_name]
+        except (ValueError, KeyError):
             continue
         ins_pos, ins_quat = nav_state_provider.pose(t)
         # World here is ENU; the INS quaternion is the body attitude in ENU.
         R_enu_from_ins = Rotation.from_quat(ins_quat)
-        rig_from_world = frame.rig_from_world
+        rig_from_world = im.cam_from_world()
         R_rig_from_enu = Rotation.from_quat(rig_from_world.rotation.quat)
         # ins_from_rig = (enu_from_ins)^-1 . (rig_from_enu)^-1
         rel_quats.append((R_enu_from_ins.inv() * R_rig_from_enu.inv()).as_quat())
@@ -127,7 +127,7 @@ def solve_rig_boresight(
 
     if len(rel_quats) < 3:
         raise SystemError(
-            f"Only {len(rel_quats)} frames with poses and nav times; "
+            f"Only {len(rel_quats)} reference-sensor frames with nav times; "
             "cannot solve the boresight."
         )
 
@@ -168,14 +168,18 @@ def solve_rig_boresight(
     return estimate
 
 
-def _camera_folder_names(
+def _folder_camera(
     reconstruction: "pycolmap.Reconstruction",
-) -> Dict[int, str]:
-    folders: Dict[int, str] = {}
+) -> Dict[str, "pycolmap.Camera"]:
+    """Map each camera folder to its Camera, via a posed image."""
+    out: Dict[str, "pycolmap.Camera"] = {}
     for image in reconstruction.images.values():
-        if image.camera_id not in folders and "/" in image.name:
-            folders[image.camera_id] = image.name.rsplit("/", 1)[0]
-    return folders
+        if not image.has_pose or "/" not in image.name:
+            continue
+        folder = image.name.rsplit("/", 1)[0]
+        if folder not in out:
+            out[folder] = reconstruction.cameras[image.camera_id]
+    return out
 
 
 def export_rig_camera_models(
@@ -183,65 +187,66 @@ def export_rig_camera_models(
     estimate: BoresightEstimate,
     nav_state_provider: NavStateINSJson,
     save_dir: str | os.PathLike,
+    ref_modality: str = "rgb",
+    sensor_from_rig: Optional[Dict[str, "pycolmap.Rigid3d"]] = None,
     use_lever_arm: bool = False,
     suffix: str = "_v3",
 ) -> Dict[str, StandardCamera]:
-    """Compose the StandardCamera mount for every rig sensor and write a
-    yaml per camera.
+    """Compose and write a StandardCamera yaml per camera folder.
 
     The mount (StandardCamera.camera_quaternion, camera->INS) is
 
         cam_quat(sensor) = ins_from_rig . rig_from_sensor
 
-    For the reference sensor rig_from_sensor is identity, so its mount is
-    the boresight itself.
+    where rig_from_sensor comes from `sensor_from_rig` (derived by
+    `rig.derive_sensor_from_rig`; computed here if not supplied). For the
+    reference sensor rig_from_sensor is identity, so its mount is the
+    boresight itself.
     """
     os.makedirs(save_dir, exist_ok=True)
-    folders = _camera_folder_names(reconstruction)
+    if sensor_from_rig is None:
+        sensor_from_rig = derive_sensor_from_rig(reconstruction, ref_modality)
+    folder_camera = _folder_camera(reconstruction)
+    ref_folder = _order_by_ref(folder_camera, ref_modality)[0]
     ins_from_rig = Rotation.from_quat(estimate.ins_from_rig)
     position = estimate.lever_arm_ins if use_lever_arm else np.zeros(3)
+
     models: Dict[str, StandardCamera] = {}
-    for rig in reconstruction.rigs.values():
-        sensor_ids = [rig.ref_sensor_id] + list(rig.non_ref_sensors.keys())
-        for sensor_id in sensor_ids:
-            cam_id = sensor_id.id
-            camera = reconstruction.cameras.get(cam_id)
-            folder = folders.get(cam_id)
-            if camera is None or folder is None:
-                print(f"[yellow]Sensor {sensor_id} has no camera/images, skipping.")
-                continue
-            if rig.is_ref_sensor(sensor_id):
-                rig_from_sensor = Rotation.identity()
-                cam_offset_rig = np.zeros(3)
-            else:
-                sensor_from_rig = rig.sensor_from_rig(sensor_id)
-                rig_from_sensor = Rotation.from_quat(sensor_from_rig.rotation.quat).inv()
-                R = sensor_from_rig.rotation.matrix()
-                cam_offset_rig = -R.T @ sensor_from_rig.translation
-            mount = ins_from_rig * rig_from_sensor
-            if camera.model.name == "OPENCV":
-                fx, fy, cx, cy, d1, d2, d3, d4 = camera.params
-                dist = np.array([d1, d2, d3, d4])
-            elif camera.model.name == "PINHOLE":
-                fx, fy, cx, cy = camera.params
-                dist = np.zeros(4)
-            else:
-                raise SystemError(f"Unexpected camera model {camera.model.name}")
-            K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
-            # cam_offset_rig is in rig coords; the mount position is in the
-            # INS frame, so rotate rig->INS via ins_from_rig.
-            cam_position = position + ins_from_rig.apply(cam_offset_rig)
-            model = StandardCamera(
-                camera.width,
-                camera.height,
-                K,
-                dist,
-                cam_position if use_lever_arm else np.zeros(3),
-                mount.as_quat(),
-                platform_pose_provider=nav_state_provider,
-            )
-            out_path = os.path.join(save_dir, f"{folder}{suffix}.yaml")
-            model.save_to_file(out_path)
-            print(f"Wrote {out_path}")
-            models[folder] = model
+    for folder, camera in folder_camera.items():
+        if folder == ref_folder:
+            rig_from_sensor = Rotation.identity()
+            cam_offset_rig = np.zeros(3)
+        elif folder in sensor_from_rig:
+            sfr = sensor_from_rig[folder]
+            rig_from_sensor = Rotation.from_quat(sfr.rotation.quat).inv()
+            cam_offset_rig = -sfr.rotation.matrix().T @ sfr.translation
+        else:
+            print(f"[yellow]No extrinsics for {folder}; skipping.")
+            continue
+        mount = ins_from_rig * rig_from_sensor
+        if camera.model.name == "OPENCV":
+            fx, fy, cx, cy, d1, d2, d3, d4 = camera.params
+            dist = np.array([d1, d2, d3, d4])
+        elif camera.model.name == "PINHOLE":
+            fx, fy, cx, cy = camera.params
+            dist = np.zeros(4)
+        else:
+            raise SystemError(f"Unexpected camera model {camera.model.name}")
+        K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
+        # cam_offset_rig is in rig coords; the mount position is in the INS
+        # frame, so rotate rig->INS via ins_from_rig.
+        cam_position = position + ins_from_rig.apply(cam_offset_rig)
+        model = StandardCamera(
+            camera.width,
+            camera.height,
+            K,
+            dist,
+            cam_position if use_lever_arm else np.zeros(3),
+            mount.as_quat(),
+            platform_pose_provider=nav_state_provider,
+        )
+        out_path = os.path.join(save_dir, f"{folder}{suffix}.yaml")
+        model.save_to_file(out_path)
+        print(f"Wrote {out_path}")
+        models[folder] = model
     return models

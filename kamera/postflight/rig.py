@@ -280,10 +280,12 @@ def _incremental_options(use_priors: bool) -> "pycolmap.IncrementalPipelineOptio
     return options
 
 
-def _best_reconstruction(
+def best_reconstruction(
     recs: Dict[int, "pycolmap.Reconstruction"],
 ) -> "pycolmap.Reconstruction":
-    return max(recs.values(), key=lambda r: r.num_reg_frames)
+    """The reconstruction with the most registered images. Incremental
+    mapping always emits scrap sub-models alongside the main one."""
+    return max(recs.values(), key=lambda r: r.num_reg_images())
 
 
 def run_rig_mapping(
@@ -292,56 +294,36 @@ def run_rig_mapping(
     output_path: str | os.PathLike,
     use_priors: bool = True,
     mapper: str = "incremental",
-    ref_modality: str = "rgb",
 ) -> Dict[int, "pycolmap.Reconstruction"]:
-    """Map a rig/prior-configured database.
+    """Prior-position map a database into an ENU model.
 
-    "global" (COLMAP's GLOMAP-style mapper) is fast but ignores both the
-    rig extrinsics and the priors, so its output is in an arbitrary gauge
-    -- useful only as a quick sanity/seed. "incremental" runs the
-    two-pass rig workflow: a first pass with priors but no multi-sensor
-    rig produces an ENU per-image model, from which sensor_from_rig is
-    derived; the database is reconfigured with those extrinsics and a
-    second, rig-constrained pass produces the final model in
-    `output_path`.
+    The rig is deliberately NOT imposed on the mapper: rig-constrained
+    incremental mapping from scratch fragments badly (initializing rigid
+    multi-camera frames is far harder than individual images -- on fl09
+    it split into 50 sub-models, largest ~100 images vs ~1450 rigless).
+    The rig geometry is recovered afterward, in closed form, by
+    `derive_sensor_from_rig` and the boresight solve, both of which only
+    need this per-image ENU model. So mapping stays a single rigless
+    pass.
+
+    "global" (COLMAP's GLOMAP-style mapper) additionally ignores the
+    priors, giving an arbitrary-gauge model; it is only a fast sanity
+    check, never the ENU source for calibration.
     """
     os.makedirs(output_path, exist_ok=True)
     if mapper == "global":
         options = pycolmap.GlobalPipelineOptions()
         return pycolmap.global_mapping(database_path, image_path, output_path, options)
 
-    # Pass 1: priors only (trivial per-camera rigs), yields an ENU model.
+    # Rigless so the mapper registers individual images; the priors fix
+    # the ENU gauge.
     db = pycolmap.Database.open(database_path)
     try:
         db.clear_rigs()
         db.clear_frames()
     finally:
         db.close()
-    pass1_dir = os.path.join(output_path, "pass1")
-    os.makedirs(pass1_dir, exist_ok=True)
-    print("[blue]Rig mapping pass 1: prior-position, rigless.[/blue]")
-    recs1 = pycolmap.incremental_mapping(
-        database_path, image_path, pass1_dir, _incremental_options(use_priors)
-    )
-    if not recs1:
-        raise SystemError("Pass 1 produced no reconstruction.")
-    rec1 = _best_reconstruction(recs1)
-    print(f"Pass 1 best model: {rec1.num_reg_frames} frames.")
-
-    # Derive extrinsics and reconfigure the database with a real rig.
-    sensor_from_rig = derive_sensor_from_rig(rec1, ref_modality=ref_modality)
-    db = pycolmap.Database.open(database_path)
-    try:
-        configure_rig_and_frames(
-            db, ref_modality=ref_modality, sensor_from_rig=sensor_from_rig
-        )
-    finally:
-        db.close()
-
-    # Pass 2: rig-constrained, prior-position.
-    pass2_dir = os.path.join(output_path, "sparse")
-    os.makedirs(pass2_dir, exist_ok=True)
-    print("[blue]Rig mapping pass 2: rig-constrained, prior-position.[/blue]")
+    print("[blue]Prior-position mapping (rigless).[/blue]")
     return pycolmap.incremental_mapping(
-        database_path, image_path, pass2_dir, _incremental_options(use_priors)
+        database_path, image_path, output_path, _incremental_options(use_priors)
     )
