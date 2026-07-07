@@ -89,9 +89,9 @@ A raw flight looks like this (fl004):
 ```
 fl004/
 ├── images_21deg_N56RF/          # raw imagery, one folder per camera view
-│   ├── center_view/             #   *_C_*_rgb.jpg  +  *_C_*_meta.json
-│   ├── left_view/               #   *_L_*_rgb.jpg  +  *_L_*_meta.json
-│   ├── right_view/              #   *_R_*_rgb.jpg  +  *_R_*_meta.json
+│   ├── center_view/             #   *_C_*_<mod>.jpg  +  *_C_*_meta.json
+│   ├── left_view/               #   *_L_*_<mod>.jpg  +  *_L_*_meta.json
+│   ├── right_view/              #   *_R_*_<mod>.jpg  +  *_R_*_meta.json
 │   └── sys_config.json
 ├── ins_raw/
 │   └── ins_raw_*.dat
@@ -99,8 +99,11 @@ fl004/
 ```
 
 Each `center/left/right_view` folder holds every image that camera took,
-of every modality (here EO only — `rgb`), alongside a `_meta.json` per
-image carrying the INS state at exposure time.
+across whatever modalities the flight carried — `rgb`, `uv`, `ir`, or a
+mix — alongside a `_meta.json` per image carrying the INS state at
+exposure time. The example commands below are shown for the RGB imagery
+in fl004, but UV and IR are picked up automatically and handled the same
+way (see modality groups, below).
 
 Image names encode their provenance:
 
@@ -109,8 +112,9 @@ TO26Su1_RicesWhale_calibration_fl004_C_20260704_193924.627932_rgb.jpg
 └──────────── effort ────────────┘ └flt┘└ch┘└─ date ─┘└── time ──┘└mod┘
 ```
 
-The three cameras are hardware-synchronized: at each trigger they share
-an identical timestamp.
+All cameras on the rig — every station and modality — are
+hardware-synchronized: at each trigger they share an identical
+timestamp, which is how images are grouped into frames.
 
 ---
 
@@ -136,15 +140,21 @@ python kamera/postflight/scripts/prepare_flight.py \
 This creates, by **symlink** (nothing is copied):
 
 ```
-fl004/colmap_rgb/images0/
-├── 21deg_N56RF_center_rgb/
-├── 21deg_N56RF_left_rgb/
-└── 21deg_N56RF_right_rgb/
+fl004/
+├── colmap_rgb/images0/                 # EO group (rgb + uv)
+│   ├── 21deg_N56RF_center_rgb/
+│   ├── 21deg_N56RF_left_rgb/
+│   ├── 21deg_N56RF_right_rgb/
+│   └── ...                              #   + *_uv folders if the flight has UV
+└── colmap_ir/images0/                   # IR group, only if the flight has IR
+    └── ...                              #   21deg_N56RF_center_ir/ ...
 ```
 
 Modalities are split into groups so SIFT never tries to match across the
-EO/IR gap: `rgb` + `uv` → `colmap_rgb`, `ir` → `colmap_ir`. An IR camera
-would land in `colmap_ir/images0/` automatically.
+EO/IR gap: `rgb` + `uv` → `colmap_rgb`, `ir` → `colmap_ir`. Whichever
+modalities the flight actually contains are staged; a group with no
+imagery simply isn't created. (fl004 as shown here is RGB, so only
+`colmap_rgb` appears.)
 
 ### Paring down the frame set
 
@@ -209,8 +219,10 @@ Useful flags:
 | `--groups rgb:colmap_rgb ir:colmap_ir` | override which workspaces to calibrate |
 | `--no-gifs` / `--num-gifs N` | skip or set the number of QC gifs per camera |
 
-The IR group is skipped automatically if `colmap_ir` is absent (fl004 is
-EO-only, so only `rgb` runs).
+Each group runs only if its workspace exists — the EO group needs
+`colmap_rgb`, the IR group needs `colmap_ir` — so a flight calibrates
+whatever modalities it carries with no extra flags. (For fl004 as shown
+here, only the EO group runs.)
 
 ---
 
@@ -220,13 +232,17 @@ All under `<flight_dir>/kamera_models/`:
 
 ```
 kamera_models/
-├── 21deg_N56RF_center_rgb_v3.yaml      # per-camera StandardCamera models
-├── 21deg_N56RF_left_rgb_v3.yaml
+├── 21deg_N56RF_center_rgb_v3.yaml      # one per camera, all modalities
+├── 21deg_N56RF_left_rgb_v3.yaml        #   (*_uv, *_ir yamls too when present)
 ├── 21deg_N56RF_right_rgb_v3.yaml
 ├── fl004_20260704_21deg_N56RF_rig.json # complete rig model (see below)
 └── registration_gifs_v3/               # QC: each camera flipped against
     └── *_vs_*_0.gif                     #     its colocated reference
 ```
+
+There is one yaml per physical camera, so a 3-station EO+UV+IR flight
+produces nine; the single rig JSON always covers every calibrated
+camera across all groups.
 
 ### Per-camera yaml (`*_v3.yaml`)
 
