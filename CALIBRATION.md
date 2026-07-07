@@ -21,7 +21,7 @@ registration QC gifs.
 ## TL;DR
 
 ```bash
-micromamba activate kamera
+conda activate kamera        # see Installation below for first-time setup
 
 # 1. Stage raw imagery into the images0 layout (symlinks, keeps all frames)
 python kamera/postflight/scripts/prepare_flight.py \
@@ -38,13 +38,45 @@ from-scratch flight — run it on a machine with a CUDA GPU.
 
 ---
 
+## Installation
+
+Same native post-processing install as the main
+[README](README.md#installation) — GDAL and pycolmap come from
+conda-forge, [uv](https://docs.astral.sh/uv/) installs the rest into
+`.venv`. Requires [conda](https://conda-forge.org/download/). Works on
+Windows and Linux (and macOS).
+
+**Linux / macOS:**
+
+```bash
+git clone https://github.com/Kitware/kamera.git
+cd kamera
+conda env create -f environment.yml
+conda activate kamera
+make install
+source .venv/bin/activate
+```
+
+**Windows (PowerShell or Anaconda Prompt):**
+
+```powershell
+git clone https://github.com/Kitware/kamera.git
+cd kamera
+conda env create -f environment.yml
+conda activate kamera
+pip install -e .
+```
+
+Afterwards, `conda activate kamera` is all you need. Conda installs the
+CUDA build of pycolmap automatically with NVIDIA driver 575+ (CUDA
+12.9), otherwise the CPU build. **The GPU only matters for this
+calibration** (feature extraction / matching over a full flight) — the
+rest of post-processing runs fine on CPU, and so will a small flight,
+just slowly.
+
 ## Prerequisites
 
-- The `kamera` conda env, with **pycolmap installed from conda-forge**
-  (never pip — the pip wheel crashes on import; see `environment.yml`).
-  `micromamba activate kamera`.
-- A CUDA GPU for feature extraction / matching on a full flight
-  (thousands of images). CPU works but is slow.
+- The `kamera` env, installed and activated as above.
 - The raw flight must contain the INS `*_meta.json` files (one per
   image); everything reads the INS from those, not the `.dat`.
 
