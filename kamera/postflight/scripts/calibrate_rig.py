@@ -29,9 +29,11 @@ from kamera.postflight.boresight import (
     export_rig_camera_models,
     solve_rig_boresight,
 )
+from kamera.postflight.registration_gifs import write_registration_gifs
 from kamera.postflight.rig import (
     basename_to_time,
     best_reconstruction,
+    build_colmap_database,
     run_rig_mapping,
     write_pose_priors,
 )
@@ -77,17 +79,22 @@ def _resolve_model(
 
     os.makedirs(workspace, exist_ok=True)
     dst_db = os.path.join(workspace, "database.db")
+    image_path = os.path.join(colmap_dir, "images0")
+    src_db = os.path.join(colmap_dir, "database.db")
     if not os.path.exists(dst_db):
-        print(f"Copying database into {dst_db}")
-        shutil.copyfile(os.path.join(colmap_dir, "database.db"), dst_db)
+        if os.path.exists(src_db):
+            # reuse a database already feature-extracted + matched
+            print(f"Copying database into {dst_db}")
+            shutil.copyfile(src_db, dst_db)
+        else:
+            # from scratch: extract features and match from images0
+            build_colmap_database(dst_db, image_path, flight_dir, nav, prior_std)
     db = pycolmap.Database.open(dst_db)
     try:
         write_pose_priors(db, flight_dir, nav, position_std=prior_std)
     finally:
         db.close()
-    recs = run_rig_mapping(
-        dst_db, os.path.join(colmap_dir, "images0"), os.path.join(workspace, "sparse")
-    )
+    recs = run_rig_mapping(dst_db, image_path, os.path.join(workspace, "sparse"))
     if not recs:
         raise SystemError(f"Mapping produced no reconstruction for {colmap_dir}.")
     rec = best_reconstruction(recs)
@@ -113,6 +120,8 @@ def main():
         metavar="MODALITY:SUBDIR",
         help="Override modality groups, e.g. rgb:colmap_rgb ir:colmap_ir.",
     )
+    p.add_argument("--no-gifs", action="store_true", help="Skip registration gifs.")
+    p.add_argument("--num-gifs", type=int, default=5, help="Gifs per camera.")
     args = p.parse_args()
 
     flight_dir = args.flight_dir
@@ -127,6 +136,7 @@ def main():
     times = basename_to_time(flight_dir)
 
     all_models: Dict[str, object] = {}
+    image_dirs: Dict[str, str] = {}
     for ref_modality, subdir in groups:
         colmap_dir = os.path.join(flight_dir, subdir)
         if not os.path.isdir(colmap_dir):
@@ -142,11 +152,21 @@ def main():
             rec, estimate, nav, save_dir, ref_modality=ref_modality
         )
         all_models.update(models)
+        for folder in models:
+            image_dirs[folder] = os.path.join(colmap_dir, "images0", folder)
 
     print("\n[bold green]=== Calibration complete ===")
     print(f"Wrote {len(all_models)} camera models to {save_dir}:")
     for folder in sorted(all_models):
         print(f"  {folder}")
+
+    if not args.no_gifs and all_models:
+        print("\n[bold blue]=== Writing registration gifs ===")
+        gif_dir = os.path.join(save_dir, "registration_gifs_v3")
+        gifs = write_registration_gifs(
+            all_models, image_dirs, times, gif_dir, num_gifs=args.num_gifs
+        )
+        print(f"Wrote {len(gifs)} gifs to {gif_dir}.")
 
 
 if __name__ == "__main__":

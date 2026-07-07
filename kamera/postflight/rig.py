@@ -39,11 +39,13 @@ from kamera.sensor_models.nav_state import NavStateINSJson
 
 __all__ = [
     "basename_to_time",
+    "build_colmap_database",
     "configure_rig_and_frames",
     "derive_sensor_from_rig",
     "write_frames",
     "write_pose_priors",
     "run_rig_mapping",
+    "best_reconstruction",
 ]
 
 
@@ -235,6 +237,63 @@ def derive_sensor_from_rig(
         )
         out[folder] = pycolmap.Rigid3d(pycolmap.Rotation3d(q), t)
     return out
+
+
+def build_colmap_database(
+    database_path: str | os.PathLike,
+    image_path: str | os.PathLike,
+    flight_dir: str | os.PathLike,
+    nav_state_provider: Optional[NavStateINSJson] = None,
+    position_std: float = 2.0,
+    matcher: str = "spatial",
+) -> None:
+    """Extract SIFT features and match images0 into a COLMAP database,
+    replacing the docker feature_extractor/matcher scripts.
+
+    One OPENCV camera per image folder, KAMERA-tuned SIFT settings, and
+    -- for the default spatial matcher -- INS position priors so pairs
+    are restricted to spatial neighbors instead of the full O(N^2) set.
+    """
+    reader = pycolmap.ImageReaderOptions()
+    reader.camera_model = "OPENCV"
+    reader.default_focal_length_factor = 1.2
+
+    extraction = pycolmap.FeatureExtractionOptions()
+    extraction.max_image_size = 3200
+    extraction.sift.max_num_features = 8192
+    extraction.sift.first_octave = -1
+    extraction.sift.num_octaves = 11
+    extraction.sift.octave_resolution = 3
+    extraction.sift.peak_threshold = 0.02 / 3
+    extraction.sift.edge_threshold = 10
+    extraction.sift.max_num_orientations = 2
+
+    print(f"Extracting features from {image_path} (one OPENCV camera per folder).")
+    pycolmap.extract_features(
+        database_path,
+        image_path,
+        camera_mode=pycolmap.CameraMode.PER_FOLDER,
+        reader_options=reader,
+        extraction_options=extraction,
+    )
+
+    if matcher == "spatial":
+        # Priors give the spatial matcher the image locations it pairs on.
+        db = pycolmap.Database.open(database_path)
+        try:
+            write_pose_priors(db, flight_dir, nav_state_provider, position_std)
+        finally:
+            db.close()
+        pairing = pycolmap.SpatialPairingOptions()
+        pairing.max_num_neighbors = 50
+        pairing.ignore_z = False
+        print("Spatial matching on INS priors.")
+        pycolmap.match_spatial(database_path, pairing_options=pairing)
+    elif matcher == "exhaustive":
+        print("Exhaustive matching.")
+        pycolmap.match_exhaustive(database_path)
+    else:
+        raise ValueError(f"Unknown matcher '{matcher}'.")
 
 
 def write_pose_priors(
