@@ -1,64 +1,44 @@
 # Camera Rig Calibration
 
-This document walks through calibrating a KAMERA camera rig from a raw
-calibration flight to per-camera models, using
-`TO26Su1_RicesWhale_calibration/fl004` as the running example.
+Calibrate a KAMERA camera rig from a raw calibration flight to
+per-camera models. For every camera it recovers:
 
-The calibration recovers, for every camera on the rig:
+- **intrinsics** — focal length, principal point, OpenCV distortion
+  (from COLMAP bundle adjustment); and
+- **the mount** — orientation and lever arm relative to the aircraft
+  INS, from a single *boresight* solve per modality group.
 
-- **intrinsics** — focal length, principal point, and OpenCV distortion,
-  solved by COLMAP bundle adjustment; and
-- **the mount (extrinsics)** — the camera's orientation (and lever arm)
-  relative to the aircraft INS, solved as a single *boresight* per
-  modality group.
+Outputs: a per-camera `*_v3.yaml`, one self-contained
+`<flight>_<date>_<config>_rig.json`, and registration QC gifs.
+`TO26Su1_RicesWhale_calibration/fl004` is the running example.
 
-It produces per-camera `*_v3.yaml` models, one self-contained
-`<flight>_<date>_<config>_rig.json` describing the whole mount, and
-registration QC gifs.
+<!-- IMAGE: sparse reconstruction / camera frustums over terrain -->
+![Reconstruction overview](assets/calibration/reconstruction_overview.jpg)
+*The prior-mapped SfM model — camera poses and 3-D points in the INS ENU frame.*
 
 ---
 
 ## Installation
 
-Same native post-processing install as the main
-[README](README.md#installation) — GDAL and pycolmap come from
-conda-forge, [uv](https://docs.astral.sh/uv/) installs the rest into
-`.venv`. Requires [conda](https://conda-forge.org/download/). Works on
-Windows and Linux (and macOS).
-
-**Linux / macOS:**
+Same native post-processing setup as the main
+[README](README.md#installation): GDAL and pycolmap from conda-forge,
+[uv](https://docs.astral.sh/uv/) for the rest. Requires
+[conda](https://conda-forge.org/download/); works on Windows and Linux.
 
 ```bash
-git clone https://github.com/Kitware/kamera.git
-cd kamera
+git clone https://github.com/Kitware/kamera.git && cd kamera
 conda env create -f environment.yml
 conda activate kamera
-make install
-source .venv/bin/activate
+make install && source .venv/bin/activate   # Linux/macOS
+# Windows:  pip install -e .
 ```
 
-**Windows (PowerShell or Anaconda Prompt):**
+Afterwards `conda activate kamera` is all you need. Conda picks the CUDA
+pycolmap build with NVIDIA driver 575+, else CPU. **A GPU only matters
+here** — feature extraction/matching over a full flight is slow on CPU.
 
-```powershell
-git clone https://github.com/Kitware/kamera.git
-cd kamera
-conda env create -f environment.yml
-conda activate kamera
-pip install -e .
-```
-
-Afterwards, `conda activate kamera` is all you need. Conda installs the
-CUDA build of pycolmap automatically with NVIDIA driver 575+ (CUDA
-12.9), otherwise the CPU build. **The GPU only matters for this
-calibration** (feature extraction / matching over a full flight) — the
-rest of post-processing runs fine on CPU, and so will a small flight,
-just slowly.
-
-## Prerequisites
-
-- The `kamera` env, installed and activated as above.
-- The raw flight must contain the INS `*_meta.json` files (one per
-  image); everything reads the INS from those, not the `.dat`.
+> The raw flight must contain the INS `*_meta.json` files (one per
+> image); everything reads the INS from those, not the `.dat`.
 
 ---
 
@@ -66,122 +46,91 @@ just slowly.
 
 ```bash
 conda activate kamera
+FLIGHT=/Volumes/extreme2tb/TO26Su1_RicesWhale_calibration/fl004
 
-# 1. Stage raw imagery into the images0 layout (symlinks, keeps all frames)
-python kamera/postflight/scripts/prepare_flight.py \
-    /Volumes/extreme2tb/TO26Su1_RicesWhale_calibration/fl004/images_21deg_N56RF \
-    /Volumes/extreme2tb/TO26Su1_RicesWhale_calibration/fl004
+# 1. Stage raw imagery into the images0 layout (symlinks)
+python kamera/postflight/scripts/prepare_flight.py $FLIGHT/images_21deg_N56RF $FLIGHT
 
 # 2. Calibrate: build database, map with INS priors, boresight, export
-python kamera/postflight/scripts/calibrate_rig.py \
-    /Volumes/extreme2tb/TO26Su1_RicesWhale_calibration/fl004
+python kamera/postflight/scripts/calibrate_rig.py $FLIGHT
 ```
 
-Outputs land in `<flight_dir>/kamera_models/`. Step 2 is GPU-heavy for a
-from-scratch flight — run it on a machine with a CUDA GPU.
+Outputs land in `$FLIGHT/kamera_models/`.
 
 ---
 
-## Input: the raw flight folder
-
-A raw flight looks like this (fl004):
+## Input: the raw flight
 
 ```
 fl004/
-├── images_21deg_N56RF/          # raw imagery, one folder per camera view
-│   ├── center_view/             #   *_C_*_<mod>.jpg  +  *_C_*_meta.json
-│   ├── left_view/               #   *_L_*_<mod>.jpg  +  *_L_*_meta.json
-│   ├── right_view/              #   *_R_*_<mod>.jpg  +  *_R_*_meta.json
-│   └── sys_config.json
-├── ins_raw/
-│   └── ins_raw_*.dat
-└── TO26Su1_..._fl004_log.txt
+├── images_21deg_N56RF/     # one folder per camera view
+│   ├── center_view/        #   *_C_*_<mod>.jpg + *_C_*_meta.json
+│   ├── left_view/          #   *_L_*_<mod>.jpg + ...
+│   └── right_view/         #   *_R_*_<mod>.jpg + ...
+├── ins_raw/ins_raw_*.dat
+└── ..._fl004_log.txt
 ```
 
-Each `center/left/right_view` folder holds every image that camera took,
-across whatever modalities the flight carried — `rgb`, `uv`, `ir`, or a
-mix — alongside a `_meta.json` per image carrying the INS state at
-exposure time. The example commands below are shown for the RGB imagery
-in fl004, but UV and IR are picked up automatically and handled the same
-way (see modality groups, below).
-
-Image names encode their provenance:
+Each view folder holds every image that camera took, in whatever
+modalities were flown (`rgb`, `uv`, `ir`, or a mix), each with a
+`_meta.json` carrying the INS state at exposure. All cameras are
+hardware-synchronized — at each trigger they share one timestamp, which
+is how images group into frames. Names encode provenance:
 
 ```
 TO26Su1_RicesWhale_calibration_fl004_C_20260704_193924.627932_rgb.jpg
 └──────────── effort ────────────┘ └flt┘└ch┘└─ date ─┘└── time ──┘└mod┘
 ```
 
-All cameras on the rig — every station and modality — are
-hardware-synchronized: at each trigger they share an identical
-timestamp, which is how images are grouped into frames.
-
 ---
 
 ## Step 1 — `prepare_flight.py`: stage into `images0`
 
-The calibration pipeline reads a per-*camera* folder layout
-(`images0/<prefix>_<channel>_<modality>/`), not the raw per-*view*
-layout. `prepare_flight.py` reorganizes the raw imagery into it:
+The pipeline reads a per-*camera* layout, not the raw per-*view* one.
+This reorganizes it (by symlink; nothing is copied) into per-modality
+groups so SIFT never matches across the EO/IR gap:
 
 ```bash
 python kamera/postflight/scripts/prepare_flight.py <raw_imagery_dir> <flight_dir>
 ```
 
-For fl004:
-
-```bash
-python kamera/postflight/scripts/prepare_flight.py \
-    /Volumes/extreme2tb/TO26Su1_RicesWhale_calibration/fl004/images_21deg_N56RF \
-    /Volumes/extreme2tb/TO26Su1_RicesWhale_calibration/fl004 \
-    --focal-px 15360        # optional: enables the overlap report
-```
-
-This creates, by **symlink** (nothing is copied):
-
 ```
 fl004/
-├── colmap_rgb/images0/                 # EO group (rgb + uv)
-│   ├── 21deg_N56RF_center_rgb/
+├── colmap_rgb/images0/          # EO group: rgb + uv
+│   ├── 21deg_N56RF_center_rgb/  #   + *_uv folders if flown
 │   ├── 21deg_N56RF_left_rgb/
-│   ├── 21deg_N56RF_right_rgb/
-│   └── ...                              #   + *_uv folders if the flight has UV
-└── colmap_ir/images0/                   # IR group, only if the flight has IR
-    └── ...                              #   21deg_N56RF_center_ir/ ...
+│   └── 21deg_N56RF_right_rgb/
+└── colmap_ir/images0/           # IR group, only if ir was flown
 ```
 
-Modalities are split into groups so SIFT never tries to match across the
-EO/IR gap: `rgb` + `uv` → `colmap_rgb`, `ir` → `colmap_ir`. Whichever
-modalities the flight actually contains are staged; a group with no
-imagery simply isn't created. (fl004 as shown here is RGB, so only
-`colmap_rgb` appears.)
+A group with no imagery simply isn't created (fl004 is RGB, so only
+`colmap_rgb`).
 
-### Paring down the frame set
+### Paring the frame set
 
-Calibration flights can carry far more frames than SfM needs, so
-`prepare_flight.py` can subsample. Selection keeps synchronized triggers
-together (all cameras at a kept trigger), which the rig logic requires.
+Selection keeps synchronized triggers together (all cameras at a kept
+trigger). Flags:
 
 | flag | effect |
 |------|--------|
-| `--spacing METERS` | keep a trigger only after the aircraft has moved this far (3-D). Evens coverage regardless of speed. |
+| `--spacing METERS` | keep a trigger only after this much 3-D travel |
 | `--every N` | keep every Nth survivor |
-| `--max-frames N` | cap the count by uniform decimation |
-| `--focal-px F` | report estimated forward overlap and warn if a selection is too sparse for SfM |
+| `--max-frames N` | cap by uniform decimation |
+| `--focal-px F` | report forward overlap; warn if too sparse for SfM |
 | `--copy` | copy instead of symlink |
 
-**Do not over-prune.** SfM needs sufficient image-to-image overlap to
-match and triangulate; the binding constraint is the *lowest-altitude*
-pass, where the ground footprint is smallest. The overlap report exists
-to catch this — if lowest-altitude overlap drops below ~40%, the model
-will fragment.
+**Don't over-prune.** SfM needs image overlap to triangulate; the
+binding constraint is the *lowest-altitude* pass (smallest footprint).
+If lowest-altitude overlap drops below ~40%, the model fragments — pass
+`--focal-px` to watch it.
 
-> **fl004 specifically:** the flight is three ~10-minute figure-8 blocks
-> at ~565 m, ~435 m, and ~275 m — all of it is calibration, no transit
-> to drop. At its native ~44 m trigger spacing, forward overlap is
-> already only ~55%, so **keep every frame** (the default). Here the
-> "glut" is not spatial oversampling; the compute saving comes from the
-> spatial matcher (Step 2), not from dropping frames.
+<!-- IMAGE: fl004 trajectory colored by altitude, three figure-8 bands -->
+![fl004 trajectory](assets/calibration/fl004_trajectory.png)
+*fl004 — three figure-8 blocks at ~565/435/275 m. All calibration, no transit.*
+
+> **fl004:** at its native ~44 m spacing, overlap is already ~55%, so
+> **keep every frame** (the default). The compute saving here is the
+> spatial matcher in Step 2, not dropping frames.
 
 ---
 
@@ -191,116 +140,89 @@ will fragment.
 python kamera/postflight/scripts/calibrate_rig.py <flight_dir>
 ```
 
-For each modality group it runs, end to end:
+Per modality group, end to end:
 
-1. **Build the COLMAP database** (if none exists) — SIFT feature
-   extraction (one OPENCV camera per folder) and **spatial matching**
-   guided by INS priors, so matching is limited to spatial neighbors
-   instead of every pair.
-2. **Write INS pose priors** — each image's ENU position at exposure
-   time, from the INS.
-3. **Map** — prior-position incremental reconstruction. The priors fix
-   the model directly in the INS ENU frame (no separate alignment step)
-   and keep it from fragmenting.
-4. **Solve the boresight** — one robust rotation solve of the rig
-   relative to the INS, over every synchronized frame.
-5. **Export** — a `StandardCamera` yaml per camera, mount =
-   `ins_from_rig ∘ rig_from_sensor`.
+1. **Build the COLMAP database** (if none) — SIFT extraction (one OPENCV
+   camera per folder) + **spatial matching** on INS priors, so matching
+   is limited to spatial neighbors instead of every pair.
+2. **Write INS pose priors** — each image's ENU position at exposure.
+3. **Map** — prior-position reconstruction, directly in the INS ENU
+   frame (no separate alignment) and resistant to fragmenting.
+4. **Boresight** — one robust rig-to-INS rotation over all frames.
+5. **Export** — a yaml per camera, mount = `ins_from_rig ∘ rig_from_sensor`.
 
-After all groups it writes the combined rig JSON and the QC gifs.
-
-Useful flags:
+Then it writes the rig JSON and QC gifs. Flags:
 
 | flag | effect |
 |------|--------|
-| `--reuse-aligned` | reuse an existing `aligned/` model instead of re-mapping (fast; the boresight is gauge-independent) |
-| `--save-dir DIR` | where models are written (default `<flight_dir>/kamera_models`) |
+| `--reuse-aligned` | reuse an existing `aligned/` model instead of re-mapping (fast) |
+| `--save-dir DIR` | output dir (default `<flight_dir>/kamera_models`) |
 | `--prior-std M` | INS position prior std, meters (default 2.0) |
-| `--groups rgb:colmap_rgb ir:colmap_ir` | override which workspaces to calibrate |
-| `--no-gifs` / `--num-gifs N` | skip or set the number of QC gifs per camera |
+| `--groups rgb:colmap_rgb ir:colmap_ir` | override which workspaces run |
+| `--no-gifs` / `--num-gifs N` | skip / set QC gifs per camera |
 
-Each group runs only if its workspace exists — the EO group needs
-`colmap_rgb`, the IR group needs `colmap_ir` — so a flight calibrates
-whatever modalities it carries with no extra flags. (For fl004 as shown
-here, only the EO group runs.)
+A group runs only if its workspace exists, so a flight calibrates
+whatever modalities it carries with no extra flags.
 
 ---
 
 ## Outputs
 
-All under `<flight_dir>/kamera_models/`:
+Under `<flight_dir>/kamera_models/`:
 
 ```
 kamera_models/
-├── 21deg_N56RF_center_rgb_v3.yaml      # one per camera, all modalities
-├── 21deg_N56RF_left_rgb_v3.yaml        #   (*_uv, *_ir yamls too when present)
-├── 21deg_N56RF_right_rgb_v3.yaml
-├── fl004_20260704_21deg_N56RF_rig.json # complete rig model (see below)
-└── registration_gifs_v3/               # QC: each camera flipped against
-    └── *_vs_*_0.gif                     #     its colocated reference
+├── 21deg_N56RF_center_rgb_v3.yaml       # one per physical camera
+├── ...                                  #   (nine for a 3-station EO+UV+IR rig)
+├── fl004_20260704_21deg_N56RF_rig.json  # complete rig model
+└── registration_gifs_v3/*.gif           # QC
 ```
 
-There is one yaml per physical camera, so a 3-station EO+UV+IR flight
-produces nine; the single rig JSON always covers every calibrated
-camera across all groups.
+**Per-camera yaml** — the runtime model: image size, `fx/fy/cx/cy`,
+distortion, `camera_quaternion` (camera→INS mount), `camera_position`.
 
-### Per-camera yaml (`*_v3.yaml`)
+**Rig JSON** — the authoritative, self-contained mount description:
+provenance (flight, date, pycolmap version, git commit); reference frame
+(INS body, ENU origin, quaternion convention); per group the boresight,
+lever arm, and residual stats; per camera the intrinsics, INS mount, rig
+extrinsics (`sensor_from_rig`), reprojection error, and image count.
 
-The runtime camera model: image size, `fx/fy/cx/cy`, OpenCV distortion,
-`camera_quaternion` (camera → INS mount), and `camera_position`.
+**Registration gifs** — each non-reference camera flipped against its
+colocated reference image warped into its view. Features hold still when
+calibrated; jitter means misregistration. The visual acceptance check.
 
-### Rig model (`<flight>_<date>_<config>_rig.json`)
-
-The authoritative, self-contained description of the whole mount:
-
-- **provenance** — flight, effort, config, date, UTC calibration time,
-  method, pycolmap version, git commit;
-- **reference frame** — INS-body platform, ENU world with its
-  `lat0/lon0/h0` origin, and the quaternion convention spelled out;
-- **per group** (rgb, ir) — reference camera, model source, boresight
-  (`ins_from_rig`), lever arm, and boresight residual statistics;
-- **per camera** — intrinsics, the INS mount, the rig extrinsics
-  (`sensor_from_rig`, rotation + translation), median reprojection
-  error, and image count.
-
-### Registration gifs
-
-Each non-reference camera is flipped against its colocated
-reference-modality image warped into its view. Well-calibrated cameras
-hold ground features still across the flip; jitter means
-misregistration. This is the visual acceptance check.
+<!-- IMAGE: registration flip gif, e.g. uv vs rgb -->
+![Registration gif](assets/calibration/registration_example.gif)
+*UV flipped against RGB warped into its view — ground features stay locked.*
 
 ---
 
-## How it works (in one paragraph)
+## How it works
 
 The cameras are rigidly mounted and synchronized, so the flight maps
 onto COLMAP's rig model. Rather than force the rig onto the mapper
 (rig-constrained mapping from scratch fragments badly), we map once with
-INS position priors to get a single ENU model, then recover the rig in
-closed form: each camera's pose relative to the rig
-(`sensor_from_rig`) by robust averaging over synchronized frames, and a
-single rig-to-INS **boresight** per modality group. Because every
-group's boresight is solved against the *same physical INS frame*, EO
-and IR cameras come out mutually consistent with no cross-modal
-matching — which is why this replaces the older per-camera search and
-IR transfer/manual-keypoint steps.
+INS priors into one ENU model, then recover the rig in closed form: each
+camera's `sensor_from_rig` by robust averaging over synchronized frames,
+and one rig-to-INS **boresight** per group. Because every group's
+boresight is solved against the *same physical INS frame*, EO and IR
+come out mutually consistent with no cross-modal matching — which is why
+this replaces the old per-camera search and IR transfer/keypoint steps.
+
+<!-- IMAGE: frame diagram — camera / rig / INS / ENU and the transforms -->
+![Mount frames](assets/calibration/mount_frames.png)
+*camera → rig (`sensor_from_rig`) → INS (`ins_from_rig` boresight) → ENU world.*
 
 ---
 
-## Verifying and troubleshooting
+## Troubleshooting
 
-- **Check the gifs first.** They are the fastest read on whether a
-  calibration is good.
-- **Reprojection error** in the rig JSON is INS-attitude-noise-limited
-  (tens of px at long EO focal lengths); it is a health signal, not the
-  primary accuracy metric. The boresight residual (fractions of a
-  degree) and the gifs are.
-- **Fragmented model / few images registered** → overlap too low. Re-run
-  Step 1 keeping more frames, and check the overlap report.
-- **Iterating on the boresight/export** without re-mapping: pass
-  `--reuse-aligned`, or point the driver at an existing model.
-- **Focal length for the overlap report** (`--focal-px`) only affects
-  the printed estimate, not the staging or the calibration. Use the
-  camera's real focal in pixels when known (~15360 for the EO cameras
-  here); it is otherwise cosmetic.
+- **Check the gifs first** — the fastest read on calibration quality.
+- **Reprojection error** (rig JSON) is INS-noise-limited (tens of px at
+  long EO focals); a health signal, not the accuracy metric. The
+  boresight residual (fractions of a degree) and the gifs are.
+- **Fragmented model / few images** → overlap too low; re-run Step 1
+  keeping more frames.
+- **Iterating on boresight/export** without re-mapping → `--reuse-aligned`.
+- **`--focal-px`** only affects the printed overlap estimate, nothing
+  else (~15360 for these EO cameras).
