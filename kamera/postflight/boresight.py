@@ -190,7 +190,7 @@ def export_rig_camera_models(
     ref_modality: str = "rgb",
     sensor_from_rig: Optional[Dict[str, "pycolmap.Rigid3d"]] = None,
     use_lever_arm: bool = False,
-    suffix: str = "_v3",
+    suffix: str = "",
 ) -> Dict[str, StandardCamera]:
     """Compose and write a StandardCamera yaml per camera folder.
 

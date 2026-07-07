@@ -68,7 +68,7 @@ def main():
     # Can switch to UV / IR if possible that they are better aligned
     main_modality = "rgb"
     # If camera models are already present, if true this will overwrite
-    force_calibrate = False
+    force_calibrate = True
     # Whether to calibrate IR models or not. A "colmap_ir" must be built
     # in the same folder
     calibrate_ir = True

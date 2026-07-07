@@ -204,7 +204,7 @@ def main():
 
     if not args.no_gifs and all_models:
         print("\n[bold blue]=== Writing registration gifs ===")
-        gif_dir = os.path.join(save_dir, "registration_gifs_v3")
+        gif_dir = os.path.join(save_dir, "registration_gifs")
         gifs = write_registration_gifs(
             all_models, image_dirs, times, gif_dir, num_gifs=args.num_gifs
         )

@@ -1,6 +1,6 @@
 """Assemble a complete, self-contained rig model JSON for a flight.
 
-Where the per-camera ``*_v3.yaml`` files each describe one camera, the
+Where the per-camera ``*.yaml`` files each describe one camera, the
 rig JSON is the authoritative description of the whole mount: every
 camera's intrinsics and INS mount, the rig extrinsics
 (``sensor_from_rig``) and boresight (``ins_from_rig``) that relate them,
