@@ -13,8 +13,8 @@ from osgeo import osr, gdal
 from scipy.spatial import ConvexHull
 from scipy.interpolate import griddata
 
-import colmap_processing.vtk_util as vtk_util
-from colmap_processing.geo_conversions import enu_to_llh
+import kamera.colmap_processing.vtk_util as vtk_util
+from kamera.colmap_processing.geo_conversions import enu_to_llh
 
 
 src_fname = ''

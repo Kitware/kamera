@@ -15,7 +15,7 @@ except ImportError:
     pass
 
 # Kitware imports
-from colmap_processing.geo_conversions import enu_to_llh, llh_to_enu, \
+from kamera.colmap_processing.geo_conversions import enu_to_llh, llh_to_enu, \
     FastENUConverter
 
 
