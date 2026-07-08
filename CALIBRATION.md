@@ -8,9 +8,17 @@ per-camera models. For every camera it recovers:
 - **the mount** — orientation and lever arm relative to the aircraft
   INS, from a single *boresight* solve per modality group.
 
-Outputs: a per-camera `*_v3.yaml`, one self-contained
+Outputs: a per-camera `*.yaml`, one self-contained
 `<flight>_<date>_<config>_rig.json`, and registration QC gifs.
 `TO26Su1_RicesWhale_calibration/fl004` is the running example.
+
+```mermaid
+flowchart LR
+    raw["Raw flight<br/>center/left/right_view<br/>+ meta.json"]
+    img0["images0/<br/>colmap_rgb · colmap_ir"]
+    out["kamera_models/<br/>*.yaml · rig.json · gifs"]
+    raw -->|"prepare_flight.py"| img0 -->|"calibrate_rig.py"| out
+```
 
 <!-- IMAGE: sparse reconstruction / camera frustums over terrain -->
 ![Reconstruction overview](assets/calibration/reconstruction_overview.jpg)
@@ -140,18 +148,33 @@ If lowest-altitude overlap drops below ~40%, the model fragments — pass
 python kamera/postflight/scripts/calibrate_rig.py <flight_dir>
 ```
 
-Per modality group, end to end:
+Per modality group, the map fans out to two independent solves that
+rejoin at export:
 
-1. **Build the COLMAP database** (if none) — SIFT extraction (one OPENCV
-   camera per folder) + **spatial matching** on INS priors, so matching
-   is limited to spatial neighbors instead of every pair.
-2. **Write INS pose priors** — each image's ENU position at exposure.
-3. **Map** — prior-position reconstruction, directly in the INS ENU
-   frame (no separate alignment) and resistant to fragmenting.
-4. **Boresight** — one robust rig-to-INS rotation over all frames.
-5. **Export** — a yaml per camera, mount = `ins_from_rig ∘ rig_from_sensor`.
+```mermaid
+flowchart TD
+    db["Build database<br/>SIFT + spatial match"] --> priors["Write INS<br/>pose priors"]
+    priors --> map["Prior-position map<br/>→ one ENU model"]
+    map --> bore["Boresight<br/>rig → INS"]
+    map --> sfr["Derive<br/>sensor_from_rig"]
+    bore --> export["Export"]
+    sfr --> export
+    export --> yaml["*.yaml"]
+    export --> rig["rig.json"]
+    export --> gif["registration gifs"]
+```
 
-Then it writes the rig JSON and QC gifs. Flags:
+- **Build the database** (if none) — SIFT extraction, one OPENCV camera
+  per folder, then **spatial matching** on INS priors (spatial neighbors,
+  not every pair).
+- **Priors + map** — each image's ENU position at exposure seeds a
+  prior-position reconstruction, directly in the INS ENU frame (no
+  separate alignment) and resistant to fragmenting.
+- **Boresight + `sensor_from_rig`** — a single robust rig-to-INS rotation
+  and each camera's rig pose, both recovered from that one model.
+- **Export** — a yaml per camera, mount = `ins_from_rig ∘ rig_from_sensor`.
+
+Flags:
 
 | flag | effect |
 |------|--------|
@@ -172,10 +195,10 @@ Under `<flight_dir>/kamera_models/`:
 
 ```
 kamera_models/
-├── 21deg_N56RF_center_rgb_v3.yaml       # one per physical camera
+├── 21deg_N56RF_center_rgb.yaml          # one per physical camera
 ├── ...                                  #   (nine for a 3-station EO+UV+IR rig)
 ├── fl004_20260704_21deg_N56RF_rig.json  # complete rig model
-└── registration_gifs_v3/*.gif           # QC
+└── registration_gifs/*.gif              # QC
 ```
 
 **Per-camera yaml** — the runtime model: image size, `fx/fy/cx/cy`,
@@ -199,19 +222,24 @@ calibrated; jitter means misregistration. The visual acceptance check.
 
 ## How it works
 
+Each camera's mount composes down a chain of frames:
+
+```mermaid
+flowchart LR
+    cam["Camera<br/>pixels / rays"] -->|"sensor_from_rig"| rig["Rig<br/>= reference camera"]
+    rig -->|"ins_from_rig<br/>(boresight)"| ins["INS body"]
+    ins -->|"nav state at t"| enu["ENU world"]
+```
+
 The cameras are rigidly mounted and synchronized, so the flight maps
 onto COLMAP's rig model. Rather than force the rig onto the mapper
 (rig-constrained mapping from scratch fragments badly), we map once with
-INS priors into one ENU model, then recover the rig in closed form: each
-camera's `sensor_from_rig` by robust averaging over synchronized frames,
-and one rig-to-INS **boresight** per group. Because every group's
-boresight is solved against the *same physical INS frame*, EO and IR
+INS priors into one ENU model, then recover the two rig transforms above
+in closed form — `sensor_from_rig` by robust averaging over synchronized
+frames, and one rig-to-INS **boresight** per group. Because every
+group's boresight resolves to the *same physical INS frame*, EO and IR
 come out mutually consistent with no cross-modal matching — which is why
 this replaces the old per-camera search and IR transfer/keypoint steps.
-
-<!-- IMAGE: frame diagram — camera / rig / INS / ENU and the transforms -->
-![Mount frames](assets/calibration/mount_frames.png)
-*camera → rig (`sensor_from_rig`) → INS (`ins_from_rig` boresight) → ENU world.*
 
 ---
 
