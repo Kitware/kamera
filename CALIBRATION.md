@@ -183,9 +183,59 @@ Flags:
 | `--prior-std M` | INS position prior std, meters (default 2.0) |
 | `--groups rgb:colmap_rgb ir:colmap_ir` | override which workspaces run |
 | `--no-gifs` / `--num-gifs N` | skip / set QC gifs per camera |
+| `--fuse` | cross-modal fusion — see the next section |
 
 A group runs only if its workspace exists, so a flight calibrates
 whatever modalities it carries with no extra flags.
+
+---
+
+## Optional — `--fuse`: one multimodal model
+
+By default EO and IR mounts agree only *through the INS*: each group's
+boresight resolves to the same physical INS frame, so their relative
+mount inherits the INS attitude noise (validated to ~0.01–0.27 deg).
+`--fuse` replaces that relay with direct image evidence, using
+[MINIMA-LoFTR](https://github.com/LSXI7/MINIMA) — a modality-invariant
+deep matcher — to register every IR image straight into the EO model:
+
+```bash
+uv sync --group fusion        # one-time: torch + vismatch (weights
+                              # auto-download on first run)
+python kamera/postflight/scripts/calibrate_rig.py $FLIGHT --fuse
+```
+
+Per IR image, its co-located same-trigger EO image is warped into the
+IR view (a ground-plane homography from the just-computed per-group
+mounts, so the matcher only faces the modality gap, not the ~20x scale
+gap), matched, and each matched EO pixel is lifted to 3-D at the
+interpolated depth of that EO image's triangulated points. Per-image
+PnP only *filters* these correspondences — over near-planar terrain a
+single image's pose has a strong tilt/translation ambiguity — and all
+surviving matches (tens of thousands) jointly solve **one Sim3**
+aligning the IR reconstruction to the EO reconstruction. Every fused IR
+pose therefore keeps the IR model's own multi-view relative geometry,
+globally registered by the cross-modal matches. The boresight,
+`sensor_from_rig`, and export then re-run once on the fused model, so
+IR extrinsics are measured against the EO reference camera directly.
+
+The per-group solve still runs first — it supplies the IR intrinsics
+and the warp initialization — and any IR camera that fuses too few
+frames falls back to its two-boresight calibration with a warning.
+Outputs are the same yamls/rig.json (the rig JSON gains a fused
+`rgb+ir` group and a `fusion` provenance block) plus a
+`fusion_report.json` with per-image match/inlier stats, the model
+alignment (rotation, translation, scale, reprojection), and each IR
+camera's mount delta vs the two-boresight solution — expect that delta
+within the INS-noise band above; a large outlier on one camera flags a
+bad fusion.
+
+Tuning flags (defaults are sensible): `--fuse-matcher` (any vismatch
+name, e.g. `minima-roma`), `--fuse-pairs-per-ir` (add neighbor-trigger
+EO partners), `--fuse-max-dt`, `--fuse-snap-px`, `--fuse-ransac-px`,
+`--fuse-min-inliers`, `--fuse-max-images` (smoke runs), `--fuse-ba` /
+`--fuse-refine-ir-intrinsics` (optional fused bundle adjustment). A GPU
+(CUDA or Apple MPS) makes matching ~6x faster; CPU works.
 
 ---
 
@@ -240,6 +290,8 @@ frames, and one rig-to-INS **boresight** per group. Because every
 group's boresight resolves to the *same physical INS frame*, EO and IR
 come out mutually consistent with no cross-modal matching — which is why
 this replaces the old per-camera search and IR transfer/keypoint steps.
+`--fuse` tightens that INS-relayed link into a measured one by matching
+IR images directly into the EO model (see the fusion section above).
 
 ---
 

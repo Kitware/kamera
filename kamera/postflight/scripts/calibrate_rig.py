@@ -8,15 +8,28 @@ against the INS, so every camera's exported mount is camera->INS in the
 same physical INS frame -- EO and IR mounts are mutually consistent
 without any cross-modal matching or transfer calibration.
 
+With ``--fuse`` (and the optional ``fusion`` dependency group installed)
+the IR images are additionally registered directly into the EO model via
+deep cross-modal matching (MINIMA-LoFTR; see ``fusion.py``), and the
+boresight/extrinsics/export re-run once on that single multimodal model
+-- replacing the INS-relayed EO<->IR link with direct image evidence.
+The per-group solve still runs first: it supplies the IR intrinsics and
+the warp initialization, and remains the fallback for any IR camera that
+fails to fuse.
+
 Examples:
     # EO + IR, mapping each workspace fresh
     python calibrate_rig.py /data/fl09_85mm_25_5deg
 
     # reuse existing ENU (sim3-aligned or prior-mapped) models, no remap
     python calibrate_rig.py /data/fl09_85mm_25_5deg --reuse-aligned
+
+    # one fused multimodal model (needs: uv sync --group fusion)
+    python calibrate_rig.py /data/fl09_85mm_25_5deg --fuse
 """
 
 import argparse
+import json
 import os
 import pathlib
 import shutil
@@ -116,6 +129,132 @@ def _resolve_model(
     return rec, source
 
 
+def _fuse_groups(
+    args, flight_dir, save_dir, per_group, all_models, image_dirs, times, nav
+):
+    """Register the IR group into the EO model (see fusion.py), re-solve
+    boresight + extrinsics once on the fused reconstruction, and re-export.
+
+    `all_models` is updated in place so the downstream QC (gifs, DIVE
+    homographies) runs off the fused mounts. Returns the replacement
+    (rig_groups, rig_cameras, extra_provenance); IR cameras that fail to
+    fuse keep their two-boresight export and group record.
+    """
+    # lazy: torch/vismatch only load on the --fuse path
+    from kamera.postflight.deep_match import DeepMatcher
+    from kamera.postflight.fusion import fuse_ir_into_eo, mount_delta_deg
+
+    print(f"\n[bold blue]=== Fusing IR into the EO model ({args.fuse_matcher}) ===")
+    eo, ir = per_group["rgb"], per_group["ir"]
+    fused_rec = eo["rec"]  # mutated into the fused model
+    report = fuse_ir_into_eo(
+        fused_rec,
+        ir["rec"],
+        all_models,
+        image_dirs,
+        times,
+        DeepMatcher(args.fuse_matcher),
+        pairs_per_ir=args.fuse_pairs_per_ir,
+        max_dt_s=args.fuse_max_dt,
+        snap_px=args.fuse_snap_px,
+        ransac_px=args.fuse_ransac_px,
+        min_inliers=args.fuse_min_inliers,
+        warp_scale=args.fuse_warp_scale,
+        run_ba=args.fuse_ba or args.fuse_refine_ir_intrinsics,
+        refine_ir_intrinsics=args.fuse_refine_ir_intrinsics,
+        max_images=args.fuse_max_images,
+    )
+    fused_dir = os.path.join(flight_dir, "colmap_rig_fused", "sparse", "0")
+    os.makedirs(fused_dir, exist_ok=True)
+    fused_rec.write(fused_dir)
+    print(f"Wrote fused model to {fused_dir}")
+
+    estimate = solve_rig_boresight(fused_rec, nav, times, ref_modality="rgb")
+    sensor_from_rig = derive_sensor_from_rig(fused_rec, ref_modality="rgb")
+    fused_models = export_rig_camera_models(
+        fused_rec, estimate, nav, save_dir,
+        ref_modality="rgb", sensor_from_rig=sensor_from_rig,
+    )
+
+    # QC: how far did direct image evidence move each IR mount from the
+    # INS-relayed (two-boresight) solution?
+    deltas = {}
+    for folder in sorted(ir["models"]):
+        if folder in fused_models:
+            deltas[folder] = mount_delta_deg(
+                all_models[folder], fused_models[folder]
+            )
+            print(
+                f"  {folder}: fused mount is {deltas[folder]:.3f} deg from "
+                "the two-boresight mount"
+            )
+    fallback = [f for f in ir["models"] if f not in fused_models]
+    for folder in fallback:
+        print(
+            f"[yellow]  {folder}: too few fused frames; keeping its "
+            "two-boresight calibration."
+        )
+    all_models.update(fused_models)
+
+    ref_folder = _order_by_ref(fused_models, "rgb")[0]
+    source = (
+        f"fused:{args.fuse_matcher} "
+        f"(rgb: {eo['source']}; ir: {ir['source']})"
+    )
+    rig_groups = [
+        group_record(
+            "rgb+ir", ref_folder, estimate, source,
+            int(fused_rec.num_reg_images()),
+        )
+    ]
+    if fallback:
+        rig_groups.append(
+            group_record(
+                "ir", ir["ref_folder"], ir["estimate"],
+                ir["source"] + " (fusion fallback)",
+                int(ir["rec"].num_reg_images()),
+            )
+        )
+    fused_records = _camera_records(
+        fused_rec, fused_models, sensor_from_rig, ref_folder, times
+    )
+    rig_cameras = list(fused_records.values()) + [
+        ir["camera_records"][f] for f in fallback
+    ]
+
+    report["mount_delta_vs_two_boresight_deg"] = deltas
+    report_path = os.path.join(save_dir, "fusion_report.json")
+    with open(report_path, "w") as f:
+        json.dump(report, f, indent=2)
+    print(f"Wrote fusion report: {report_path}")
+
+    provenance = {
+        "fusion": {k: v for k, v in report.items() if k != "per_image"}
+    }
+    return rig_groups, rig_cameras, provenance
+
+
+def _camera_records(rec, models, sensor_from_rig, ref_folder, times):
+    """One camera_record per exported model, counted against `rec`,
+    keyed by camera folder."""
+    records = {}
+    for folder, model in models.items():
+        n_imgs = sum(
+            1
+            for im in rec.images.values()
+            if im.has_pose and im.name.rsplit("/", 1)[0] == folder
+        )
+        records[folder] = camera_record(
+            folder,
+            model,
+            sensor_from_rig.get(folder),
+            is_reference=(folder == ref_folder),
+            reprojection_px=reprojection_error_px(rec, model, folder, times),
+            num_images=n_imgs,
+        )
+    return records
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("flight_dir")
@@ -136,6 +275,78 @@ def main():
     )
     p.add_argument("--no-gifs", action="store_true", help="Skip registration gifs.")
     p.add_argument("--num-gifs", type=int, default=5, help="Gifs per camera.")
+    fuse = p.add_argument_group(
+        "cross-modal fusion (requires: uv sync --group fusion)"
+    )
+    fuse.add_argument(
+        "--fuse",
+        action="store_true",
+        help="Register IR images directly into the EO model with deep "
+        "cross-modal matches and export from the single fused model.",
+    )
+    fuse.add_argument(
+        "--fuse-matcher",
+        default="minima-loftr",
+        help="vismatch matcher name (e.g. minima-loftr, minima-roma).",
+    )
+    fuse.add_argument(
+        "--fuse-pairs-per-ir",
+        type=int,
+        default=1,
+        help="EO partner images matched per IR image (1 = the colocated "
+        "same-trigger image; more adds neighboring triggers).",
+    )
+    fuse.add_argument(
+        "--fuse-max-dt",
+        type=float,
+        default=15.0,
+        help="Max seconds between an IR image and an EO partner trigger.",
+    )
+    fuse.add_argument(
+        "--fuse-snap-px",
+        type=float,
+        default=16.0,
+        help="Max distance (full-res EO px) for a matched EO pixel to "
+        "attach to a triangulated observation as a track observation.",
+    )
+    fuse.add_argument(
+        "--fuse-ransac-px",
+        type=float,
+        default=3.0,
+        help="PnP RANSAC threshold in IR pixels.",
+    )
+    fuse.add_argument(
+        "--fuse-min-inliers",
+        type=int,
+        default=12,
+        help="Minimum PnP inliers to accept an IR registration.",
+    )
+    fuse.add_argument(
+        "--fuse-warp-scale",
+        type=float,
+        default=1.0,
+        help="Scale of the EO-warped-to-IR matching image relative to "
+        "the IR size.",
+    )
+    fuse.add_argument(
+        "--fuse-max-images",
+        type=int,
+        default=None,
+        help="Uniformly subsample the IR images (smoke runs).",
+    )
+    fuse.add_argument(
+        "--fuse-ba",
+        action="store_true",
+        help="Bundle-adjust the fused model (EO frozen). Off by default: "
+        "IR poses come from the joint model alignment, and per-image BA "
+        "against sparse cross-modal tracks re-adds per-image wobble.",
+    )
+    fuse.add_argument(
+        "--fuse-refine-ir-intrinsics",
+        action="store_true",
+        help="Let the fused bundle adjustment refine IR focal/distortion "
+        "(implies --fuse-ba).",
+    )
     args = p.parse_args()
 
     flight_dir = args.flight_dir
@@ -151,8 +362,7 @@ def main():
 
     all_models: Dict[str, object] = {}
     image_dirs: Dict[str, str] = {}
-    rig_groups: List[Dict] = []
-    rig_cameras: List[Dict] = []
+    per_group: Dict[str, Dict] = {}
     identity_rec = None  # any group's reconstruction, for flight identity + ENU
     for ref_modality, subdir in groups:
         colmap_dir = os.path.join(flight_dir, subdir)
@@ -172,26 +382,44 @@ def main():
             ref_modality=ref_modality, sensor_from_rig=sensor_from_rig,
         )
         all_models.update(models)
+        for folder in models:
+            image_dirs[folder] = os.path.join(colmap_dir, "images0", folder)
 
         ref_folder = _order_by_ref(models, ref_modality)[0]
-        rig_groups.append(
-            group_record(ref_modality, ref_folder, estimate, source, int(rec.num_reg_images()))
+        per_group[ref_modality] = {
+            "rec": rec,
+            "estimate": estimate,
+            "sensor_from_rig": sensor_from_rig,
+            "models": models,
+            "source": source,
+            "ref_folder": ref_folder,
+            "camera_records": _camera_records(
+                rec, models, sensor_from_rig, ref_folder, times
+            ),
+        }
+
+    rig_groups: List[Dict] = [
+        group_record(
+            mod, g["ref_folder"], g["estimate"], g["source"],
+            int(g["rec"].num_reg_images()),
         )
-        for folder, model in models.items():
-            n_imgs = sum(
-                1
-                for im in rec.images.values()
-                if im.has_pose and im.name.rsplit("/", 1)[0] == folder
-            )
-            rig_cameras.append(
-                camera_record(
-                    folder, model, sensor_from_rig.get(folder),
-                    is_reference=(folder == ref_folder),
-                    reprojection_px=reprojection_error_px(rec, model, folder, times),
-                    num_images=n_imgs,
-                )
-            )
-            image_dirs[folder] = os.path.join(colmap_dir, "images0", folder)
+        for mod, g in per_group.items()
+    ]
+    rig_cameras: List[Dict] = [
+        record for g in per_group.values() for record in g["camera_records"].values()
+    ]
+    extra_provenance = None
+
+    if args.fuse and "rgb" in per_group and "ir" in per_group:
+        rig_groups, rig_cameras, extra_provenance = _fuse_groups(
+            args, flight_dir, save_dir, per_group, all_models, image_dirs,
+            times, nav,
+        )
+    elif args.fuse:
+        print(
+            "[yellow]--fuse needs both an rgb and an ir group; "
+            "skipping fusion."
+        )
 
     print("\n[bold green]=== Calibration complete ===")
     print(f"Wrote {len(all_models)} camera models to {save_dir}:")
@@ -199,7 +427,10 @@ def main():
         print(f"  {folder}")
 
     if identity_rec is not None:
-        rig = build_rig_model(identity_rec, nav, rig_groups, rig_cameras)
+        rig = build_rig_model(
+            identity_rec, nav, rig_groups, rig_cameras,
+            extra_provenance=extra_provenance,
+        )
         rig_path = write_rig_json(save_dir, rig)
         print(f"Wrote complete rig model: {rig_path}")
 
