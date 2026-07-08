@@ -36,6 +36,7 @@ import shutil
 from typing import Dict, List, Optional, Tuple
 
 import pycolmap
+import ubelt as ub
 from rich import print
 
 from kamera.postflight.boresight import (
@@ -164,8 +165,9 @@ def _fuse_groups(
         refine_ir_intrinsics=args.fuse_refine_ir_intrinsics,
         max_images=args.fuse_max_images,
     )
-    fused_dir = os.path.join(flight_dir, "colmap_rig_fused", "sparse", "0")
-    os.makedirs(fused_dir, exist_ok=True)
+    fused_dir = ub.ensuredir(
+        os.path.join(flight_dir, "colmap_rig_fused", "sparse", "0")
+    )
     fused_rec.write(fused_dir)
     print(f"Wrote fused model to {fused_dir}")
 

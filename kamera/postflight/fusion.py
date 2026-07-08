@@ -41,6 +41,7 @@ tolerance); the fused geometry comes entirely from the matches.
 """
 
 import bisect
+import functools
 import os
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -689,8 +690,15 @@ def fuse_ir_into_eo(
 
     ir_folder_camera = _folder_camera(ir_rec)
     camera_ids: Dict[str, int] = {}
-    snap_cache: Dict[int, Optional[_SnapIndex]] = {}
-    img_cache: Dict[int, Optional[np.ndarray]] = {}
+
+    @functools.lru_cache(maxsize=None)
+    def _snap(eo_id: int) -> Optional[_SnapIndex]:
+        return snap_index(eo_rec.images[eo_id], eo_rec)
+
+    @functools.lru_cache(maxsize=16)  # full-res EO images are large
+    def _gray(eo_id: int) -> Optional[np.ndarray]:
+        folder, _, base = eo_images[eo_id].rpartition("/")
+        return _load_gray(os.path.join(image_dirs[folder], base))
 
     def eo_partner(eo_id: int) -> Optional[EoPartner]:
         name = eo_images[eo_id]
@@ -701,14 +709,7 @@ def fuse_ir_into_eo(
             t = times[KameraImageName.parse(base).base_name]
         except (ValueError, KeyError):
             return None
-        if eo_id not in snap_cache:
-            snap_cache[eo_id] = snap_index(eo_rec.images[eo_id], eo_rec)
-        if eo_id not in img_cache:
-            if len(img_cache) > 16:
-                img_cache.clear()
-            img_cache[eo_id] = _load_gray(os.path.join(image_dirs[folder], base))
-        snap = snap_cache[eo_id]
-        img = img_cache[eo_id]
+        snap, img = _snap(eo_id), _gray(eo_id)
         if snap is None or img is None:
             return None
         image = eo_rec.images[eo_id]
