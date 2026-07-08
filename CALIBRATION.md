@@ -17,7 +17,7 @@ flowchart LR
     raw["Raw flight<br/>center/left/right_view<br/>+ meta.json"]
     img0["images0/<br/>colmap_rgb · colmap_ir"]
     out["kamera_models/<br/>*.yaml · rig.json · gifs"]
-    raw -->|"prepare_flight.py"| img0 -->|"calibrate_rig.py"| out
+    raw -->|"stage (automatic)"| img0 -->|"calibrate_rig.py"| out
 ```
 
 <!-- IMAGE: sparse reconstruction / camera frustums over terrain -->
@@ -56,14 +56,14 @@ here** — feature extraction/matching over a full flight is slow on CPU.
 conda activate kamera
 FLIGHT=/Volumes/extreme2tb/TO26Su1_RicesWhale_calibration/fl004
 
-# 1. Stage raw imagery into the images0 layout (symlinks)
-python kamera/postflight/scripts/prepare_flight.py $FLIGHT/images_21deg_N56RF $FLIGHT
-
-# 2. Calibrate: build database, map with INS priors, boresight, export
+# stage (first run, automatic), build database, map with INS priors,
+# boresight, export
 python kamera/postflight/scripts/calibrate_rig.py $FLIGHT
 ```
 
-Outputs land in `$FLIGHT/kamera_models/`.
+Outputs land in `$FLIGHT/kamera_models/`. The raw imagery dir is
+auto-detected under the flight dir; pass `--raw-dir` if a flight holds
+several candidates.
 
 ---
 
@@ -92,11 +92,14 @@ TO26Su1_RicesWhale_calibration_fl004_C_20260704_193924.627932_rgb.jpg
 
 ---
 
-## Step 1 — `prepare_flight.py`: stage into `images0`
+## Step 1 — staging into `images0` (automatic)
 
 The pipeline reads a per-*camera* layout, not the raw per-*view* one.
-This reorganizes it (by symlink; nothing is copied) into per-modality
-groups so SIFT never matches across the EO/IR gap:
+On its first run against a flight, `calibrate_rig.py` reorganizes it
+(by symlink; nothing is copied) into per-modality groups so SIFT never
+matches across the EO/IR gap. The same staging is available standalone
+— useful to inspect the frame selection before committing to a
+calibration run:
 
 ```bash
 python kamera/postflight/scripts/prepare_flight.py <raw_imagery_dir> <flight_dir>
@@ -117,15 +120,15 @@ A group with no imagery simply isn't created (fl004 is RGB, so only
 ### Paring the frame set
 
 Selection keeps synchronized triggers together (all cameras at a kept
-trigger). Flags:
+trigger). Flags (on `calibrate_rig.py` and `prepare_flight.py` alike):
 
 | flag | effect |
 |------|--------|
 | `--spacing METERS` | keep a trigger only after this much 3-D travel |
-| `--every N` | keep every Nth survivor |
 | `--max-frames N` | cap by uniform decimation |
 | `--focal-px F` | report forward overlap; warn if too sparse for SfM |
 | `--copy` | copy instead of symlink |
+| `--every N` | keep every Nth survivor (`prepare_flight.py` only) |
 
 **Don't over-prune.** SfM needs image overlap to triangulate; the
 binding constraint is the *lowest-altitude* pass (smallest footprint).
@@ -301,7 +304,7 @@ IR images directly into the EO model (see the fusion section above).
 - **Reprojection error** (rig JSON) is INS-noise-limited (tens of px at
   long EO focals); a health signal, not the accuracy metric. The
   boresight residual (fractions of a degree) and the gifs are.
-- **Fragmented model / few images** → overlap too low; re-run Step 1
+- **Fragmented model / few images** → overlap too low; restage with `--raw-dir`
   keeping more frames.
 - **Iterating on boresight/export** without re-mapping → `--reuse-aligned`.
 - **`--focal-px`** only affects the printed overlap estimate, nothing

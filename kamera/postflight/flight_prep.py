@@ -28,6 +28,7 @@ from kamera.sensor_models.nav_state import NavStateINSJson
 __all__ = [
     "TriggerFrame",
     "discover_frames",
+    "find_raw_dir",
     "select_by_spacing",
     "modality_group",
     "stage_flight",
@@ -56,6 +57,35 @@ def _channel_word(view_dir: str) -> str:
     """center_view -> center; also tolerates bare center/left/right."""
     base = os.path.basename(view_dir.rstrip("/"))
     return base[: -len("_view")] if base.endswith("_view") else base
+
+
+def _has_view_dirs(path: pathlib.Path) -> bool:
+    # both raw layouts occur in the wild: center_view/... and bare center/...
+    return any(path.glob("*_view")) or any(
+        (path / v).is_dir() for v in ("center", "left", "right")
+    )
+
+
+def find_raw_dir(flight_dir: str | os.PathLike) -> str:
+    """The raw imagery directory of a flight: `flight_dir` itself if it
+    holds the ``*_view`` folders, else the single immediate subdirectory
+    that does. Raises SystemError when none or several qualify (pass the
+    raw dir explicitly in that case)."""
+    flight = pathlib.Path(flight_dir)
+    if _has_view_dirs(flight):
+        return str(flight)
+    candidates = [d for d in flight.iterdir() if d.is_dir() and _has_view_dirs(d)]
+    if len(candidates) == 1:
+        return str(candidates[0])
+    detail = (
+        "none found"
+        if not candidates
+        else "several found: " + ", ".join(d.name for d in candidates)
+    )
+    raise SystemError(
+        f"Could not identify the raw imagery dir under {flight_dir} "
+        f"(a folder containing *_view subdirectories): {detail}."
+    )
 
 
 def discover_frames(

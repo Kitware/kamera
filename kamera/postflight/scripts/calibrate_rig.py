@@ -1,5 +1,12 @@
-"""Calibrate a KAMERA rig from a flight: prior mapping, one boresight
-solve per modality group, and per-camera StandardCamera export.
+"""Calibrate a KAMERA rig from a flight: stage raw imagery (first run),
+prior mapping, one boresight solve per modality group, and per-camera
+StandardCamera export.
+
+On first contact with a flight the raw ``*_view`` imagery is staged
+into the per-modality ``colmap_*/images0`` layout automatically (the
+raw dir is auto-detected, or pass ``--raw-dir``; frame paring flags
+mirror prepare_flight.py, which remains available for staging-only
+runs). Subsequent runs reuse the staged trees untouched.
 
 Each modality group is an independently reconstructed COLMAP workspace
 (EO = rgb+uv under ``colmap_rgb``; IR under ``colmap_ir``, since SIFT
@@ -18,7 +25,7 @@ the warp initialization, and remains the fallback for any IR camera that
 fails to fuse.
 
 Examples:
-    # EO + IR, mapping each workspace fresh
+    # a raw flight, end to end: stage (first run), map, boresight, export
     python calibrate_rig.py /data/fl09_85mm_25_5deg
 
     # reuse existing ENU (sim3-aligned or prior-mapped) models, no remap
@@ -43,6 +50,7 @@ from kamera.postflight.boresight import (
     export_rig_camera_models,
     solve_rig_boresight,
 )
+from kamera.postflight.flight_prep import find_raw_dir, stage_flight
 from kamera.postflight.registration_gifs import write_registration_gifs
 from kamera.postflight.registration_homography import write_registration_homographies
 from kamera.postflight.rig import (
@@ -290,6 +298,38 @@ def main():
     )
     p.add_argument("--no-gifs", action="store_true", help="Skip registration gifs.")
     p.add_argument("--num-gifs", type=int, default=5, help="Gifs per camera.")
+    stage = p.add_argument_group(
+        "staging (automatic when no colmap_* workspace exists yet)"
+    )
+    stage.add_argument(
+        "--raw-dir",
+        default=None,
+        help="Raw imagery dir with the *_view folders; forces (re)staging. "
+        "Default: auto-detected under the flight dir on first run.",
+    )
+    stage.add_argument(
+        "--prefix",
+        default=None,
+        help="Camera-folder prefix (default: raw dir name minus 'images_').",
+    )
+    stage.add_argument(
+        "--spacing",
+        type=float,
+        default=0.0,
+        help="Keep a trigger only after this many meters of travel (0 = all).",
+    )
+    stage.add_argument(
+        "--max-frames", type=int, default=None, help="Cap trigger count."
+    )
+    stage.add_argument(
+        "--focal-px",
+        type=float,
+        default=0.0,
+        help="Focal length in px, to report estimated forward overlap.",
+    )
+    stage.add_argument(
+        "--copy", action="store_true", help="Stage copies instead of symlinks."
+    )
     fuse = p.add_argument_group(
         "cross-modal fusion (requires: uv sync --group fusion)"
     )
@@ -371,6 +411,22 @@ def main():
         if args.groups
         else DEFAULT_GROUPS
     )
+
+    # Stage the raw imagery on first contact with a flight (or when
+    # --raw-dir explicitly asks for a restage).
+    if args.raw_dir or not any(
+        os.path.isdir(os.path.join(flight_dir, subdir)) for _, subdir in groups
+    ):
+        raw_dir = args.raw_dir or find_raw_dir(flight_dir)
+        prefix = args.prefix or os.path.basename(
+            raw_dir.rstrip("/")
+        ).removeprefix("images_")
+        print(f"[bold blue]=== Staging {raw_dir} (prefix {prefix}) ===")
+        stage_flight(
+            raw_dir, flight_dir, prefix,
+            spacing_m=args.spacing, max_frames=args.max_frames,
+            copy=args.copy, focal_px=args.focal_px,
+        )
 
     nav = NavStateINSJson(pathlib.Path(flight_dir).rglob("*_meta.json"))
     times = basename_to_time(flight_dir)
