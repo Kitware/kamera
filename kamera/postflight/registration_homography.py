@@ -19,7 +19,7 @@ accuracy metric (use the registration gifs for that).
 
 import json
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import cv2
 import numpy as np
@@ -36,25 +36,40 @@ def _tag(modality: str) -> str:
     return MODALITY_TAG.get(modality, modality.upper())
 
 
-def _pixel_homography(src: StandardCamera, dst: StandardCamera) -> np.ndarray:
-    """3x3 homography mapping a ``src`` pixel to the co-located ``dst`` pixel.
+def pixel_homography(
+    src: StandardCamera,
+    dst: StandardCamera,
+    t_src: float = 0.0,
+    t_dst: float = 0.0,
+    ground_z: Optional[float] = None,
+) -> np.ndarray:
+    """3x3 homography mapping a ``src`` pixel to the ``dst`` pixel seeing
+    the same scene point.
 
-    Sample the ``dst`` image, unproject each pixel to a far ray, project
-    that ray into ``src``, and fit ``src -> dst`` over the pairs that land
-    inside ``src``. Both models are evaluated at the same fixed platform
-    pose, so only their mounts (camera->INS) enter and the result depends
-    on scene geometry only through the shared far-field assumption.
+    Sample the ``dst`` image, unproject each pixel, place the rays on the
+    plane z=``ground_z`` (ENU) — or at far field when ``ground_z`` is
+    None, valid only for co-located same-time views — project into
+    ``src``, and fit ``src -> dst`` over the pairs that land inside
+    ``src``. The times let the platform move between the two exposures.
     """
     x = np.linspace(0, dst.width - 1, max(2, dst.width // 2))
     y = np.linspace(0, dst.height - 1, max(2, dst.height // 2))
     X, Y = np.meshgrid(x, y)
     dst_pts = np.vstack([X.ravel(), Y.ravel()])
 
-    _, ray_dir = dst.unproject(dst_pts, 0)
-    src_pts = src.project(ray_dir * 1e6, 0).astype(np.float64)
+    ray_pos, ray_dir = dst.unproject(dst_pts, t_dst)
+    if ground_z is None:
+        xyz = ray_dir * 1e6
+        forward = np.ones(dst_pts.shape[1], dtype=bool)
+    else:
+        s = (ground_z - ray_pos[2]) / ray_dir[2]
+        forward = s > 0
+        xyz = ray_pos + s * ray_dir
+    src_pts = src.project(xyz, t_src).astype(np.float64)
 
     inside = (
-        (src_pts[0] >= 0)
+        forward
+        & (src_pts[0] >= 0)
         & (src_pts[0] <= src.width)
         & (src_pts[1] >= 0)
         & (src_pts[1] <= src.height)
@@ -101,7 +116,7 @@ def write_registration_homographies(
             if modality == reference_modality:
                 continue
             try:
-                left_to_right = _pixel_homography(ref, model)  # EO -> other
+                left_to_right = pixel_homography(ref, model)  # EO -> other
             except ValueError as e:
                 print(f"[yellow]Station {station} {modality}: {e}; skipping pair.")
                 continue

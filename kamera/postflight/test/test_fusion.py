@@ -36,8 +36,8 @@ from kamera.postflight.fusion import (
     prewarp_eo,
     refine_fused,
     snap_index,
-    warp_homography,
 )
+from kamera.postflight.registration_homography import pixel_homography
 
 ALT = 500.0
 # camera z (optical axis) down, x east: camera -> world (= INS here)
@@ -136,9 +136,9 @@ class FakeMatcher:
 # ---------------------------------------------------------------- geometry
 
 
-def test_warp_homography_roundtrip():
+def test_pixel_homography_roundtrip():
     eo, ir = standard_camera(EO), standard_camera(IR)
-    H = warp_homography(eo, 0.0, ir, 0.0, ground_z=0.0)
+    H = pixel_homography(eo, ir, ground_z=0.0)
     xyz = ground_points(50, seed=1)
     eo_px = eo.project(xyz.T, 0.0)
     ir_px = ir.project(xyz.T, 0.0)
@@ -146,10 +146,10 @@ def test_warp_homography_roundtrip():
     assert np.max(np.linalg.norm(mapped - ir_px.T, axis=1)) < 0.5
 
 
-def test_warp_homography_moving_platform():
+def test_pixel_homography_moving_platform():
     # neighbor-trigger partner: EO exposed 40 m away from the IR trigger
     eo, ir = standard_camera(EO, pos=(40, 10, ALT)), standard_camera(IR)
-    H = warp_homography(eo, 0.0, ir, 0.0, ground_z=0.0)
+    H = pixel_homography(eo, ir, ground_z=0.0)
     xyz = ground_points(50, seed=2)
     eo_px = eo.project(xyz.T, 0.0)
     ir_px = ir.project(xyz.T, 0.0)
@@ -160,16 +160,16 @@ def test_warp_homography_moving_platform():
     assert np.max(np.linalg.norm(mapped - ir_px.T[inside], axis=1)) < 0.5
 
 
-def test_warp_homography_no_overlap():
+def test_pixel_homography_no_overlap():
     eo = standard_camera(EO, pos=(10000, 0, ALT))
     ir = standard_camera(IR)
     with pytest.raises(ValueError):
-        warp_homography(eo, 0.0, ir, 0.0, ground_z=0.0)
+        pixel_homography(eo, ir, ground_z=0.0)
 
 
 def test_prewarp_backmapping():
     eo, ir = standard_camera(EO), standard_camera(IR)
-    H = warp_homography(eo, 0.0, ir, 0.0, ground_z=0.0)
+    H = pixel_homography(eo, ir, ground_z=0.0)
     # smooth intensity field so resampling error stays small
     xx, yy = np.meshgrid(np.arange(EO["width"]), np.arange(EO["height"]))
     eo_img = ((xx / EO["width"] + yy / EO["height"]) * 127).astype(np.uint8)
@@ -466,7 +466,7 @@ def test_match_ir_image_lifts_and_snaps():
     eo_sc, ir_sc = standard_camera(EO), standard_camera(IR)
     eo_image = rec.images[1]
 
-    H = warp_homography(eo_sc, 0.0, ir_sc, 0.0, 0.0)
+    H = pixel_homography(eo_sc, ir_sc, ground_z=0.0)
     eo_px = eo_sc.project(xyz.T, 0.0).T
     warped_px = cv2.perspectiveTransform(eo_px[None], H)[0]
     ir_px = ir_sc.project(xyz.T, 0.0).T
@@ -478,7 +478,7 @@ def test_match_ir_image_lifts_and_snaps():
     kpts1 = np.vstack([ir_px, ir_sc.project(mid_xyz[:, None], 0.0).T])
 
     partner = EoPartner(
-        1, eo_image.name, np.zeros((EO["height"], EO["width"]), np.uint8),
+        np.zeros((EO["height"], EO["width"]), np.uint8),
         0.0, eo_sc, eo_image, rec.cameras[1], snap_index(eo_image, rec),
     )
     ir_img = np.zeros((IR["height"], IR["width"]), np.uint8)
@@ -529,7 +529,7 @@ def test_fuse_ir_into_eo_end_to_end(tmp_path):
         truth,
     )
 
-    H = warp_homography(eo_sc, 0.0, ir_sc, 0.0, 0.0)
+    H = pixel_homography(eo_sc, ir_sc, ground_z=0.0)
     eo_px = eo_sc.project(xyz.T, 0.0).T
     matcher = FakeMatcher(
         cv2.perspectiveTransform(eo_px[None], H)[0],

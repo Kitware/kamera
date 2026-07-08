@@ -171,12 +171,8 @@ def _fuse_groups(
     fused_rec.write(fused_dir)
     print(f"Wrote fused model to {fused_dir}")
 
-    estimate = solve_rig_boresight(fused_rec, nav, times, ref_modality="rgb")
-    sensor_from_rig = derive_sensor_from_rig(fused_rec, ref_modality="rgb")
-    fused_models = export_rig_camera_models(
-        fused_rec, estimate, nav, save_dir,
-        ref_modality="rgb", sensor_from_rig=sensor_from_rig,
-    )
+    fused = _calibrate_group(fused_rec, nav, times, save_dir, "rgb")
+    fused_models = fused["models"]
 
     # QC: how far did direct image evidence move each IR mount from the
     # INS-relayed (two-boresight) solution?
@@ -198,14 +194,13 @@ def _fuse_groups(
         )
     all_models.update(fused_models)
 
-    ref_folder = _order_by_ref(fused_models, "rgb")[0]
     source = (
         f"fused:{args.fuse_matcher} "
         f"(rgb: {eo['source']}; ir: {ir['source']})"
     )
     rig_groups = [
         group_record(
-            "rgb+ir", ref_folder, estimate, source,
+            "rgb+ir", fused["ref_folder"], fused["estimate"], source,
             int(fused_rec.num_reg_images()),
         )
     ]
@@ -217,10 +212,7 @@ def _fuse_groups(
                 int(ir["rec"].num_reg_images()),
             )
         )
-    fused_records = _camera_records(
-        fused_rec, fused_models, sensor_from_rig, ref_folder, times
-    )
-    rig_cameras = list(fused_records.values()) + [
+    rig_cameras = list(fused["camera_records"].values()) + [
         ir["camera_records"][f] for f in fallback
     ]
 
@@ -255,6 +247,27 @@ def _camera_records(rec, models, sensor_from_rig, ref_folder, times):
             num_images=n_imgs,
         )
     return records
+
+
+def _calibrate_group(rec, nav, times, save_dir, ref_modality):
+    """Boresight, rig extrinsics, per-camera yaml export, and rig-JSON
+    camera records for one ENU reconstruction."""
+    estimate = solve_rig_boresight(rec, nav, times, ref_modality=ref_modality)
+    sensor_from_rig = derive_sensor_from_rig(rec, ref_modality=ref_modality)
+    models = export_rig_camera_models(
+        rec, estimate, nav, save_dir,
+        ref_modality=ref_modality, sensor_from_rig=sensor_from_rig,
+    )
+    ref_folder = _order_by_ref(models, ref_modality)[0]
+    return {
+        "estimate": estimate,
+        "sensor_from_rig": sensor_from_rig,
+        "models": models,
+        "ref_folder": ref_folder,
+        "camera_records": _camera_records(
+            rec, models, sensor_from_rig, ref_folder, times
+        ),
+    }
 
 
 def main():
@@ -377,28 +390,12 @@ def main():
             flight_dir, colmap_dir, workspace, nav, args.prior_std, args.reuse_aligned
         )
         identity_rec = identity_rec or rec
-        estimate = solve_rig_boresight(rec, nav, times, ref_modality=ref_modality)
-        sensor_from_rig = derive_sensor_from_rig(rec, ref_modality=ref_modality)
-        models = export_rig_camera_models(
-            rec, estimate, nav, save_dir,
-            ref_modality=ref_modality, sensor_from_rig=sensor_from_rig,
-        )
-        all_models.update(models)
-        for folder in models:
+        group = _calibrate_group(rec, nav, times, save_dir, ref_modality)
+        group.update(rec=rec, source=source)
+        per_group[ref_modality] = group
+        all_models.update(group["models"])
+        for folder in group["models"]:
             image_dirs[folder] = os.path.join(colmap_dir, "images0", folder)
-
-        ref_folder = _order_by_ref(models, ref_modality)[0]
-        per_group[ref_modality] = {
-            "rec": rec,
-            "estimate": estimate,
-            "sensor_from_rig": sensor_from_rig,
-            "models": models,
-            "source": source,
-            "ref_folder": ref_folder,
-            "camera_records": _camera_records(
-                rec, models, sensor_from_rig, ref_folder, times
-            ),
-        }
 
     rig_groups: List[Dict] = [
         group_record(

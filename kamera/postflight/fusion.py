@@ -3,39 +3,28 @@
 The per-group pipeline leaves EO and IR as two independent ENU models
 whose mutual consistency comes only from both boresights referencing the
 same INS -- an INS-attitude-noise-limited link. This module registers
-every IR image directly into the EO model instead, visual-localization
-style, so `derive_sensor_from_rig` and `solve_rig_boresight` can then
-run once on a single multimodal reconstruction:
+every IR image directly into the EO model instead (MINIMA-LoFTR against
+each image's co-located EO partner, pre-warped into the IR view so the
+matcher faces only the modality gap), then re-derives the mounts from
+that single multimodal reconstruction. `fuse_ir_into_eo` orchestrates;
+the per-stage functions carry their own contracts.
 
-1. pick each IR image's EO partner(s): the co-located same-trigger EO
-   image, optionally neighboring triggers of the same station;
-2. warp the EO image into the IR view with a ground-plane homography
-   from the per-group calibrations, so the matcher (MINIMA-LoFTR, see
-   `deep_match.py`) faces only the modality gap, not the ~20x scale gap;
-3. map matched EO pixels back through the (exactly invertible) warp and
-   lift each one to 3D by casting its ray from the EO image's
-   reconstructed pose to the locally interpolated depth of that image's
-   own triangulated points (EO models carry only a few hundred
-   triangulated points per image, far too sparse to snap thousands of
-   dense matches onto directly -- and for colocated cameras a depth
-   error moves the point along the EO ray, which barely changes its
-   bearing from the IR camera, so the rotation this pipeline is after is
-   insensitive to the interpolation);
-4. PnP+RANSAC each IR image into the EO/ENU frame -- for outlier
-   rejection and health stats, NOT for its pose: single-image PnP over
-   near-planar terrain has a strong tilt/lateral-translation ambiguity
-   (degrees of per-image rotation wobble). Instead, all inlier
-   correspondences of all IR images jointly solve one Sim3 aligning the
-   IR reconstruction to the EO reconstruction (`align_ir_to_eo`), so
-   every fused IR pose inherits the IR model's own multi-view relative
-   geometry, globally registered by tens of thousands of cross-modal
-   matches;
-5. insert the posed IR images -- inliers that land within `snap_px` of a
-   triangulated observation become observations of those existing EO 3D
-   points (multimodal tracks) -- and optionally bundle-adjust with the
-   EO poses and intrinsics frozen (off by default; see `fuse_ir_into_eo`).
+Two constraints shape the design:
 
-The warp uses the two-boresight mounts only as an *initialization* (a
+- Matched EO pixels are lifted to 3D at the interpolated depth of the
+  EO image's own triangulated points, not snapped to them -- EO images
+  carry only a few hundred SIFT points, far too sparse for thousands of
+  dense matches. For co-located cameras a depth error moves the point
+  along the EO ray, which barely changes its bearing from the IR
+  camera, so the recovered rotation is insensitive to the interpolation.
+- Per-image PnP is only an outlier filter, never the pose: over
+  near-planar terrain a single image has a strong tilt/translation
+  ambiguity (degrees of rotation wobble). All inlier correspondences
+  jointly solve one Sim3 aligning the IR reconstruction to the EO
+  reconstruction (`align_ir_to_eo`), so every fused pose inherits the
+  IR model's own multi-view relative geometry.
+
+The pre-warp uses the two-boresight mounts only as an initialization (a
 0.27 deg mount error is ~4 IR px of warp offset, well within matcher
 tolerance); the fused geometry comes entirely from the matches.
 """
@@ -44,7 +33,7 @@ import bisect
 import functools
 import os
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import cv2
@@ -59,6 +48,7 @@ from kamera.colmap_processing.camera_models import StandardCamera
 from kamera.postflight.boresight import _folder_camera
 from kamera.postflight.deep_match import to_uint8
 from kamera.postflight.naming import KameraCameraName, KameraImageName
+from kamera.postflight.registration_homography import pixel_homography
 from kamera.postflight.rig import _frame_key
 
 __all__ = [
@@ -75,54 +65,7 @@ __all__ = [
     "prewarp_eo",
     "refine_fused",
     "snap_index",
-    "warp_homography",
 ]
-
-
-def warp_homography(
-    eo_model: StandardCamera,
-    t_eo: float,
-    ir_model: StandardCamera,
-    t_ir: float,
-    ground_z: float,
-) -> np.ndarray:
-    """3x3 homography mapping a full-res EO pixel to the IR pixel seeing
-    the same ground point.
-
-    Sample an IR pixel grid, unproject with the IR model at `t_ir`,
-    intersect the rays with the plane z=`ground_z` (ENU), and project the
-    ground points into the EO model at `t_eo`. Unlike the far-field trick
-    in registration_homography, this stays valid when the two exposures
-    are at different times (neighbor-trigger partners), where the
-    platform has moved between the views.
-    """
-    x = np.linspace(0, ir_model.width - 1, 24)
-    y = np.linspace(0, ir_model.height - 1, 20)
-    X, Y = np.meshgrid(x, y)
-    ir_pts = np.vstack([X.ravel(), Y.ravel()])
-
-    ray_pos, ray_dir = ir_model.unproject(ir_pts, t_ir)
-    s = (ground_z - ray_pos[2]) / ray_dir[2]
-    forward = s > 0
-    xyz = ray_pos + s * ray_dir
-    eo_pts = eo_model.project(xyz, t_eo)
-
-    inside = (
-        forward
-        & (eo_pts[0] >= 0)
-        & (eo_pts[0] <= eo_model.width)
-        & (eo_pts[1] >= 0)
-        & (eo_pts[1] <= eo_model.height)
-    )
-    if inside.sum() < 8:
-        raise ValueError(
-            f"only {int(inside.sum())} IR grid points land inside the EO "
-            "image; views do not overlap enough for a warp"
-        )
-    h, _ = cv2.findHomography(eo_pts[:, inside].T, ir_pts[:, inside].T, 0)
-    if h is None:
-        raise ValueError("homography fit failed")
-    return h
 
 
 def prewarp_eo(
@@ -303,8 +246,6 @@ def _key_dist(a: str, b: str) -> float:
 class EoPartner:
     """One EO image prepared for matching against an IR image."""
 
-    image_id: int
-    name: str
     img: np.ndarray  # grayscale uint8, full resolution
     time: float
     model: StandardCamera  # exported mount model, for the warp
@@ -328,11 +269,10 @@ class IrMatchResult:
     point3D_ids: np.ndarray  # [N] uint64, INVALID_POINT3D where unsnapped
     snap_dist: np.ndarray  # [N]
     num_raw: int = 0
-    per_partner: List[dict] = field(default_factory=list)
 
-    @property
-    def num_snapped(self) -> int:
-        return int((self.point3D_ids != INVALID_POINT3D).sum())
+
+def _concat(rows: List[np.ndarray], empty_shape: Tuple, dtype="float64") -> np.ndarray:
+    return np.concatenate(rows) if rows else np.empty(empty_shape, dtype=dtype)
 
 
 def match_ir_image(
@@ -354,20 +294,15 @@ def match_ir_image(
     """
     rows_xy, rows_xyz, rows_pid, rows_dist = [], [], [], []
     num_raw = 0
-    per_partner = []
     ir_u8 = to_uint8(ir_img)
     h, w = ir_u8.shape[:2]
     for p in partners:
-        stats = {"name": p.name, "raw": 0, "lifted": 0, "snapped": 0}
-        per_partner.append(stats)
         try:
-            H = warp_homography(p.model, p.time, ir_model, t_ir, ground_z)
-        except ValueError as e:
-            stats["error"] = str(e)
-            continue
+            H = pixel_homography(p.model, ir_model, p.time, t_ir, ground_z)
+        except ValueError:
+            continue  # views no longer overlap (e.g. turn between triggers)
         warped, H_used = prewarp_eo(p.img, H, (w, h), warp_scale)
         eo_kpts, ir_kpts = matcher.match(warped, ir_u8)
-        stats["raw"] = len(eo_kpts)
         num_raw += len(eo_kpts)
         if not len(eo_kpts):
             continue
@@ -375,33 +310,22 @@ def match_ir_image(
             eo_kpts[None], np.linalg.inv(H_used)
         )[0]
         xyz, valid = lift_eo_pixels(p.camera, p.image, p.snap, eo_px)
-        stats["lifted"] = int(valid.sum())
         dist, idx = p.snap.tree.query(eo_px)
         pid = np.where(
             dist <= snap_px, p.snap.point3D_ids[idx], INVALID_POINT3D
         )
-        stats["snapped"] = int((pid[valid] != INVALID_POINT3D).sum())
         rows_xy.append(ir_kpts[valid])
         rows_xyz.append(xyz[valid])
         rows_pid.append(pid[valid])
         rows_dist.append(dist[valid])
 
-    if rows_xy:
-        result = IrMatchResult(
-            np.concatenate(rows_xy),
-            np.concatenate(rows_xyz),
-            np.concatenate(rows_pid).astype(np.uint64),
-            np.concatenate(rows_dist),
-            num_raw,
-            per_partner,
-        )
-    else:
-        result = IrMatchResult(
-            np.empty((0, 2)), np.empty((0, 3)),
-            np.empty(0, dtype=np.uint64), np.empty(0),
-            num_raw, per_partner,
-        )
-    return result
+    return IrMatchResult(
+        _concat(rows_xy, (0, 2)),
+        _concat(rows_xyz, (0, 3)),
+        _concat(rows_pid, (0,), "uint64"),
+        _concat(rows_dist, (0,)),
+        num_raw,
+    )
 
 
 def pnp_ir_image(
@@ -662,8 +586,9 @@ def fuse_ir_into_eo(
     `run_ba` is off by default: the fused poses come from the joint
     model alignment, and per-image bundle adjustment against the sparse
     multimodal track observations would re-introduce the very per-image
-    tilt wobble the alignment defeats.
+    tilt wobble the alignment defeats. `refine_ir_intrinsics` implies it.
     """
+    run_ba = run_ba or refine_ir_intrinsics
     ground_z = float(
         np.median([p.xyz[2] for p in eo_rec.points3D.values()])
     )
@@ -714,13 +639,11 @@ def fuse_ir_into_eo(
             return None
         image = eo_rec.images[eo_id]
         return EoPartner(
-            eo_id, name, img, t, models[folder],
-            image, eo_rec.cameras[image.camera_id], snap,
+            img, t, models[folder], image, eo_rec.cameras[image.camera_id], snap
         )
 
     skipped = defaultdict(int)
-    matched = []  # (ir_id, name, folder, result, inlier_mask)
-    entries: List[AlignmentEntry] = []
+    matched = []  # (name, folder, result, inlier_mask, alignment_entry)
     per_image: List[dict] = []
     inlier_counts: Dict[str, List[int]] = defaultdict(list)
     for n, ir_id in enumerate(ordered, 1):
@@ -763,15 +686,14 @@ def fuse_ir_into_eo(
             skipped["pnp_failed" if len(result.ir_xy) >= min_inliers else "few_matches"] += 1
             continue
         _, inlier_mask = pnp
-        matched.append((ir_id, name, folder, result, inlier_mask))
-        entries.append(
-            AlignmentEntry(
-                ir_rec.images[ir_id].cam_from_world(),
-                ir_folder_camera[folder],
-                result.ir_xy[inlier_mask],
-                result.xyz[inlier_mask],
-            )
+        entry = AlignmentEntry(
+            ir_rec.images[ir_id].cam_from_world(),
+            ir_folder_camera[folder],
+            result.ir_xy[inlier_mask],
+            result.xyz[inlier_mask],
         )
+        result.xyz = np.empty((0, 3))  # the entry holds the inlier copy
+        matched.append((name, folder, result, inlier_mask, entry))
         inlier_counts[folder].append(int(inlier_mask.sum()))
         if n % 25 == 0 or n == len(ordered):
             print(
@@ -782,10 +704,8 @@ def fuse_ir_into_eo(
     fused_ids: List[int] = []
     align_stats = None
     if matched:
-        R, t, s, align_stats = align_ir_to_eo(entries)
-        for (ir_id, name, folder, result, inlier_mask), entry in zip(
-            matched, entries
-        ):
+        R, t, s, align_stats = align_ir_to_eo([m[4] for m in matched])
+        for name, folder, result, inlier_mask, entry in matched:
             pose = aligned_ir_pose(entry.cam_from_irworld, R, t, s)
             if folder not in camera_ids:
                 camera_ids[folder] = add_ir_camera(
