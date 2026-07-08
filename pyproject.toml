@@ -38,6 +38,14 @@ dev = [
     "ipdb>=0.13.13",
     "pytest>=8.0",
 ]
+# Cross-modal (EO<->IR) deep matching for calibrate_rig.py --fuse. vismatch
+# wraps MINIMA-LoFTR and auto-downloads its weights on first use; it pulls in
+# torch, so it is opt-in:  uv sync --group fusion
+fusion = [
+    "vismatch>=1.2.1",
+    # MINIMA's vendored LoFTR imports kornia.utils.grid, removed in kornia 0.8.
+    "kornia>=0.7.3,<0.8",
+]
 
 [tool.uv]
 # Build .venv on the conda python, never a uv-managed one, so
