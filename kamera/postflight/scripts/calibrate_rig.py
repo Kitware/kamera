@@ -4,9 +4,9 @@ StandardCamera export.
 
 On first contact with a flight the raw ``*_view`` imagery is staged
 into the per-modality ``colmap_*/images0`` layout automatically (the
-raw dir is auto-detected, or pass ``--raw-dir``; frame paring flags
-mirror prepare_flight.py, which remains available for staging-only
-runs). Subsequent runs reuse the staged trees untouched.
+raw dir is auto-detected, or pass ``--raw-dir``). Every trigger is
+staged -- frame density is a flight-planning concern. Subsequent runs
+reuse the staged trees untouched.
 
 Each modality group is an independently reconstructed COLMAP workspace
 (EO = rgb+uv under ``colmap_rgb``; IR under ``colmap_ir``, since SIFT
@@ -313,21 +313,6 @@ def main():
         help="Camera-folder prefix (default: raw dir name minus 'images_').",
     )
     stage.add_argument(
-        "--spacing",
-        type=float,
-        default=0.0,
-        help="Keep a trigger only after this many meters of travel (0 = all).",
-    )
-    stage.add_argument(
-        "--max-frames", type=int, default=None, help="Cap trigger count."
-    )
-    stage.add_argument(
-        "--focal-px",
-        type=float,
-        default=0.0,
-        help="Focal length in px, to report estimated forward overlap.",
-    )
-    stage.add_argument(
         "--copy", action="store_true", help="Stage copies instead of symlinks."
     )
     fuse = p.add_argument_group(
@@ -422,11 +407,7 @@ def main():
             raw_dir.rstrip("/")
         ).removeprefix("images_")
         print(f"[bold blue]=== Staging {raw_dir} (prefix {prefix}) ===")
-        stage_flight(
-            raw_dir, flight_dir, prefix,
-            spacing_m=args.spacing, max_frames=args.max_frames,
-            copy=args.copy, focal_px=args.focal_px,
-        )
+        stage_flight(raw_dir, flight_dir, prefix, copy=args.copy)
 
     nav = NavStateINSJson(pathlib.Path(flight_dir).rglob("*_meta.json"))
     times = basename_to_time(flight_dir)

@@ -117,31 +117,14 @@ fl004/
 A group with no imagery simply isn't created (fl004 is RGB, so only
 `colmap_rgb`).
 
-### Paring the frame set
-
-Selection keeps synchronized triggers together (all cameras at a kept
-trigger). Flags (on `calibrate_rig.py` and `prepare_flight.py` alike):
-
-| flag | effect |
-|------|--------|
-| `--spacing METERS` | keep a trigger only after this much 3-D travel |
-| `--max-frames N` | cap by uniform decimation |
-| `--focal-px F` | report forward overlap; warn if too sparse for SfM |
-| `--copy` | copy instead of symlink |
-| `--every N` | keep every Nth survivor (`prepare_flight.py` only) |
-
-**Don't over-prune.** SfM needs image overlap to triangulate; the
-binding constraint is the *lowest-altitude* pass (smallest footprint).
-If lowest-altitude overlap drops below ~40%, the model fragments — pass
-`--focal-px` to watch it.
+Every trigger with a nav time is staged (`--copy` copies instead of
+symlinking). Frame density and overlap are set during the flight, not
+pared here — SfM needs enough overlap to triangulate, and the binding
+constraint is the *lowest-altitude* pass (smallest footprint).
 
 <!-- IMAGE: fl004 trajectory colored by altitude, three figure-8 bands -->
 ![fl004 trajectory](assets/calibration/fl004_trajectory.png)
 *fl004 — three figure-8 blocks at ~565/435/275 m. All calibration, no transit.*
-
-> **fl004:** at its native ~44 m spacing, overlap is already ~55%, so
-> **keep every frame** (the default). The compute saving here is the
-> spatial matcher in Step 2, not dropping frames.
 
 ---
 
@@ -304,8 +287,7 @@ IR images directly into the EO model (see the fusion section above).
 - **Reprojection error** (rig JSON) is INS-noise-limited (tens of px at
   long EO focals); a health signal, not the accuracy metric. The
   boresight residual (fractions of a degree) and the gifs are.
-- **Fragmented model / few images** → overlap too low; restage with `--raw-dir`
-  keeping more frames.
+- **Fragmented model / few images** → the flight was too sparse (not
+  enough overlap, especially on the lowest-altitude pass); a
+  calibration flight needs dense, overlapping coverage by design.
 - **Iterating on boresight/export** without re-mapping → `--reuse-aligned`.
-- **`--focal-px`** only affects the printed overlap estimate, nothing
-  else (~15360 for these EO cameras).

@@ -1220,10 +1220,10 @@ def debayer_dir_tree(src_dir, dst_dir=None, num_threads=1):
 
 def stretch_constrast(img):
     img = img.astype(np.float32)
-    img -= np.percentile(img.ravel(), 0.1)
+    img -= np.percentile(img.ravel(), 1)
     img[img < 0] = 0
-    img /= np.percentile(img.ravel(), 99.9) / 255
-    img[img > 225] = 255
+    img /= np.percentile(img.ravel(), 99) / 255
+    img[img > 255] = 255
     img = np.round(img).astype(np.uint8)
 
     clahe = cv2.createCLAHE(clipLimit=1, tileGridSize=(5, 5))
