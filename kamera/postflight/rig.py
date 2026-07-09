@@ -26,6 +26,7 @@ directly instead.
 import json
 import os
 import pathlib
+import shutil
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
@@ -374,6 +375,11 @@ def run_rig_mapping(
     priors, giving an arbitrary-gauge model; it is only a fast sanity
     check, never the ENU source for calibration.
     """
+    # Mapping always starts over, so clear the numbered submodels of any
+    # previous run -- a stale sparse/3 next to a fresh sparse/0-2 would
+    # misrepresent this run's output.
+    if os.path.isdir(output_path):
+        shutil.rmtree(output_path)
     os.makedirs(output_path, exist_ok=True)
     if mapper == "global":
         options = pycolmap.GlobalPipelineOptions()

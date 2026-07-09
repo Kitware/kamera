@@ -1,12 +1,13 @@
-"""Calibrate a KAMERA rig from a flight: stage raw imagery (first run),
-prior mapping, one boresight solve per modality group, and per-camera
+"""Calibrate a KAMERA rig from a flight: stage raw imagery, prior
+mapping, one boresight solve per modality group, and per-camera
 StandardCamera export.
 
-On first contact with a flight the raw ``*_view`` imagery is staged
-into the per-modality ``colmap_*/images0`` layout automatically (the
-raw dir is auto-detected, or pass ``--raw-dir``). Every trigger is
-staged -- frame density is a flight-planning concern. Subsequent runs
-reuse the staged trees untouched.
+The raw ``*_view`` imagery is staged into the per-modality
+``colmap_*/images0`` layout automatically whenever the raw dir is
+locatable (auto-detected, or pass ``--raw-dir``); already-staged
+entries are skipped, so reruns verify and heal the trees rather than
+rebuild them. Every trigger is staged -- frame density is a
+flight-planning concern.
 
 Each modality group is an independently reconstructed COLMAP workspace
 (EO = rgb+uv under ``colmap_rgb``; IR under ``colmap_ir``, since SIFT
@@ -25,7 +26,7 @@ the warp initialization, and remains the fallback for any IR camera that
 fails to fuse.
 
 Examples:
-    # a raw flight, end to end: stage (first run), map, boresight, export
+    # a raw flight, end to end: stage, map, boresight, export
     python calibrate_rig.py /data/fl09_85mm_25_5deg
 
     # reuse existing ENU (sim3-aligned or prior-mapped) models, no remap
@@ -99,6 +100,7 @@ def _resolve_model(
     nav: NavStateINSJson,
     prior_std: float,
     reuse_aligned: bool,
+    force_rebuild: bool = False,
 ) -> Tuple["pycolmap.Reconstruction", str]:
     """Get an ENU reconstruction for a group: reuse an existing aligned
     model if asked, else prior-map the workspace database. Returns
@@ -114,17 +116,19 @@ def _resolve_model(
     dst_db = os.path.join(workspace, "database.db")
     image_path = os.path.join(colmap_dir, "images0")
     src_db = os.path.join(colmap_dir, "database.db")
-    source = "prior-mapped"
-    if not os.path.exists(dst_db):
-        if os.path.exists(src_db):
-            # reuse a database already feature-extracted + matched
-            print(f"Copying database into {dst_db}")
-            shutil.copyfile(src_db, dst_db)
-            source = "prior-mapped (existing database)"
-        else:
-            # from scratch: extract features and match from images0
-            build_colmap_database(dst_db, image_path, flight_dir, nav, prior_std)
-            source = "prior-mapped (extracted + spatial-matched)"
+    if force_rebuild and os.path.exists(dst_db):
+        print(f"Removing {dst_db} (--force-rebuild).")
+        os.remove(dst_db)
+    source = "prior-mapped (extracted + spatial-matched)"
+    if not force_rebuild and not os.path.exists(dst_db) and os.path.exists(src_db):
+        # seed from a database already feature-extracted + matched
+        print(f"Copying database into {dst_db}")
+        shutil.copyfile(src_db, dst_db)
+        source = "prior-mapped (existing database)"
+    # Always runs: extraction skips images that already have features and
+    # matching skips already-matched pairs, so a database left partial by
+    # a crash resumes here instead of being trusted as complete.
+    build_colmap_database(dst_db, image_path, flight_dir, nav, prior_std)
     db = pycolmap.Database.open(dst_db)
     try:
         write_pose_priors(db, flight_dir, nav, position_std=prior_std)
@@ -290,6 +294,12 @@ def main():
         "re-mapping (the boresight is gauge-independent).",
     )
     p.add_argument(
+        "--force-rebuild",
+        action="store_true",
+        help="Delete each workspace database and re-extract/match from "
+        "scratch instead of resuming it.",
+    )
+    p.add_argument(
         "--groups",
         nargs="+",
         default=None,
@@ -299,7 +309,7 @@ def main():
     p.add_argument("--no-gifs", action="store_true", help="Skip registration gifs.")
     p.add_argument("--num-gifs", type=int, default=5, help="Gifs per camera.")
     stage = p.add_argument_group(
-        "staging (automatic when no colmap_* workspace exists yet)"
+        "staging (automatic whenever the raw imagery dir is locatable)"
     )
     stage.add_argument(
         "--raw-dir",
@@ -397,12 +407,22 @@ def main():
         else DEFAULT_GROUPS
     )
 
-    # Stage the raw imagery on first contact with a flight (or when
-    # --raw-dir explicitly asks for a restage).
-    if args.raw_dir or not any(
-        os.path.isdir(os.path.join(flight_dir, subdir)) for _, subdir in groups
-    ):
-        raw_dir = args.raw_dir or find_raw_dir(flight_dir)
+    # Stage whenever the raw imagery is locatable. Staging skips entries
+    # that are already correct, so this is a cheap no-op on a fully
+    # staged flight but heals one left partial by a crash. Flights whose
+    # raw dir has since moved away run off their staged trees.
+    raw_dir = args.raw_dir
+    if raw_dir is None:
+        try:
+            raw_dir = find_raw_dir(flight_dir)
+        except SystemError as err:
+            if not any(
+                os.path.isdir(os.path.join(flight_dir, subdir))
+                for _, subdir in groups
+            ):
+                raise
+            print(f"[yellow]Using existing staged trees ({err})")
+    if raw_dir is not None:
         prefix = args.prefix or os.path.basename(
             raw_dir.rstrip("/")
         ).removeprefix("images_")
@@ -424,7 +444,13 @@ def main():
         print(f"\n[bold blue]=== Calibrating {ref_modality} group ({subdir}) ===")
         workspace = os.path.join(flight_dir, f"colmap_rig_{ref_modality}")
         rec, source = _resolve_model(
-            flight_dir, colmap_dir, workspace, nav, args.prior_std, args.reuse_aligned
+            flight_dir,
+            colmap_dir,
+            workspace,
+            nav,
+            args.prior_std,
+            args.reuse_aligned,
+            args.force_rebuild,
         )
         identity_rec = identity_rec or rec
         group = _calibrate_group(rec, nav, times, save_dir, ref_modality)

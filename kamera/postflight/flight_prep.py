@@ -15,6 +15,7 @@ concern, not something this pipeline second-guesses.
 
 import os
 import pathlib
+import shutil
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
@@ -166,13 +167,26 @@ def stage_flight(
             )
             os.makedirs(dst_dir, exist_ok=True)
             dst = os.path.join(dst_dir, os.path.basename(src))
-            if os.path.lexists(dst):
-                os.remove(dst)
-            if copy:
-                import shutil
-
-                shutil.copyfile(src, dst)
-            else:
-                os.symlink(os.path.abspath(src), dst)
+            src_abs = os.path.abspath(src)
+            if not _staged_ok(src_abs, dst, copy):
+                if os.path.lexists(dst):
+                    os.remove(dst)
+                if copy:
+                    shutil.copyfile(src, dst)
+                else:
+                    os.symlink(src_abs, dst)
             counts[camera_folder] += 1
     return dict(counts)
+
+
+def _staged_ok(src: str, dst: str, copy: bool) -> bool:
+    """Whether dst already stages src -- a symlink pointing at it, or for
+    copies a regular file of the same size (a mid-copy crash leaves a
+    shorter one). Lets restaging skip completed entries."""
+    if copy:
+        return (
+            os.path.isfile(dst)
+            and not os.path.islink(dst)
+            and os.path.getsize(dst) == os.path.getsize(src)
+        )
+    return os.path.islink(dst) and os.readlink(dst) == src
