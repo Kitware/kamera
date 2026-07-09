@@ -184,7 +184,10 @@ def _fuse_groups(
     fused_rec.write(fused_dir)
     print(f"Wrote fused model to {fused_dir}")
 
-    fused = _calibrate_group(fused_rec, nav, times, save_dir, "rgb")
+    fused = _calibrate_group(
+        fused_rec, nav, times, save_dir, "rgb",
+        use_lever_arm=not args.no_lever_arm,
+    )
     fused_models = fused["models"]
 
     # QC: how far did direct image evidence move each IR mount from the
@@ -265,7 +268,7 @@ def _camera_records(rec, models, sensor_from_rig, ref_folder, times):
     return records
 
 
-def _calibrate_group(rec, nav, times, save_dir, ref_modality):
+def _calibrate_group(rec, nav, times, save_dir, ref_modality, use_lever_arm=True):
     """Boresight, rig extrinsics, per-camera yaml export, and rig-JSON
     camera records for one ENU reconstruction."""
     estimate = solve_rig_boresight(rec, nav, times, ref_modality=ref_modality)
@@ -273,6 +276,7 @@ def _calibrate_group(rec, nav, times, save_dir, ref_modality):
     models = export_rig_camera_models(
         rec, estimate, nav, save_dir,
         ref_modality=ref_modality, sensor_from_rig=sensor_from_rig,
+        use_lever_arm=use_lever_arm,
     )
     ref_folder = _order_by_ref(models, ref_modality)[0]
     return {
@@ -296,6 +300,14 @@ def main():
         action="store_true",
         help="Use each workspace's existing aligned/ model instead of "
         "re-mapping (the boresight is gauge-independent).",
+    )
+    p.add_argument(
+        "--no-lever-arm",
+        action="store_true",
+        help="Export mounts with a zero lever arm instead of the estimated "
+        "INS->rig offset. Use on single-heading flights, where a body-frame "
+        "lever arm is indistinguishable from a rigid model shift and the "
+        "estimate cannot be trusted.",
     )
     p.add_argument(
         "--force-rebuild",
@@ -457,7 +469,10 @@ def main():
             args.force_rebuild,
         )
         identity_rec = identity_rec or rec
-        group = _calibrate_group(rec, nav, times, save_dir, ref_modality)
+        group = _calibrate_group(
+            rec, nav, times, save_dir, ref_modality,
+            use_lever_arm=not args.no_lever_arm,
+        )
         group.update(rec=rec, source=source)
         per_group[ref_modality] = group
         all_models.update(group["models"])
