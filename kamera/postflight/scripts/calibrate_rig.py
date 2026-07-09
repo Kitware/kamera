@@ -54,6 +54,7 @@ from kamera.postflight.boresight import (
 from kamera.postflight.flight_prep import find_raw_dir, stage_flight
 from kamera.postflight.registration_gifs import write_registration_gifs
 from kamera.postflight.registration_homography import write_registration_homographies
+from kamera.postflight.error_report import write_error_report
 from kamera.postflight.rig import (
     _order_by_ref,
     basename_to_time,
@@ -210,6 +211,9 @@ def _fuse_groups(
         f"fused:{args.fuse_matcher} "
         f"(rgb: {eo['source']}; ir: {ir['source']})"
     )
+    # register the fused solve so the error report covers it too
+    fused.update(rec=fused_rec, source=source)
+    per_group["rgb+ir"] = fused
     rig_groups = [
         group_record(
             "rgb+ir", fused["ref_folder"], fused["estimate"], source,
@@ -495,6 +499,15 @@ def main():
         )
         rig_path = write_rig_json(save_dir, rig)
         print(f"Wrote complete rig model: {rig_path}")
+
+    if per_group:
+        report_path = write_error_report(
+            save_dir,
+            os.path.basename(os.path.normpath(flight_dir)),
+            per_group,
+            nav,
+        )
+        print(f"Wrote calibration error report: {report_path}")
 
     if all_models:
         cal_paths = write_registration_homographies(all_models, save_dir)

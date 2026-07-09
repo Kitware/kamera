@@ -18,7 +18,7 @@ build. The reconstruction must share the nav provider's ENU frame.
 """
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -50,6 +50,13 @@ class BoresightEstimate:
     num_frames: int  # frames used (inliers)
     num_rejected: int  # frames rejected as outliers
     residuals_deg: np.ndarray  # per-inlier-frame angular residual
+    # Every per-frame sample, pre-outlier-rejection, so error_report.py
+    # can re-derive the residual under different assumptions (e.g. a
+    # camera-to-INS time offset). `inlier_mask` marks the frames the
+    # averaged boresight used.
+    sample_times: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    sample_quats: np.ndarray = field(default_factory=lambda: np.zeros((0, 4)))
+    inlier_mask: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=bool))
 
 
 def average_quaternions(
@@ -106,6 +113,7 @@ def solve_rig_boresight(
 
     rel_quats: List[np.ndarray] = []
     lever_arms: List[np.ndarray] = []
+    frame_times: List[float] = []
     for im in reconstruction.images.values():
         if not im.has_pose or im.name.rsplit("/", 1)[0] != ref_folder:
             continue
@@ -120,6 +128,7 @@ def solve_rig_boresight(
         R_rig_from_enu = Rotation.from_quat(rig_from_world.rotation.quat)
         # ins_from_rig = (enu_from_ins)^-1 . (rig_from_enu)^-1
         rel_quats.append((R_enu_from_ins.inv() * R_rig_from_enu.inv()).as_quat())
+        frame_times.append(t)
         # Rig origin in ENU, then expressed in the INS body frame.
         R = rig_from_world.rotation.matrix()
         rig_pos_enu = -R.T @ rig_from_world.translation
@@ -157,6 +166,9 @@ def solve_rig_boresight(
         num_frames=int(inliers.sum()),
         num_rejected=int((~inliers).sum()),
         residuals_deg=residuals,
+        sample_times=np.asarray(frame_times),
+        sample_quats=quats,
+        inlier_mask=inliers,
     )
     print(
         f"Boresight from {estimate.num_frames} frames "
