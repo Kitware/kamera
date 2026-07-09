@@ -259,6 +259,11 @@ def build_colmap_database(
     reader.default_focal_length_factor = 1.2
 
     extraction = pycolmap.FeatureExtractionOptions()
+    # The default (-1) spawns one worker per core, each holding a
+    # full-resolution decode of these very large images -- tens of GB of
+    # transient RAM on a many-core machine. A few feeder threads already
+    # saturate the GPU.
+    extraction.num_threads = min(8, os.cpu_count() or 8)
     extraction.max_image_size = 3200
     extraction.sift.max_num_features = 8192
     extraction.sift.first_octave = -1
