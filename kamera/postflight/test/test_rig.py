@@ -1,7 +1,11 @@
+import json
+from datetime import datetime, timezone
+
 import numpy as np
 import pycolmap
+import pytest
 
-from kamera.postflight.rig import filter_same_trigger_matches
+from kamera.postflight.rig import filter_same_trigger_matches, write_pose_priors
 
 BASE = "test_fl09_{ch}_20200830_{time}_{mod}.jpg"
 
@@ -67,3 +71,55 @@ def test_filter_same_trigger_matches(tmp_path):
 
     # idempotent: nothing left to empty
     assert filter_same_trigger_matches(db_path) == 0
+
+
+class _FakeNav:
+    """pose(t) encodes t in the east coordinate so tests can check which
+    exposure time each prior was interpolated at."""
+
+    def pose(self, t):
+        return [np.array([t, 0.0, 100.0]), np.array([0.0, 0.0, 0.0, 1.0])]
+
+
+def test_write_pose_priors_falls_back_to_filename_time(tmp_path):
+    db_path = tmp_path / "database.db"
+    ids = _make_db(db_path)
+
+    # meta.json only for the first trigger; the second must fall back to
+    # the filename's <date>_<time> (a missing prior aborts COLMAP's
+    # spatial matcher, so every image needs one)
+    meta = "test_fl09_C_20200830_020748.058907_meta.json"
+    (tmp_path / meta).write_text(json.dumps({"evt": {"time": 123.0}}))
+
+    db = pycolmap.Database.open(str(db_path))
+    try:
+        assert write_pose_priors(db, tmp_path, _FakeNav()) == 4
+        by_image = {p.corr_data_id.id: p for p in db.read_all_pose_priors()}
+        t_meta = by_image[ids[0]].position[0]
+        t_name = by_image[ids[2]].position[0]
+    finally:
+        db.close()
+
+    assert t_meta == 123.0
+    expected = (
+        datetime.strptime("20200830_020750.058907", "%Y%m%d_%H%M%S.%f")
+        .replace(tzinfo=timezone.utc)
+        .timestamp()
+    )
+    assert t_name == expected
+
+
+def test_write_pose_priors_rejects_non_finite_position(tmp_path):
+    db_path = tmp_path / "database.db"
+    _make_db(db_path)
+
+    class _NanNav:
+        def pose(self, t):
+            return [np.array([np.nan, 0.0, 0.0]), np.array([0.0, 0.0, 0.0, 1.0])]
+
+    db = pycolmap.Database.open(str(db_path))
+    try:
+        with pytest.raises(ValueError, match="Non-finite"):
+            write_pose_priors(db, tmp_path, _NanNav())
+    finally:
+        db.close()

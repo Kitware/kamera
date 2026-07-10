@@ -102,6 +102,7 @@ def _resolve_model(
     reuse_aligned: bool,
     force_rebuild: bool = False,
     filter_same_trigger: bool = True,
+    rematch: bool = False,
 ) -> Tuple["pycolmap.Reconstruction", str]:
     """Get an ENU reconstruction for a group: reuse an existing model if
     asked (a previous run's mapping in the workspace, or a legacy
@@ -131,6 +132,15 @@ def _resolve_model(
         print(f"Copying database into {dst_db}")
         shutil.copyfile(src_db, dst_db)
         source = "prior-mapped (existing database)"
+    if rematch and os.path.exists(dst_db):
+        # keep the extracted features, redo pairing/matching/verification
+        print(f"Clearing matches in {dst_db} (--rematch).")
+        db = pycolmap.Database.open(dst_db)
+        try:
+            db.clear_matches()
+            db.clear_two_view_geometries()
+        finally:
+            db.close()
     # Always runs: extraction skips images that already have features and
     # matching skips already-matched pairs, so a database left partial by
     # a crash resumes here instead of being trusted as complete.
@@ -324,6 +334,13 @@ def main():
         action="store_true",
         help="Delete each workspace database and re-extract/match from "
         "scratch instead of resuming it.",
+    )
+    p.add_argument(
+        "--rematch",
+        action="store_true",
+        help="Clear each workspace's matches and two-view geometries and "
+        "re-run matching, reusing the already-extracted features "
+        "(a lighter --force-rebuild).",
     )
     p.add_argument(
         "--keep-same-trigger-pairs",
@@ -520,6 +537,7 @@ def main():
             args.reuse_aligned,
             args.force_rebuild,
             filter_same_trigger=not args.keep_same_trigger_pairs,
+            rematch=args.rematch,
         )
         identity_rec = identity_rec or rec
         group = _calibrate_group(

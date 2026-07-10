@@ -29,6 +29,7 @@ import os
 import pathlib
 import shutil
 from collections import defaultdict
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -368,6 +369,15 @@ def write_pose_priors(
     """Write an ENU position prior for every image, interpolated from the
     INS at the exposure time. The ENU origin is the nav provider's
     (lat0, lon0), matching the frame postflight already works in.
+
+    Every image MUST get a finite prior: COLMAP's spatial pair generator
+    sizes its position matrix by image count but only fills rows for
+    images with finite priors, then mean-centers over the whole matrix --
+    one prior-less image poisons every position with uninitialized memory
+    and the matcher aborts. Images whose ``*_meta.json`` is missing fall
+    back to the exposure time embedded in the filename (the archiver
+    renders ``<date>_<time>`` from the event time in UTC, so inverting it
+    recovers the same timestamp).
     """
     if nav_state_provider is None:
         json_glob = pathlib.Path(flight_dir).rglob("*_meta.json")
@@ -376,21 +386,33 @@ def write_pose_priors(
     covariance = np.eye(3) * position_std**2
 
     db.clear_pose_priors()
-    written = skipped = 0
+    written = fallback = 0
     for im in db.read_all_images():
+        name = KameraImageName.parse(im.name)
         try:
-            t = times[KameraImageName.parse(im.name).base_name]
-        except (ValueError, KeyError):
-            skipped += 1
-            continue
+            t = times[name.base_name]
+        except KeyError:
+            fmt = "%Y%m%d_%H%M%S.%f" if "." in name.time else "%Y%m%d_%H%M%S"
+            dt = datetime.strptime(f"{name.date}_{name.time}", fmt)
+            t = dt.replace(tzinfo=timezone.utc).timestamp()
+            fallback += 1
+        position = np.asarray(nav_state_provider.pose(t)[0], dtype=float)
+        if not np.all(np.isfinite(position)):
+            raise ValueError(
+                f"Non-finite INS position {position} for image {im.name} "
+                f"(t={t}); a non-finite prior would crash spatial matching."
+            )
         prior = pycolmap.PosePrior()
         prior.corr_data_id = pycolmap.data_t(_camera_sensor(im.camera_id), im.image_id)
-        prior.position = np.asarray(nav_state_provider.pose(t)[0], dtype=float)
+        prior.position = position
         prior.position_covariance = covariance
         prior.coordinate_system = pycolmap.PosePriorCoordinateSystem.CARTESIAN
         db.write_pose_prior(prior)
         written += 1
-    print(f"Wrote {written} pose priors ({skipped} images without nav times).")
+    print(
+        f"Wrote {written} pose priors "
+        f"({fallback} from filename times; no meta.json)."
+    )
     return written
 
 
