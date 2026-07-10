@@ -23,6 +23,7 @@ are embedded in the basename), so this module writes rigs/frames
 directly instead.
 """
 
+import itertools
 import json
 import os
 import pathlib
@@ -43,6 +44,7 @@ __all__ = [
     "build_colmap_database",
     "configure_rig_and_frames",
     "derive_sensor_from_rig",
+    "filter_same_trigger_matches",
     "write_frames",
     "write_pose_priors",
     "run_rig_mapping",
@@ -240,6 +242,54 @@ def derive_sensor_from_rig(
     return out
 
 
+def filter_same_trigger_matches(database_path: str | os.PathLike) -> int:
+    """Empty the matches between images captured at the same trigger.
+
+    Co-located cameras fire simultaneously, so same-trigger pairs are
+    the strongest matches in the database (same scene, same instant) but
+    have ~zero baseline: their correspondences can never triangulate,
+    and incremental mapping -- which ranks candidate pairs by match
+    count -- keeps initializing and growing through them, fragmenting
+    the reconstruction. The rig geometry these pairs describe is
+    recovered downstream from the per-image poses instead
+    (``derive_sensor_from_rig``), so mapping loses nothing.
+
+    The pairs are overwritten with empty match/geometry entries rather
+    than deleted, so a re-run of the matcher skips them instead of
+    faithfully recreating them. Returns the number of pairs emptied.
+    """
+    empty = np.zeros((0, 2), dtype=np.uint32)
+    emptied = 0
+    db = pycolmap.Database.open(database_path)
+    try:
+        by_trigger: Dict[Tuple[str, str], List[int]] = defaultdict(list)
+        for im in db.read_all_images():
+            try:
+                name = KameraImageName.parse(im.name)
+            except ValueError:
+                continue
+            by_trigger[(name.date, name.time)].append(im.image_id)
+        for ids in by_trigger.values():
+            for id1, id2 in itertools.combinations(sorted(ids), 2):
+                if not db.exists_matches(id1, id2):
+                    continue
+                if len(db.read_matches(id1, id2)) == 0:
+                    continue  # already emptied by a previous run
+                db.delete_matches(id1, id2)
+                db.write_matches(id1, id2, empty)
+                if db.exists_two_view_geometry(id1, id2):
+                    db.delete_two_view_geometry(id1, id2)
+                geom = pycolmap.TwoViewGeometry()
+                geom.inlier_matches = empty
+                db.write_two_view_geometry(id1, id2, geom)
+                emptied += 1
+    finally:
+        db.close()
+    if emptied:
+        print(f"Emptied {emptied} same-trigger (zero-baseline) match pairs.")
+    return emptied
+
+
 def build_colmap_database(
     database_path: str | os.PathLike,
     image_path: str | os.PathLike,
@@ -247,6 +297,7 @@ def build_colmap_database(
     nav_state_provider: Optional[NavStateINSJson] = None,
     position_std: float = 2.0,
     matcher: str = "spatial",
+    filter_same_trigger: bool = True,
 ) -> None:
     """Extract SIFT features and match images0 into a COLMAP database,
     replacing the docker feature_extractor/matcher scripts.
@@ -254,6 +305,9 @@ def build_colmap_database(
     One OPENCV camera per image folder, KAMERA-tuned SIFT settings, and
     -- for the default spatial matcher -- INS position priors so pairs
     are restricted to spatial neighbors instead of the full O(N^2) set.
+    Same-trigger pairs are then emptied (see
+    ``filter_same_trigger_matches``) unless `filter_same_trigger` is
+    False.
     """
     reader = pycolmap.ImageReaderOptions()
     reader.camera_model = "OPENCV"
@@ -300,6 +354,9 @@ def build_colmap_database(
         pycolmap.match_exhaustive(database_path)
     else:
         raise ValueError(f"Unknown matcher '{matcher}'.")
+
+    if filter_same_trigger:
+        filter_same_trigger_matches(database_path)
 
 
 def write_pose_priors(

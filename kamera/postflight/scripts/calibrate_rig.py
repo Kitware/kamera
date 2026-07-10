@@ -101,6 +101,7 @@ def _resolve_model(
     prior_std: float,
     reuse_aligned: bool,
     force_rebuild: bool = False,
+    filter_same_trigger: bool = True,
 ) -> Tuple["pycolmap.Reconstruction", str]:
     """Get an ENU reconstruction for a group: reuse an existing model if
     asked (a previous run's mapping in the workspace, or a legacy
@@ -133,7 +134,10 @@ def _resolve_model(
     # Always runs: extraction skips images that already have features and
     # matching skips already-matched pairs, so a database left partial by
     # a crash resumes here instead of being trusted as complete.
-    build_colmap_database(dst_db, image_path, flight_dir, nav, prior_std)
+    build_colmap_database(
+        dst_db, image_path, flight_dir, nav, prior_std,
+        filter_same_trigger=filter_same_trigger,
+    )
     db = pycolmap.Database.open(dst_db)
     try:
         write_pose_priors(db, flight_dir, nav, position_std=prior_std)
@@ -322,6 +326,15 @@ def main():
         "scratch instead of resuming it.",
     )
     p.add_argument(
+        "--keep-same-trigger-pairs",
+        action="store_true",
+        help="Keep matches between images of the same trigger instead of "
+        "emptying them before mapping. They are ~zero-baseline (co-located "
+        "cameras firing together), cannot triangulate, and fragment "
+        "incremental mapping; the rig geometry they describe is recovered "
+        "from the per-image poses instead.",
+    )
+    p.add_argument(
         "--groups",
         nargs="+",
         default=None,
@@ -506,6 +519,7 @@ def main():
             args.prior_std,
             args.reuse_aligned,
             args.force_rebuild,
+            filter_same_trigger=not args.keep_same_trigger_pairs,
         )
         identity_rec = identity_rec or rec
         group = _calibrate_group(
