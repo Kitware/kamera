@@ -346,7 +346,17 @@ def build_colmap_database(
         finally:
             db.close()
         pairing = pycolmap.SpatialPairingOptions()
-        pairing.max_num_neighbors = 50
+        # Budget neighbors in triggers, not images: each trigger drops
+        # several co-located images at the same INS position (and the
+        # same-trigger pairs are emptied afterward), so with ~6 images
+        # per trigger 200 neighbors spans ~±15 triggers along-track plus
+        # cross-line loop closures.
+        pairing.max_num_neighbors = 200
+        # The pair loop stops at the first neighbor beyond max_distance
+        # (default 100 m, min_num_neighbors 0), which cuts the graph to
+        # an adjacent-trigger chain with no cross-line closures and
+        # fragments the model. Let the neighbor count do the limiting.
+        pairing.max_distance = float("inf")
         pairing.ignore_z = False
         print("Spatial matching on INS priors.")
         pycolmap.match_spatial(database_path, pairing_options=pairing)
