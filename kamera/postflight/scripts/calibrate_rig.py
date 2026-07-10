@@ -598,7 +598,7 @@ def main():
     if all_models:
         cal_paths = write_registration_homographies(all_models, save_dir)
         if cal_paths:
-            print(f"Wrote {len(cal_paths)} DIVE calibration.json files:")
+            print(f"Wrote {len(cal_paths)} registration homography files:")
             for path in cal_paths:
                 print(f"  {path}")
 

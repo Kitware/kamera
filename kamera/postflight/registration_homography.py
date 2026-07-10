@@ -1,20 +1,23 @@
-"""Per-station registration homographies for DIVE.
+"""Per-camera registration homographies.
 
-DIVE visualizes co-located cameras by warping one modality onto another
-with a plane homography. This module derives that homography for each
-non-reference camera at a station straight from the calibrated camera
-models -- no scene points or hand-clicked correspondences. It writes one
-``calibration.json`` per station in the DIVE format:
+Co-located cameras are visualized (e.g. in DIVE) by warping one modality
+onto another with a plane homography. This module derives that homography
+for each non-reference camera at a station straight from the calibrated
+camera models -- no scene points or hand-clicked correspondences. It
+writes one ``<camera>_to_<reference_camera>_registration.json`` per
+non-reference camera (matching the registration gif naming):
 
-    {"version": 1, "pairs": [{"left": "EO", "right": "IR",
-                              "leftToRight": <3x3>, "rightToLeft": <3x3>,
-                              "transformType": "homography"}, ...]}
+    {"camera": "<camera folder>",
+     "reference_camera": "<reference camera folder>",
+     "camera_to_reference": <3x3>,
+     "reference_to_camera": <3x3>}
 
-``left`` is always the reference modality (EO); ``leftToRight`` maps a
-reference-image pixel to the other camera's pixel, and ``rightToLeft`` is
-its inverse. The cameras are rigidly co-located, so the pixel map is a
-homography to within a fraction of a pixel; DIVE renders it, it is not an
-accuracy metric (use the registration gifs for that).
+``camera_to_reference`` maps a pixel in the camera's image to the
+reference (EO) camera's pixel seeing the same scene point, and
+``reference_to_camera`` is its inverse. The cameras are rigidly
+co-located, so the pixel map is a homography to within a fraction of a
+pixel; it is for rendering, not an accuracy metric (use the registration
+gifs for that).
 """
 
 import json
@@ -27,13 +30,6 @@ from rich import print
 
 from kamera.colmap_processing.camera_models import StandardCamera
 from kamera.postflight.naming import KameraCameraName
-
-# Modality string -> the tag DIVE labels the camera with.
-MODALITY_TAG = {"rgb": "EO", "ir": "IR", "uv": "UV"}
-
-
-def _tag(modality: str) -> str:
-    return MODALITY_TAG.get(modality, modality.upper())
 
 
 def pixel_homography(
@@ -89,54 +85,53 @@ def write_registration_homographies(
     save_dir: str,
     reference_modality: str = "rgb",
 ) -> List[str]:
-    """Write one DIVE ``calibration.json`` per station under ``save_dir``.
+    """Write one ``<camera>_to_<reference_camera>_registration.json`` per
+    non-reference camera under ``save_dir``.
 
     ``models`` maps camera folder (e.g. ``21deg_N56RF_center_rgb``) to its
-    StandardCamera. Cameras are grouped by station; each station's file
-    pairs its reference (EO) camera with every other co-located modality.
-    Returns the paths written.
+    StandardCamera. Cameras are grouped by station; each non-reference
+    camera gets its own file with the homography to its station's
+    reference (EO) camera. Returns the paths written.
     """
-    by_station: Dict[str, Dict[str, StandardCamera]] = {}
-    for folder, model in models.items():
+    by_station: Dict[str, Dict[str, str]] = {}
+    for folder in models:
         cam = KameraCameraName.parse(folder)
-        by_station.setdefault(cam.channel, {})[cam.modality] = model
+        by_station.setdefault(cam.channel, {})[cam.modality] = folder
 
     written: List[str] = []
-    for station, mods in sorted(by_station.items()):
-        ref = mods.get(reference_modality)
-        if ref is None:
+    for station, folders in sorted(by_station.items()):
+        ref_folder = folders.get(reference_modality)
+        if ref_folder is None:
             print(
                 f"[yellow]Station {station}: no {reference_modality} reference "
-                "camera; skipping calibration.json."
+                "camera; skipping registration homographies."
             )
             continue
+        ref = models[ref_folder]
 
-        pairs = []
-        for modality, model in sorted(mods.items()):
+        for modality, folder in sorted(folders.items()):
             if modality == reference_modality:
                 continue
             try:
-                left_to_right = pixel_homography(ref, model)  # EO -> other
+                cam_to_ref = pixel_homography(models[folder], ref)
             except ValueError as e:
                 print(f"[yellow]Station {station} {modality}: {e}; skipping pair.")
                 continue
-            pairs.append(
-                {
-                    "left": _tag(reference_modality),
-                    "right": _tag(modality),
-                    "leftToRight": left_to_right.tolist(),
-                    "rightToLeft": np.linalg.inv(left_to_right).tolist(),
-                    "transformType": "homography",
-                }
+            os.makedirs(save_dir, exist_ok=True)
+            out_path = os.path.join(
+                save_dir, f"{folder}_to_{ref_folder}_registration.json"
             )
-
-        if not pairs:
-            continue
-        out_dir = os.path.join(save_dir, station)
-        os.makedirs(out_dir, exist_ok=True)
-        out_path = os.path.join(out_dir, "calibration.json")
-        with open(out_path, "w") as f:
-            json.dump({"version": 1, "pairs": pairs}, f, indent=2)
-        written.append(out_path)
+            with open(out_path, "w") as f:
+                json.dump(
+                    {
+                        "camera": folder,
+                        "reference_camera": ref_folder,
+                        "camera_to_reference": cam_to_ref.tolist(),
+                        "reference_to_camera": np.linalg.inv(cam_to_ref).tolist(),
+                    },
+                    f,
+                    indent=2,
+                )
+            written.append(out_path)
 
     return written
