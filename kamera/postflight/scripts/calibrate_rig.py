@@ -341,6 +341,31 @@ def main():
     stage.add_argument(
         "--copy", action="store_true", help="Stage copies instead of symlinks."
     )
+    stage.add_argument(
+        "--stretch-modalities",
+        nargs="*",
+        default=["ir"],
+        metavar="MODALITY",
+        help="Modalities staged as contrast-stretched 8-bit copies instead "
+        "of symlinks (16-bit IR has no usable SIFT contrast as captured). "
+        "Pass no values to disable. Already-stretched files are kept, so "
+        "changing the stretch bounds requires deleting the staged folders.",
+    )
+    stage.add_argument(
+        "--stretch-low-pct",
+        type=float,
+        default=1.0,
+        help="Low stretch bound as a percentile.",
+    )
+    stage.add_argument(
+        "--stretch-top-px",
+        type=int,
+        default=30,
+        help="High stretch bound as a pixel count: the value of the Nth-"
+        "brightest pixel. Count-based so a tiny warm target (a seal is a "
+        "few dozen IR pixels) sets the top of the range instead of "
+        "vanishing above a percentile.",
+    )
     fuse = p.add_argument_group(
         "cross-modal fusion (requires: uv sync --group fusion)"
     )
@@ -443,7 +468,15 @@ def main():
             raw_dir.rstrip("/")
         ).removeprefix("images_")
         print(f"[bold blue]=== Staging {raw_dir} (prefix {prefix}) ===")
-        stage_flight(raw_dir, flight_dir, prefix, copy=args.copy)
+        stage_flight(
+            raw_dir,
+            flight_dir,
+            prefix,
+            copy=args.copy,
+            stretch_modalities=args.stretch_modalities,
+            stretch_low_pct=args.stretch_low_pct,
+            stretch_top_px=args.stretch_top_px,
+        )
 
     nav = NavStateINSJson(pathlib.Path(flight_dir).rglob("*_meta.json"))
     times = basename_to_time(flight_dir)

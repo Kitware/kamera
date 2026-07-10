@@ -11,6 +11,11 @@ ir -> colmap_ir) so SIFT never tries to match across the EO/IR gap.
 Every trigger event with a nav time is staged, as symlinks by default
 so nothing is duplicated on disk; frame density is a flight-planning
 concern, not something this pipeline second-guesses.
+
+IR is the exception to symlinking: its 16-bit imagery spans a sliver of
+the sensor range, so SIFT finds nothing in the file as captured. IR
+images are staged as contrast-stretched 8-bit copies instead (see
+``stretch_to_uint8``).
 """
 
 import os
@@ -18,8 +23,10 @@ import pathlib
 import shutil
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
+from typing import Dict, List, Sequence, Tuple
 
+import cv2
+import numpy as np
 from rich import print
 
 from kamera.postflight.naming import KameraImageName
@@ -30,6 +37,7 @@ __all__ = [
     "find_raw_dir",
     "modality_group",
     "stage_flight",
+    "stretch_to_uint8",
 ]
 
 # EO modalities share a reconstruction; IR is on its own.
@@ -141,14 +149,65 @@ def _basename_times(flight_dir: str | os.PathLike) -> Dict[str, float]:
     return out
 
 
+def stretch_to_uint8(
+    img: np.ndarray, low_pct: float = 1.0, top_px: int = 30
+) -> np.ndarray:
+    """An 8-bit contrast stretch mapping [the ``low_pct`` percentile,
+    the value of the ``top_px``-th brightest pixel] onto [0, 255].
+
+    The high bound is count-based, not a percentile: the warm targets
+    these surveys care about (a seal on cold ice) can be a few dozen
+    pixels, far below any workable percentile, so a percentile top
+    either lumps them in with thousands of background pixels or lets a
+    single hot pixel set the range.
+    """
+    if img.ndim == 3:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    flat = img.ravel()
+    k = int(np.clip(top_px, 1, flat.size))
+    lo = float(np.percentile(flat, low_pct))
+    hi = float(np.partition(flat, flat.size - k)[flat.size - k])
+    if hi <= lo:  # (near-)constant image
+        lo = float(flat.min())
+        hi = max(float(flat.max()), lo + 1)
+    out = (img.astype(np.float32) - lo) * (255.0 / (hi - lo))
+    return np.clip(np.rint(out), 0, 255).astype(np.uint8)
+
+
+def _stage_stretched(src: str, dst: str, low_pct: float, top_px: int) -> None:
+    """Stage src at dst as a stretched 8-bit copy, atomically. An
+    existing regular file is trusted -- a crashed write never leaves one
+    -- so restretching with new parameters requires removing the staged
+    camera folders first."""
+    if os.path.isfile(dst) and not os.path.islink(dst):
+        return
+    if os.path.lexists(dst):
+        os.remove(dst)  # e.g. a symlink staged before stretching existed
+    img = cv2.imread(src, cv2.IMREAD_UNCHANGED)
+    if img is None:
+        raise SystemError(f"Could not read image {src}.")
+    stretched = stretch_to_uint8(img, low_pct, top_px)
+    tmp = f"{dst}.tmp{os.path.splitext(dst)[1]}"
+    if not cv2.imwrite(tmp, stretched):
+        raise SystemError(f"Could not write {tmp}.")
+    os.replace(tmp, dst)
+
+
 def stage_flight(
     raw_dir: str | os.PathLike,
     flight_dir: str | os.PathLike,
     prefix: str,
     copy: bool = False,
+    stretch_modalities: Sequence[str] = ("ir",),
+    stretch_low_pct: float = 1.0,
+    stretch_top_px: int = 30,
 ) -> Dict[str, int]:
     """Discover and stage every trigger frame into per-modality-group
     ``<flight_dir>/colmap_<group>/images0/<camera>/`` trees.
+
+    Modalities in `stretch_modalities` are written as contrast-stretched
+    8-bit copies (never symlinks; see ``stretch_to_uint8``) so feature
+    extraction sees usable contrast.
 
     Returns a map of camera folder -> number of images staged.
     """
@@ -168,7 +227,9 @@ def stage_flight(
             os.makedirs(dst_dir, exist_ok=True)
             dst = os.path.join(dst_dir, os.path.basename(src))
             src_abs = os.path.abspath(src)
-            if not _staged_ok(src_abs, dst, copy):
+            if modality in stretch_modalities:
+                _stage_stretched(src_abs, dst, stretch_low_pct, stretch_top_px)
+            elif not _staged_ok(src_abs, dst, copy):
                 if os.path.lexists(dst):
                     os.remove(dst)
                 if copy:
