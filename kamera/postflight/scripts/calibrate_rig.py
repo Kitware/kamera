@@ -77,14 +77,13 @@ from kamera.sensor_models.nav_state import NavStateINSJson
 DEFAULT_GROUPS = [("rgb", "colmap_rgb"), ("ir", "colmap_ir")]
 
 
-def _largest_aligned_model(colmap_dir: str) -> Optional[str]:
-    """Path to the aligned/ submodel with the most images, if any."""
-    aligned = os.path.join(colmap_dir, "aligned")
-    if not os.path.isdir(aligned):
+def _largest_submodel(parent: str) -> Optional[str]:
+    """Path to the submodel under `parent` with the most images, if any."""
+    if not os.path.isdir(parent):
         return None
     best, best_n = None, -1
-    for name in os.listdir(aligned):
-        path = os.path.join(aligned, name)
+    for name in os.listdir(parent):
+        path = os.path.join(parent, name)
         try:
             n = int(pycolmap.Reconstruction(path).num_images())
         except Exception:
@@ -103,15 +102,20 @@ def _resolve_model(
     reuse_aligned: bool,
     force_rebuild: bool = False,
 ) -> Tuple["pycolmap.Reconstruction", str]:
-    """Get an ENU reconstruction for a group: reuse an existing aligned
-    model if asked, else prior-map the workspace database. Returns
+    """Get an ENU reconstruction for a group: reuse an existing model if
+    asked (a previous run's mapping in the workspace, or a legacy
+    aligned/ model), else prior-map the workspace database. Returns
     (reconstruction, source_label) for provenance."""
-    if reuse_aligned:
-        model = _largest_aligned_model(colmap_dir)
-        if model is not None:
-            print(f"Reusing aligned model {model}")
-            return pycolmap.Reconstruction(model), f"reused-aligned:{model}"
-        print(f"[yellow]No aligned model under {colmap_dir}; mapping instead.")
+    if reuse_aligned and not force_rebuild:
+        for label, parent in (
+            ("reused-sparse", os.path.join(workspace, "sparse")),
+            ("reused-aligned", os.path.join(colmap_dir, "aligned")),
+        ):
+            model = _largest_submodel(parent)
+            if model is not None:
+                print(f"Reusing model {model}")
+                return pycolmap.Reconstruction(model), f"{label}:{model}"
+        print(f"[yellow]No reusable model for {colmap_dir}; mapping instead.")
 
     os.makedirs(workspace, exist_ok=True)
     dst_db = os.path.join(workspace, "database.db")
@@ -298,8 +302,10 @@ def main():
     p.add_argument(
         "--reuse-aligned",
         action="store_true",
-        help="Use each workspace's existing aligned/ model instead of "
-        "re-mapping (the boresight is gauge-independent).",
+        help="Reuse each group's existing model instead of re-mapping: a "
+        "previous run's colmap_rig_*/sparse output, else a legacy aligned/ "
+        "model (the boresight is gauge-independent). Overridden by "
+        "--force-rebuild.",
     )
     p.add_argument(
         "--no-lever-arm",
