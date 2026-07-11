@@ -3,21 +3,26 @@
 Co-located cameras are visualized (e.g. in DIVE) by warping one modality
 onto another with a plane homography. This module derives that homography
 for each non-reference camera at a station straight from the calibrated
-camera models -- no scene points or hand-clicked correspondences. It
-writes one ``<camera>_to_<reference_camera>_registration.json`` per
-non-reference camera (matching the registration gif naming):
+camera models -- no scene points or hand-clicked correspondences -- and
+writes one DIVE camera-registration file per station
+(``<station>_registration.json``):
 
-    {"camera": "<camera folder>",
-     "reference_camera": "<reference camera folder>",
-     "camera_to_reference": <3x3>,
-     "reference_to_camera": <3x3>}
+    {"type": "dive-camera-registration",
+     "version": 1,
+     "source": {"model": "kamera-v3", "flight": "<flight>"},
+     "pairs": [{"left": "eo", "right": "ir",
+                "points": [[xl, yl, xr, yr], ...],
+                "leftToRight": <3x3>, "rightToLeft": <3x3>,
+                "transformType": "homography"}, ...]}
 
-``camera_to_reference`` maps a pixel in the camera's image to the
-reference (EO) camera's pixel seeing the same scene point, and
-``reference_to_camera`` is its inverse. The cameras are rigidly
-co-located, so the pixel map is a homography to within a fraction of a
-pixel; it is for rendering, not an accuracy metric (use the registration
-gifs for that).
+``left`` is always the station's reference camera under its DIVE name
+(rgb -> "eo"), and ``leftToRight`` maps a left pixel to the right
+camera's pixel seeing the same scene point. ``points`` are exact
+correspondences under the homography, sampled on a grid over the right
+image, so a consumer can refit its own transform type. The cameras are
+rigidly co-located, so the pixel map is a homography to within a
+fraction of a pixel; it is for rendering, not an accuracy metric (use
+the registration gifs for that).
 """
 
 import json
@@ -80,17 +85,40 @@ def pixel_homography(
     return h
 
 
+# DIVE's camera names where they differ from KAMERA modality names.
+_DIVE_CAMERA_NAMES = {"rgb": "eo"}
+
+
+def _grid_correspondences(
+    cam_to_ref: np.ndarray, width: int, height: int, n: int = 3
+) -> List[List[float]]:
+    """Exact [x_left, y_left, x_right, y_right] correspondences under the
+    homography, on an ``n x n`` grid over the right (non-reference) image.
+    The right footprint sits inside the reference view for co-located
+    KAMERA stations, so gridding the right image keeps both ends in frame.
+    """
+    x = np.linspace(0, width - 1, n)
+    y = np.linspace(0, height - 1, n)
+    X, Y = np.meshgrid(x, y)
+    right = np.vstack([X.ravel(), Y.ravel(), np.ones(X.size)])
+    left = cam_to_ref @ right
+    left = left[:2] / left[2]
+    return np.round(np.vstack([left, right[:2]]).T, 2).tolist()
+
+
 def write_registration_homographies(
     models: Dict[str, StandardCamera],
     save_dir: str,
     reference_modality: str = "rgb",
+    flight: str = "",
+    source_model: str = "kamera-v3",
 ) -> List[str]:
-    """Write one ``<camera>_to_<reference_camera>_registration.json`` per
-    non-reference camera under ``save_dir``.
+    """Write one DIVE camera-registration json per station under
+    ``save_dir`` (``<station>_registration.json``).
 
     ``models`` maps camera folder (e.g. ``21deg_N56RF_center_rgb``) to its
-    StandardCamera. Cameras are grouped by station; each non-reference
-    camera gets its own file with the homography to its station's
+    StandardCamera. Cameras are grouped by station; each station's file
+    holds one ``pairs`` entry per non-reference camera, left = the
     reference (EO) camera. Returns the paths written.
     """
     by_station: Dict[str, Dict[str, str]] = {}
@@ -108,7 +136,9 @@ def write_registration_homographies(
             )
             continue
         ref = models[ref_folder]
+        left = _DIVE_CAMERA_NAMES.get(reference_modality, reference_modality)
 
+        pairs = []
         for modality, folder in sorted(folders.items()):
             if modality == reference_modality:
                 continue
@@ -117,21 +147,39 @@ def write_registration_homographies(
             except ValueError as e:
                 print(f"[yellow]Station {station} {modality}: {e}; skipping pair.")
                 continue
-            os.makedirs(save_dir, exist_ok=True)
-            out_path = os.path.join(
-                save_dir, f"{folder}_to_{ref_folder}_registration.json"
+            ref_to_cam = np.linalg.inv(cam_to_ref)
+            ref_to_cam /= ref_to_cam[2, 2]
+            cam = models[folder]
+            pairs.append(
+                {
+                    "left": left,
+                    "right": _DIVE_CAMERA_NAMES.get(modality, modality),
+                    "points": _grid_correspondences(
+                        cam_to_ref, cam.width, cam.height
+                    ),
+                    "leftToRight": ref_to_cam.tolist(),
+                    "rightToLeft": cam_to_ref.tolist(),
+                    "transformType": "homography",
+                }
             )
-            with open(out_path, "w") as f:
-                json.dump(
-                    {
-                        "camera": folder,
-                        "reference_camera": ref_folder,
-                        "camera_to_reference": cam_to_ref.tolist(),
-                        "reference_to_camera": np.linalg.inv(cam_to_ref).tolist(),
-                    },
-                    f,
-                    indent=2,
-                )
-            written.append(out_path)
+        if not pairs:
+            continue
+
+        name = KameraCameraName.parse(ref_folder)
+        station_slug = f"{name.prefix}_{name.channel}" if name.prefix else name.channel
+        os.makedirs(save_dir, exist_ok=True)
+        out_path = os.path.join(save_dir, f"{station_slug}_registration.json")
+        with open(out_path, "w") as f:
+            json.dump(
+                {
+                    "type": "dive-camera-registration",
+                    "version": 1,
+                    "source": {"model": source_model, "flight": flight},
+                    "pairs": pairs,
+                },
+                f,
+                indent=2,
+            )
+        written.append(out_path)
 
     return written

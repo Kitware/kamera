@@ -596,7 +596,11 @@ def main():
         print(f"Wrote calibration error report: {report_path}")
 
     if all_models:
-        cal_paths = write_registration_homographies(all_models, save_dir)
+        cal_paths = write_registration_homographies(
+            all_models,
+            save_dir,
+            flight=os.path.basename(os.path.normpath(flight_dir)),
+        )
         if cal_paths:
             print(f"Wrote {len(cal_paths)} registration homography files:")
             for path in cal_paths:
