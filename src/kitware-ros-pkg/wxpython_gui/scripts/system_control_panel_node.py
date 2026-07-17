@@ -1,38 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
-ckwg +31
-Copyright 2017 by Kitware, Inc.
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
- * Redistributions of source code must retain the above copyright notice,
-   this list of conditions and the following disclaimer.
-
- * Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
- * Neither name of Kitware, Inc. nor the names of any contributors may be used
-   to endorse or promote products derived from this software without specific
-   prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS''
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-==============================================================================
-
 Library handling imagery simulation.
-
 """
 from __future__ import division, print_function
 import os
@@ -42,6 +10,7 @@ import rospy
 
 from wxpython_gui.system_control_panel.gui import MainFrame
 from roskv.impl.redis_envoy import RedisEnvoy
+from roskv.util import filter_hosts_by_system
 
 
 def main():
@@ -49,26 +18,25 @@ def main():
     name_space = rospy.get_namespace()
 
     envoy = RedisEnvoy(os.environ["REDIS_HOST"], client_name=node_name)
-    channels = envoy.get("/sys/channels").keys()
-    hosts = envoy.get("/sys/arch/hosts")
+    enabled = envoy.get("/sys/enabled")
+    all_hosts = envoy.get("/sys/arch/hosts")
+    hosts = {h: all_hosts[h] for h in filter_hosts_by_system(all_hosts.keys())}
 
     topic_names = {}
 
-    # From the camera driver itself
+    # From the camera driver itself (RGB) and view_server sync node (IR/UV).
+    # Topic keys must match gui.MainFrame, which gates panels on /sys/enabled,
+    # not /sys/channels (channels drives driver launch, not GUI visibility).
     for host, d in hosts.items():
-        channel = "rgb"
         fov = d["fov"]
-        topic_names["_".join([fov, channel, "srv", "topic"])] = "/".join(
-            ["", host, channel, "%s_view_service" % channel, "get_image_view"]
-        )
-
-    # From the view_server sync node
-    for host, d in hosts.items():
-        channel = "rgb"
-        for channel in channels:
-            if channel == "rgb":
+        fov_enabled = enabled.get(fov, {})
+        if fov_enabled.get("rgb"):
+            topic_names["_".join([fov, "rgb", "srv", "topic"])] = "/".join(
+                ["", host, "rgb", "rgb_view_service", "get_image_view"]
+            )
+        for channel in ("ir", "uv"):
+            if not fov_enabled.get(channel):
                 continue
-            fov = d["fov"]
             topic_names["_".join([fov, channel, "srv", "topic"])] = "/".join(
                 ["", host, "synched", "%s_view_service" % channel]
             )

@@ -1,5 +1,6 @@
 import wx
 import wxpython_gui.system_control_panel.form_builder_output_hot_key_list as form_builder_output_hot_key_list
+from wxpython_gui.system_control_panel.gui_utils import unclip_static_text
 
 
 class HotKeyList(form_builder_output_hot_key_list.MainFrame):
@@ -13,7 +14,9 @@ class HotKeyList(form_builder_output_hot_key_list.MainFrame):
         # ----------------------------- Hot Keys -----------------------------
         entries = [wx.AcceleratorEntry() for _ in range(1)]
 
-        random_id = wx.NewId()
+        random_id = wx.NewIdRef()
+        # Retain the id ref so its reserved id isn't recycled.
+        self._accel_id = random_id
         self.Bind(wx.EVT_MENU, self.on_cancel, id=random_id)
         entries[0].Set(wx.ACCEL_NORMAL, wx.WXK_ESCAPE, random_id)
 
@@ -23,6 +26,8 @@ class HotKeyList(form_builder_output_hot_key_list.MainFrame):
 
         self.Show()
         self.SetMinSize(self.GetSize())
+        # Recompute enlarged title fonts so they are not clipped under Phoenix.
+        wx.CallAfter(unclip_static_text, self)
 
     def on_cancel(self, event=None):
         """When the 'Cancel' button is selected.

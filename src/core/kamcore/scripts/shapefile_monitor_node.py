@@ -14,8 +14,8 @@ import numpy as np
 import rospy
 
 from custom_msgs.msg import GSOF_INS
-
-HOSTS = []
+from roskv.impl.redis_envoy import RedisEnvoy
+from roskv.util import filter_hosts_by_system
 
 # Location of the geod file.
 KAM_DIR = os.environ["DOCKER_KAMERA_DIR"]
@@ -31,6 +31,13 @@ class ShapefileMonitor(object):
     def __init__(self):
         self.redis = redis.Redis(os.environ["REDIS_HOST"],
                                 client_name="shapefile_monitor")
+        envoy = RedisEnvoy(os.environ["REDIS_HOST"],
+                           client_name="shapefile_monitor")
+        self.hosts = filter_hosts_by_system(
+            envoy.get("/sys/arch/hosts").keys()
+        )
+        print("hosts: ")
+        print(self.hosts)
         self.cnt = 0
         self.use_archive_region = False
         self.archive_region = None
@@ -138,13 +145,13 @@ class ShapefileMonitor(object):
                 print("is_archiving = 0")
                 self.redis.set("/sys/arch/is_archiving", 0)
                 # make sure nucmode is set to automatic by default
-                for host in HOSTS:
+                for host in self.hosts:
                     topic = "/".join(["", 'sys', 'requested_geni_params',
                                 host, "ir", "CorrectionAutoEnabled"])
                     self.redis.set(topic, "1")
         else:
             # make sure nucmode is set to automatic by default
-            for host in HOSTS:
+            for host in self.hosts:
                 topic = "/".join(["", 'sys', 'requested_geni_params',
                             host, "ir", "CorrectionAutoEnabled"])
                 self.redis.set(topic, "1")
@@ -153,7 +160,7 @@ class ShapefileMonitor(object):
         if not allow_ir_nuc and is_archiving:
             print("Turning off NUCing when archiving.")
             # Make sure NUCing is turned off
-            for host in HOSTS:
+            for host in self.hosts:
                 topic = "/".join(["", 'sys', 'requested_geni_params',
                             host, "ir", "CorrectionAutoEnabled"])
                 self.redis.set(topic, "0")

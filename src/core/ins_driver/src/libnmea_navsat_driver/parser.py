@@ -38,10 +38,7 @@ import math
 import logging
 # for doctests and debugging
 from pprint import pprint
-from vprint import aprint
-from vprint.loggers import get_verbose_logger
-# logger = logging.getLogger('rosout')
-logger = get_verbose_logger('rosout2', verbose=True)
+logger = logging.getLogger('rosout2')
 
 
 def safe_float(field):

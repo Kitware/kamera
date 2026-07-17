@@ -1,0 +1,7 @@
+[Desktop Entry]
+Exec=gnome-terminal -e '/home/user/kw/kamera/provision/start_stop/kamera_power.sh reboot right'
+Name=reboot_right
+Terminal=true
+Type=Application
+Icon=system-reboot
+Name[en_US]=Reboot\nRight System

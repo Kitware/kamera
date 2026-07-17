@@ -1,0 +1,9 @@
+{
+    "insecure-registries": ["center0nayak:5000"],
+    "runtimes": {
+        "nvidia": {
+            "args": [],
+            "path": "nvidia-container-runtime"
+        }
+    }
+}

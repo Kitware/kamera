@@ -417,8 +417,11 @@ def parse_gsof_stream(buf):
 
 def maybe_gsof(buf):
     # type: (bytes) -> bool
-    if struct.unpack("B", buf[0:1])[0] == START_TX:
-        return True
+    try:
+        if struct.unpack('B', buf[0:1])[0] == START_TX:
+            return True
+    except:
+        pass
     return False
 
 

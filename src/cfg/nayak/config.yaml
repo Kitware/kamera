@@ -23,22 +23,22 @@ arch:
   min_frame_rate: 0.1
   base_template: "{base}/{project}/fl{flight}/{sys_cfg}/"
   template: "{base}/{project}/fl{flight}/{sys_cfg}/{cam_fov}_view/{project}_fl{flight}_{cf}_{time}_{mode}.{ext}"
-  max_exposure_ms: 100
+  max_exposure_ms: 125
   ext_rgb: jpg
   ext_uv: jpg
   ext_ir: tif
   ext_evt: json
   ext_ins: json
   hosts:
-    cas0:
+    center0nayak:
       fov: center
       idx: 0
       enabled: true
-    cas1:
+    left1nayak:
       fov: left
       idx: 1
       enabled: true
-    cas2:
+    right2nayak:
       fov: right
       idx: 2
       enabled: true
@@ -50,15 +50,13 @@ nas_mnt: "/mnt/flight_data"
 local_ssd_mnt: "/mnt/data"
 kamera_dir: "/home/user/kw/kamera"
 gui_cfg_dir: "/home/user/.config/kamera/gui"
-master_host: cas0
-redis_host: cas0
+master_host: center0nayak
+redis_host: center0nayak
 verbosity: 9
 max_mpix: 200000 # 0.2e6
 
 channels:
     rgb: 0
-    ir: 1
-    uv: 2
 interfaces:
   # map channels to ethernet interface names
   # this is gonna usurp the locations mapping
@@ -83,17 +81,17 @@ locations:
 
 enabled:
   center:
-    ir: true
     rgb: true
-    uv: true
+    ir: false
+    uv: false
   left:
-    ir: true
     rgb: true
-    uv: true
+    ir: false
+    uv: false
   right:
-    ir: true
     rgb: true
-    uv: true
+    ir: false
+    uv: false
 
 # This is configuration information for each physical device
 # `ir_n0` is a DEV_ID. This is an abstract label and has no absolute correlation

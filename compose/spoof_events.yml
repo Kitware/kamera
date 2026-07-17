@@ -1,10 +1,10 @@
 ---
 ## Bring up the core nodes (aside from roscore)
-version: '3.7'
 services:
   spoof_events:
     container_name: spoof_events
-    image: kitware/kamera:core
+    image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     devices:
       - "${PULSE_TTY}:${PULSE_TTY}"

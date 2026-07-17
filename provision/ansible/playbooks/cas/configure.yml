@@ -9,13 +9,13 @@
         git:
           repo: "git@github.com:Kitware/kamera.git"
           dest: "{{ kamera_dir }}"
-          version: main
+          version: develop
           recursive: True
           accept_hostkey: True
           update: True
           force: True
 
-      - name: Set redis configuration
+      - name: "Set redis configuration to {{ kamera_dir }}/src/cfg/{{ config_dir }}redis.conf"
         become: True
         when: redis_host
         copy:
@@ -30,9 +30,20 @@
         service: name=redis-server state=restarted enabled=yes
 
         # Sets all system-wide parameters (except for REDIS_HOST)
-      - name: Set Redis defaults
+      - name: Seed Redis defaults
         when: redis_host
-        shell: cat "{{ kamera_dir }}/src/cfg/redis/{{ config_dir }}_system_config.conf" | xargs -n 2 bash -c 'redis-cli -h {{ inventory_hostname }} set $0 $1'
+        command: >
+          python3 {{ kamera_dir }}/scripts/seed_redis.py
+            --redis-host {{ inventory_hostname }}
+            --config {{ kamera_dir }}/src/cfg/{{ config_dir }}/default_system_state.json
+
+      - name: Seed Redis debug defaults
+        when: redis_host
+        command: >
+          python3 {{ kamera_dir }}/scripts/seed_redis.py
+            --redis-host {{ inventory_hostname }}
+            --prefix /debug
+            --config {{ kamera_dir }}/src/cfg/debug_defaults.json
 
       - name: Set up supervisor trampoline
         become: True
@@ -68,6 +79,18 @@
           path: ~/.config/kamera
           state: directory
           mode: '0755'
+
+      - name: Create ~/kw/SYSTEM_NAME if it does not exist
+        file:
+          path: ~/kw/SYSTEM_NAME
+          state: touch
+          mode: '0755'
+
+      - name: Insert system name into ~/kw/SYSTEM_NAME
+        copy:
+          dest: ~/kw/SYSTEM_NAME
+          content: |
+            {{ config_dir }}
 
       - name: Create repo dir symlink
         file:
@@ -113,7 +136,7 @@
         become: True
         lineinfile:
           path: /etc/fstab
-          line: kamera_nas:/volume1/kamera/flight_data {{ data_dir }} nfs auto,nofail,noatime,nolock,intr,tcp,actimeo=1800   0   0
+          line: kamera_nas:/volume1/kamera/flight_data {{ data_dir }} nfs vers=3,auto,nofail,noatime,nolock,intr,tcp,actimeo=1800   0   0
           state: present
           insertbefore: EOF
 
@@ -140,6 +163,19 @@
           remote_src: true
           dest: /etc/chrony/chrony.conf
           owner: root
+
+      - name: Place docker daemon config.
+        become: True
+        when: leader or follower or gui
+        copy:
+          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/docker-daemon.json"
+          remote_src: true
+          dest: /etc/docker/daemon.json
+          owner: root
+
+      - name: Docker restart
+        become: true
+        service: name=docker state=restarted enabled=yes
 
       - name: Place tmux config.
         become: True
@@ -171,43 +207,22 @@
           remote_src: true
           dest: /home/user/.bash_aliases
 
-      - name: Disable timesyncd on subsystems.
-        become: True
-        when: follower or leader or gui
-        shell: sudo systemctl disable systemd-timesyncd
+      - name: Install start/stop desktop shortcuts
+        when: leader
+        command: bash {{ kamera_dir }}/provision/start_stop/install_desktop_shortcuts.sh
+
+      - name: Symlink NAS mount to Desktop
+        when: leader
+        file:
+          src: "{{ data_dir }}"
+          dest: "/home/{{ ansible_user }}/Desktop/NAS"
+          state: link
+          force: true
 
       - name: Disable sleep state on subsystems.
         become: True
         when: follower or leader or gui
         shell: sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
-
-      - name: Create ~/.local/bin if it does not exist
-        when: gui
-        file:
-          path: ~/.local/bin
-          state: directory
-          mode: '0755'
-
-      - name: Create ~/.tmuxinator if it does not exist
-        file:
-          path: ~/.tmuxinator
-          state: directory
-          mode: '0755'
-
-      - name: Create bootstrap symlink
-        file:
-          src: "{{ kamera_dir }}/src/run_scripts/bootstrap_app.sh"
-          dest: ~/.config/kamera/repo_dir.bash
-          owner: "{{ ansible_user }}"
-          state: link
-
-      - name: Create kamera_run symlink
-        when: gui
-        file:
-          src: "{{ kamera_dir }}/src/run_scripts/newstartup/kamera_run.sh"
-          dest: ~/.local/bin/kamera_run
-          owner: "{{ ansible_user }}"
-          state: link
 
       - name: Create udev rule for mcc_daq
         become: True

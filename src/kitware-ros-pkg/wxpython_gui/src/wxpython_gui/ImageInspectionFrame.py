@@ -2,6 +2,7 @@ import wx
 import wxpython_gui.system_control_panel.form_builder_output_imagery_inspection as form_builder_output_imagery_inspection
 from wxpython_gui.FullAndZoomView import FullAndZoomView
 from wxpython_gui.cfg import SYS_CFG
+from wxpython_gui.system_control_panel.gui_utils import unclip_static_text
 
 
 class ImageInspectionFrame(form_builder_output_imagery_inspection.MainFrame):
@@ -37,6 +38,11 @@ class ImageInspectionFrame(form_builder_output_imagery_inspection.MainFrame):
 
         ir_contrast_strength = SYS_CFG["ir_contrast_strength"]
         self.ir_contrast_strength_txt_ctrl.SetValue(str(ir_contrast_strength))
+        # The server applies a fixed detector-matching IR stretch and ignores
+        # contrast_strength, so grey out this control to avoid misleading.
+        self.ir_contrast_strength_txt_ctrl.Disable()
+        self.m_staticText71.Disable()
+        self.m_staticText71.SetLabel("IR Contrast Stretch Strength (n/a)")
 
         for i in range(self.image_stream_combo_box.GetCount()):
             if stream == self.image_stream_combo_box.GetString(i):
@@ -44,6 +50,9 @@ class ImageInspectionFrame(form_builder_output_imagery_inspection.MainFrame):
                 wx.CallAfter(self.on_select_stream, None)
 
         self.Bind(wx.EVT_CLOSE, self.when_closed)
+
+        # Recompute enlarged title fonts so they are not clipped under Phoenix.
+        wx.CallAfter(unclip_static_text, self)
 
     def on_select_stream(self, event=None):
         if self.full_view_rp is not None:
@@ -85,8 +94,8 @@ class ImageInspectionFrame(form_builder_output_imagery_inspection.MainFrame):
 
     def on_ir_contrast_strength(self, event=None):
         try:
-            SYS_CFG["ir_contrast_strength"] = float(
-                    self.ir_contrast_strength_txt_ctrl.GetValue())
+            SYS_CFG["ir_contrast_strength"] = int(float(
+                    self.ir_contrast_strength_txt_ctrl.GetValue()))
         except ValueError:
             pass
 

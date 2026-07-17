@@ -1,0 +1,11 @@
+# Binary deps (GDAL, pycolmap) with no reliable cross-platform wheels.
+# `make install` layers the rest on top; see README.md for setup.
+name: kamera
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.10,<3.14  # make install builds .venv on whichever version the env has
+  - gdal>=3.10
+  - pycolmap>=4.1  # COLMAP 3.14 bindings; postflight calibration is tested against 4.1
+  - pip
+  - uv

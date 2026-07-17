@@ -1,8 +1,11 @@
 **__pycache__
 **.swp
 **.pyc
+**.DS_Store
 artifacts
 build
 devel
 provision/ansible/.password
 .catkin_tools
+.venv
+kamera.egg-info

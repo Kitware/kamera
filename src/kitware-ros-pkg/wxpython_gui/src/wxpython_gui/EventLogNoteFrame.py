@@ -1,4 +1,6 @@
+import wx
 import wxpython_gui.system_control_panel.form_builder_output_event_log_note as form_builder_output_event_log_note
+from wxpython_gui.system_control_panel.gui_utils import unclip_static_text
 
 class EventLogNoteFrame(form_builder_output_event_log_note.MainFrame):
     """.
@@ -10,6 +12,8 @@ class EventLogNoteFrame(form_builder_output_event_log_note.MainFrame):
         """
         # Initialize parent class
         form_builder_output_event_log_note.MainFrame.__init__(self, parent)
+        # Recompute enlarged title fonts so they are not clipped under Phoenix.
+        wx.CallAfter(unclip_static_text, self)
         self.parent = parent
         self.Show()
         self.SetMinSize(self.GetSize())

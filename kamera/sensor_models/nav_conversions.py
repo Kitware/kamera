@@ -403,6 +403,11 @@ def ecef_to_llh(X, Y, Z, in_degrees=True):
             else:
                 h = - _a * (1) * H / _e2a
 
+    sphi = np.min(sphi)
+    cphi = np.min(cphi)
+    slam = np.min(slam)
+    clam = np.min(clam)
+
     lat = float(np.arctan2(sphi, cphi)*180/np.pi)
     lon = float(np.arctan2(slam, clam)*180/np.pi)
     return lat, lon, h

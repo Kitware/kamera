@@ -58,6 +58,8 @@ class RemoteImagePanel(object):
         self.raw_image_lock = threading.RLock()
 
         self.wx_panel.SetBackgroundStyle(wx.BG_STYLE_CUSTOM)
+        if self.wx_histogram_panel is not None:
+            self.wx_histogram_panel.SetBackgroundStyle(wx.BG_STYLE_CUSTOM)
 
         self.status_static_text = status_static_text
         self.update_status_msg(format_status())
@@ -70,6 +72,8 @@ class RemoteImagePanel(object):
         self.wx_panel.Bind(wx.EVT_RIGHT_DOWN, self.on_click)
         self.wx_panel.Bind(wx.EVT_PAINT, self.on_paint)
         self.wx_panel.Bind(wx.EVT_SIZE, self.on_size)
+        if self.wx_histogram_panel is not None:
+            self.wx_histogram_panel.Bind(wx.EVT_PAINT, self.on_histogram_paint)
         # --------------------------------------------------------------------
 
     def start_image_thread(self):
@@ -114,15 +118,19 @@ class RemoteImagePanel(object):
             if self.raw_image is not None:
                 #print('on_size')
                 panel_width, panel_height = self.wx_panel.GetSize()
-                self.wx_image = wx.EmptyImage(panel_width, panel_height)
+                self.wx_image = wx.Image(panel_width, panel_height)
                 self.update_homography()
                 self.update_inverse_homography()
                 self.warp_image()
                 self.wx_panel.Refresh(True)
+                if self.wx_histogram_panel is not None:
+                    self.wx_histogram_panel.Refresh(True)
             else:
                 self.wx_bitmap = None
                 self._histogram = None
                 self.wx_panel.Refresh(True)
+                if self.wx_histogram_panel is not None:
+                    self.wx_histogram_panel.Refresh(True)
 
     def update_all(self):
         self.needs_update = True
@@ -182,10 +190,10 @@ class RemoteImagePanel(object):
                                                self.panel_image_height),
                                                flags=flags)
 
-            wx_image = wx.EmptyImage(self.panel_image_width,
-                                     self.panel_image_height)
+            wx_image = wx.Image(self.panel_image_width,
+                                self.panel_image_height)
             try:
-                wx_image.SetData(image.tostring())
+                wx_image.SetData(image.tobytes())
             except ValueError as err:
                 raise ValueError('Shape: {}  Chan {} \n {}'.format(image.shape, self.raw_image.dtype, err))
             self.wx_bitmap = wx_image.ConvertToBitmap()
@@ -250,7 +258,7 @@ class RemoteImagePanel(object):
         #vmax = min([vmax1,vmax2*2])
         vmax = vmax1
         v = v/(vmax)*panel_height
-        h = panel_height - np.round(v).astype(np.int)
+        h = panel_height - np.round(v).astype(int)
         image = np.full((panel_height,256,3), 255, np.uint8)
 
         for i in range(len(h)):
@@ -262,8 +270,9 @@ class RemoteImagePanel(object):
         """Called on event wx.EVT_PAINT.
 
         """
+        # Phoenix requires a PaintDC every paint event to validate the region.
+        pdc = wx.PaintDC(self.wx_panel)
         if self.wx_bitmap is not None:
-            pdc = wx.PaintDC(self.wx_panel)
             dc = wx.GCDC(pdc)
 
             panel_width, panel_height = self.wx_panel.GetSize()
@@ -271,21 +280,24 @@ class RemoteImagePanel(object):
             dy = (panel_height - self.panel_image_height)//2
             dc.DrawBitmap(self.wx_bitmap, dx, dy)
 
+    def on_histogram_paint(self, event=None):
+        """Called on event wx.EVT_PAINT for the histogram panel.
+
+        Phoenix only allows a PaintDC for the window being painted, so the
+        histogram can't be drawn from on_paint above.
+        """
+        pdc = wx.PaintDC(self.wx_histogram_panel)
         if self._histogram is not None:
             panel_width, panel_height = self.wx_histogram_panel.GetSize()
             image = cv2.resize(self._histogram, dsize=(panel_width,
                                panel_height), interpolation=cv2.INTER_NEAREST)
 
-            wx_image = wx.EmptyImage(panel_width, panel_height)
-            wx_image.SetData(image.tostring())
+            wx_image = wx.Image(panel_width, panel_height)
+            wx_image.SetData(image.tobytes())
             wx_histogram_bitmap = wx_image.ConvertToBitmap()
 
-            pdc = wx.PaintDC(self.wx_histogram_panel)
             dc = wx.GCDC(pdc)
             dc.DrawBitmap(wx_histogram_bitmap, 0, 0)
-
-        if event is not None:
-            event.Skip()
 
     def refresh(self, event):
         """Useful to bind the Refresh of self.wx_panel to an event.
@@ -304,7 +316,11 @@ class RemoteImagePanel(object):
         else:
             self.status_static_text.SetForegroundColour((0,0,0))
 
-        if len(string0) != len(string):
+        # Re-fit on any change so the centered label tracks its text: a pinned
+        # min size (from unclip) would otherwise mis-center variable-width text.
+        if string0 != string:
+            self.status_static_text.InvalidateBestSize()
+            self.status_static_text.SetMinSize(self.status_static_text.GetBestSize())
             self.status_static_text.GetParent().Layout()
 
     def release(self):
@@ -314,6 +330,8 @@ class RemoteImagePanel(object):
 
         self.wx_panel.Unbind(wx.EVT_PAINT)
         self.wx_panel.Unbind(wx.EVT_SIZE)
+        if self.wx_histogram_panel is not None:
+            self.wx_histogram_panel.Unbind(wx.EVT_PAINT)
 
         if self.update_image_thread:
             self.update_image_thread.stop()

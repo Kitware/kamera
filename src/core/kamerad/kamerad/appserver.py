@@ -1,24 +1,25 @@
 #!/usr/bin/env python
+import json
 import os
 import subprocess
-from pathlib import Path
 import time
-import json
 from collections import deque
+from pathlib import Path
 from xmlrpc.client import ServerProxy
 
-import redis
-from loguru import logger
-from kamerad.kam_types import server_parser, ServerArgs
-from kamerad import arpj
-
 from flask import Flask, request
+from loguru import logger
+
+from kamerad import arpj
+from kamerad.kam_types import ServerArgs, server_parser
+from kamerad.power import PowerManager
 
 # todo: global thread pool or maybe celery
 app = Flask(__name__)
 arp_scan_deque = deque(maxlen=1)
 threads = {}
-server = ServerProxy('http://localhost:9001/RPC2')
+server = ServerProxy("http://localhost:9001/RPC2")
+power_manager = None
 
 
 def run_cmd(cmd):
@@ -118,7 +119,7 @@ def mountall_p():
     process = "mount_nas"
     try:
         server.supervisor.stopProcess(process, True)
-    except:
+    except Exception:
         pass
     server.supervisor.startProcess(process, True)
     code = 1
@@ -127,16 +128,36 @@ def mountall_p():
     return json.dumps({"code": code, "out": out, "err": err})
 
 
-# @app.route("/arp-scan/<string:iface>/start", methods=["POST"])
-# def arp_scan_start(iface):
-#     global threads
-#     t = threading.Thread(target=loop_arp_scan, args=(iface, 10))
-#     t.start()
-#     threads[iface] = t
-#     return 'true'
+@app.route("/powerinfo", methods=["POST"])
+def powerinfo_p():
+    if power_manager is None:
+        return json.dumps({"ok": False, "error": "power manager unavailable"}), 503
+    return json.dumps(power_manager.get_status())
+
+
+@app.route("/power/shutdown", methods=["POST"])
+def power_shutdown():
+    if power_manager is None:
+        return json.dumps({"ok": False, "error": "power manager unavailable"}), 503
+    logger.info("Shutdown requested for {}", power_manager.hostname)
+    result = power_manager.request_shutdown()
+    status = 200 if result.get("ok", True) else 500
+    return json.dumps(result), status
+
+
+@app.route("/power/reboot", methods=["POST"])
+def power_reboot():
+    if power_manager is None:
+        return json.dumps({"ok": False, "error": "power manager unavailable"}), 503
+    logger.info("Reboot requested for {}", power_manager.hostname)
+    result = power_manager.request_reboot()
+    status = 200 if result.get("ok", True) else 500
+    return json.dumps(result), status
 
 
 def entry(args: ServerArgs):
+    global power_manager
+    power_manager = PowerManager(server)
     app.run(host=args.host, port=args.port, debug=args.debug)
 
 

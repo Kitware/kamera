@@ -71,6 +71,56 @@ find_package(catkin REQUIRED COMPONENTS
 ## System dependencies are found with CMake's conventions
 find_package(Boost REQUIRED COMPONENTS system)
 
+## Find CUDA
+find_package(CUDA QUIET)
+if(CUDA_FOUND)
+    enable_language(CUDA)
+    message(STATUS "CUDA found: ${CUDA_VERSION}")
+    message(STATUS "CUDA libraries: ${CUDA_LIBRARIES}")
+else()
+    message(WARNING "CUDA not found - nvjpeg will not be available")
+endif()
+
+## Find nvjpeg (part of CUDA Toolkit)
+if(CUDA_FOUND)
+    find_library(NVJPEG_LIBRARY
+        NAMES nvjpeg
+        PATHS
+            ${CUDA_TOOLKIT_ROOT_DIR}/lib64
+            ${CUDA_TOOLKIT_ROOT_DIR}/lib
+            /usr/local/cuda/lib64
+            /usr/local/cuda/lib
+        NO_DEFAULT_PATH
+    )
+
+    if(NVJPEG_LIBRARY)
+        message(STATUS "nvjpeg library found: ${NVJPEG_LIBRARY}")
+        set(NVJPEG_FOUND TRUE)
+    else()
+        message(WARNING "nvjpeg library not found - nvjpeg encoding will not be available")
+        set(NVJPEG_FOUND FALSE)
+    endif()
+
+    # Find nvjpeg header
+    find_path(NVJPEG_INCLUDE_DIR
+        NAMES nvjpeg.h
+        PATHS
+            ${CUDA_TOOLKIT_ROOT_DIR}/include
+            /usr/local/cuda/include
+        NO_DEFAULT_PATH
+    )
+
+    if(NVJPEG_INCLUDE_DIR)
+        message(STATUS "nvjpeg headers found: ${NVJPEG_INCLUDE_DIR}")
+        add_definitions(-DHAVE_NVJPEG)
+    else()
+        message(WARNING "nvjpeg headers not found")
+        set(NVJPEG_FOUND FALSE)
+    endif()
+else()
+    set(NVJPEG_FOUND FALSE)
+endif()
+
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -174,6 +224,9 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(include ${Boost_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
+if(NVJPEG_FOUND AND NVJPEG_INCLUDE_DIR)
+    include_directories(${NVJPEG_INCLUDE_DIR} ${CUDA_INCLUDE_DIRS})
+endif()
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
@@ -192,7 +245,8 @@ set(SRC
 
 # build and install the nodelet
 
-add_library(phase_one ${SRC})
+add_library(${PROJECT_NAME} ${SRC})
+add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(phase_one PRIVATE
@@ -201,6 +255,13 @@ target_link_libraries(phase_one PRIVATE
     CameraSDK::CameraSdkCpp
     ImageSDK::ImageSdkCpp
 )
+if(NVJPEG_FOUND)
+    target_link_libraries(phase_one PRIVATE
+        ${NVJPEG_LIBRARY}
+        ${CUDA_LIBRARIES}
+        ${CUDA_CUDART_LIBRARY}
+    )
+endif()
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
@@ -218,6 +279,13 @@ target_link_libraries(phase_one_standalone PRIVATE
     CameraSDK::CameraSdkCpp
     ImageSDK::ImageSdkCpp
 )
+if(NVJPEG_FOUND)
+    target_link_libraries(phase_one_standalone PRIVATE
+        ${NVJPEG_LIBRARY}
+        ${CUDA_LIBRARIES}
+        ${CUDA_CUDART_LIBRARY}
+    )
+endif()
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

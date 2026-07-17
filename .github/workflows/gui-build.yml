@@ -1,0 +1,30 @@
+name: GUI build
+
+on:
+  push:
+    paths:
+      - ".github/workflows/gui-build.yml"
+      - "docker/base/gui-deps.dockerfile"
+      - "docker/gui.dockerfile"
+      - "docker-compose.yml"
+      - "Makefile"
+  pull_request:
+    paths:
+      - ".github/workflows/gui-build.yml"
+      - "docker/base/gui-deps.dockerfile"
+      - "docker/gui.dockerfile"
+      - "docker-compose.yml"
+      - "Makefile"
+
+# NOTE: This is config validation only, not an image build. A real `make gui`
+# build requires the published Noetic core-deps image as a base and a display
+# for the wx smoke test. Upgrade this to an actual layer build (e.g. build
+# gui-deps against a published core-deps) when CI infrastructure allows.
+jobs:
+  validate-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate gui compose config
+        run: docker compose --profile gui config

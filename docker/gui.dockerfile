@@ -1,5 +1,6 @@
 ARG BRANCH=latest
-FROM kamera/base/kamera-gui-deps:latest
+ARG GUI_DEPS_IMAGE=kamera/base/gui-deps:latest
+FROM ${GUI_DEPS_IMAGE}
 
 
 # Create a non-root user and switch to it. Running X11 applications as root does
@@ -9,37 +10,42 @@ RUN useradd -m --uid=1000 user \
     && useradd --uid=7777 share \
     && usermod -aG share user
 
-# Source code goes into ~/noaa_kamera, live dir goes into ~/kamera_ws
+# Source code goes into ~/kamera
 ENV HOME_DIR=/home/user \
-    REPO_DIR=/home/user/noaa_kamera \
-    WS_DIR=/home/user/kamera_ws \
+    REPO_DIR=/home/user/kamera \
     GUI_CFG_DIR=/home/user/.config/kamera/gui
 
 # trying to speed up chown operation
 RUN mkdir -p /home/user && chown -R user:user /home/user
 
-COPY --chown=user:user  src/kitware-ros-pkg/wxpython_gui/config $GUI_CFG_DIR/config
-COPY --chown=user:user  repo_dir.bash      $REPO_DIR/repo_dir.bash
-COPY --chown=user:user  src                $REPO_DIR/src
-COPY --chown=user:user  activate_ros.bash  $WS_DIR/activate_ros.bash
-RUN ln -sf              $REPO_DIR/src      $WS_DIR/src                  &&\
-    rm -rf /entry                                                       &&\
-    ln -sf $REPO_DIR/src/run_scripts/entry /entry                       &&\
-    printf "\nsource /entry/project.sh\n" >> /home/user/.bashrc         &&\
-    touch $WS_DIR/.catkin_workspace                                     &&\
-    ln -sf $REPO_DIR/src/run_scripts/aliases.sh /aliases.sh             &&\
-    printf "\nsource /aliases.sh\n" >> /root/.bashrc                    &&\
-    ln -sf $REPO_DIR/src/cfg /cfg                                       &&\
-    HOME=/home/user $REPO_DIR/src/run_scripts/setup/install_links.sh
+WORKDIR $REPO_DIR
+COPY --chown=user:user  .  $REPO_DIR
 
-WORKDIR $WS_DIR
+RUN rm -rf /entry \
+    && ln -sf $REPO_DIR/src/run_scripts/entry /entry \
+    && printf "\nsource /entry/project.sh\n" >> /home/user/.bashrc \
+    && touch $REPO_DIR/.catkin_workspace \
+    && ln -sf $REPO_DIR/src/run_scripts/aliases.sh /aliases.sh \
+    && printf "\nsource /aliases.sh\n" >> /home/user/.bashrc
+
+RUN ln -sf $REPO_DIR/scripts/activate_ros.bash $REPO_DIR/activate_ros.bash
+RUN ln -sf $REPO_DIR/src/cfg /cfg
+RUN mkdir -p /home/user/.config/kamera && \
+    ln -sf $REPO_DIR/.dir /home/user/.config/kamera/repo_dir.bash
+
+RUN ln -sv /usr/bin/python3 /usr/bin/python || true
 RUN find /home/user -not -user user -execdir chown user {} \+
+
+# Install kamera for wxpython_gui imports. --no-deps: deps come from the base
+# image (a full install trips on ROS's distutils PyYAML).
+# --ignore-requires-python: ROS Noetic pins python 3.8, below our 3.10 floor.
+RUN pip install --no-cache-dir matplotlib \
+    && pip install --no-cache-dir --no-deps --ignore-requires-python -e $REPO_DIR
 
 # use the exec form of run because we need bash syntax
 USER user
 RUN [ "/bin/bash", "-c", "source /entry/project.sh && catkin build wxpython_gui "]
 RUN [ "/bin/bash", "-c", "source /entry/project.sh && catkin build ins_driver "]
-RUN [ "/bin/bash", "-c", "pip install -e ."]
 USER root
 RUN find /home/user -not -user user -execdir chown user {} \+
 USER user

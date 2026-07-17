@@ -14,11 +14,28 @@ import rospy
 from roskv.impl.redis_envoy import RedisEnvoy
 from phase_one.srv import GetPhaseOneParameter, SetPhaseOneParameter
 from custom_msgs.srv import CamGetAttr, CamSetAttr
+from roskv.util import filter_hosts_by_system
 
 p1setsrv = "set_phaseone_parameter"
 p1getsrv = "get_phaseone_parameter"
 setsrv = "set_camera_attr"
 getsrv = "get_camera_attr"
+
+P1_SHUTTER_MODE_LABELS = {"LS": "1", "ES": "2"}
+
+
+def normalize_p1_shutter_mode(val):
+    """Map Phase One shutter mode labels and numeric values to '1' or '2'."""
+    if val in (None, ""):
+        return None
+    s = str(val).strip()
+    if s in P1_SHUTTER_MODE_LABELS:
+        return P1_SHUTTER_MODE_LABELS[s]
+    try:
+        return str(int(float(s)))
+    except (TypeError, ValueError):
+        return s
+
 
 class CamParamMonitor(object):
     """ A class to monitor state that is set in Redis,
@@ -30,7 +47,9 @@ class CamParamMonitor(object):
         print("Redis host: %s" % redis_host)
         self.envoy = RedisEnvoy(os.environ["REDIS_HOST"],
                                 client_name="cam_param_monitor")
-        self.hosts = self.envoy.get("/sys/arch/hosts").keys()
+        self.hosts = filter_hosts_by_system(
+            self.envoy.get("/sys/arch/hosts").keys()
+        )
         self.modes = self.envoy.get("/sys/channels").keys()
         print("hosts: ")
         print(self.hosts)
@@ -86,9 +105,12 @@ class CamParamMonitor(object):
                 # Phase one params have the type in the return string
                 getsrv_val = ''.join(getsrv_val.split(' ')[1:])
                 # A random s is sometimes in shutter speed
-                if "s" in getsrv_val:
+                if "s" in getsrv_val and param != "Shutter Mode":
                     getsrv_val = getsrv_val[:-1]
-                if isinstance(requested_val, float):
+                if param == "Shutter Mode":
+                    getsrv_val = normalize_p1_shutter_mode(getsrv_val)
+                    requested_val = normalize_p1_shutter_mode(requested_val)
+                elif isinstance(requested_val, float):
                     try:
                         getsrv_val = float(getsrv_val)
                     except:
@@ -115,7 +137,7 @@ class CamParamMonitor(object):
             return
         if mode == "rgb":
             param = '_'.join(param.split(' '))
-        self.envoy.kv.set("/sys/actual_geni_params/%s/%s/%s"
+        self.envoy.set("/sys/actual_geni_params/%s/%s/%s"
                             % (host, mode, param), getsrv_val)
         if param == "GainValue" or param == "ExposureValue"\
                 or param == "ISO" or param == "Shutter_Speed"\

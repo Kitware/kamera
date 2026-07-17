@@ -1,11 +1,11 @@
 ---
 ## Auxiliary node to attach to master
-version: '3.7'
 services:
   ## =========================== headless nodes =============================
   image_manager:
     container_name: "image_manager"
-    image: kitware/kamera:core
+    image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"

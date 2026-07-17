@@ -1,6 +1,7 @@
-from wxpython_gui.cfg import kv, DOCK_KAM_REPO_DIR, REAL_KAM_REPO_DIR
+from wxpython_gui.cfg import kv, DOCK_KAM_REPO_DIR, REAL_KAM_REPO_DIR, system_name
+from roskv.util import filter_hosts_by_system
 import time
-import xmlrpclib
+import xmlrpc.client as xmlrpclib
 
 
 class SystemCommandsCall(object):
@@ -9,8 +10,10 @@ class SystemCommandsCall(object):
     """
 
     def __init__(self, hosts):
-        self.hosts = hosts
-        self.process_group = "taiga" if "nuvo0" in hosts else "nayak"
+        if isinstance(hosts, dict):
+            hosts = list(hosts.keys())
+        self.hosts = filter_hosts_by_system(hosts)
+        self.process_group = system_name
         self.supers = {
             host: xmlrpclib.Server("http://%s:9001/RPC2" % host) for host in self.hosts
         }

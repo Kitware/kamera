@@ -102,30 +102,3 @@ RUN cd /src/DALSA &&\
     > GigeV/bin/temp && mv GigeV/bin/temp GigeV/bin/install.gigev &&\
     chmod +x GigeV/bin/install.gigev && ./corinstall install
 
-## === === === === === === Project specifics === === === === === === === ===
-ENV WS_DIR=/root/kamera
-WORKDIR /root/kamera
-
-# Copy products into container
-COPY        .             $WS_DIR
-
-RUN rm -rf /entry                                                       &&\
-    ln -sf $WS_DIR/src/run_scripts/entry /entry                        &&\
-    printf "\nsource /entry/project.sh\n" >> /root/.bashrc              &&\
-    touch $WS_DIR/.catkin_workspace                             &&\
-    ln -sf $WS_DIR/src/run_scripts/aliases.sh /aliases.sh             &&\
-    printf "\nsource /aliases.sh\n" >> /root/.bashrc
-
-# Making useful links and copies
-RUN ln -sf $WS_DIR/scripts/activate_ros.bash $WS_DIR/activate_ros.bash
-RUN ln -sf $WS_DIR/src/cfg /cfg
-RUN mkdir -p /root/.config/kamera && \
-    ln -sf $WS_DIR/.dir /root/.config/kamera/repo_dir.bash
-
-# Need to build phase one first to generate SRV
-RUN ln -sv /usr/bin/python3 /usr/bin/python || true
-RUN [ "/bin/bash", "-c", "source ${WS_DIR}/activate_ros.bash && catkin build phase_one"]
-RUN [ "/bin/bash", "-c", "source /entry/project.sh && catkin build backend"]
-
-ENTRYPOINT ["/entry/project.sh"]
-CMD ["bash"]

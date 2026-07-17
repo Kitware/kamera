@@ -1,8 +1,9 @@
 from __future__ import division, print_function
 import time
 from enum import Enum
-from wxpython_gui.cfg import SYS_CFG, kv
+from wxpython_gui.cfg import SYS_CFG, kv, get_detector_pipefile
 from wxpython_gui.utils import diffpair
+from roskv.util import filter_hosts_by_system
 
 
 class EPodStatus(Enum):
@@ -46,7 +47,7 @@ class DetectorState(object):
     def set_det_attr_state(self, host, attr, state):
         # type: (str, str, EPodStatus) -> EPodStatus
         v = state.value
-        SYS_CFG[host]["detector"][attr] = v
+        self.kv.put("/sys/{}/detector/{}".format(host, attr), v)
         return self.get_det_attr_state(host, attr)
 
     def get_det_attr_state(self, host, attr):
@@ -62,8 +63,9 @@ class DetectorState(object):
         # type: (str, EPodStatus) -> EPodStatus
         status = self.set_det_attr_state(host, "desired", state)
         self.desired[host] = status
-        SYS_CFG[host]["detector"]["last_change_desired"] = time.time()
-        self.last_change_desired = SYS_CFG[host]["detector"]["last_change_desired"]
+        now = time.time()
+        self.kv.put("/sys/{}/detector/last_change_desired".format(host), now)
+        self.last_change_desired = now
         return status
 
     def bump(self, host):
@@ -116,9 +118,9 @@ class DetectorState(object):
             # Reported health from the detectors
             try:
                 health = self.kv.get("/{}/detector/health//".format(host))
-                cmdpipef = SYS_CFG[host]["detector"]["pipefile"]
             except KeyError as e:
                 continue
+            cmdpipef = get_detector_pipefile(host)
             try:
                 health = health[""]
             except KeyError:
@@ -161,4 +163,8 @@ def set_detector_state(system, host, desired):
     system.run_command("detector", host, verb)
 
 
-detector_state = DetectorState(kv, SYS_CFG["arch"]["hosts"])
+_hosts = SYS_CFG["arch"]["hosts"]
+detector_state = DetectorState(
+    kv,
+    {h: _hosts[h] for h in filter_hosts_by_system(_hosts.keys())},
+)
