@@ -22,11 +22,41 @@ KAMERA, or the **K**nowledge-guided Image **A**cquisition **M**anag**ER** and **
 
 ## Installation
 
+### Post-processing (native, Windows or Linux)
+
+GDAL and pycolmap come from conda-forge; [uv](https://docs.astral.sh/uv/)
+installs the rest into `.venv`. Requires
+[conda](https://conda-forge.org/download/).
+
+Linux/macOS:
+
 ```bash
 git clone https://github.com/Kitware/kamera.git
 cd kamera
-# For the pure post-processing and generating flight summary, you can install
-# the requirements in requirements.txt, or use the provided dockerfile
+conda env create -f environment.yml
+conda activate kamera
+make install
+source .venv/bin/activate
+```
+
+Windows (PowerShell or Anaconda Prompt):
+
+```powershell
+git clone https://github.com/Kitware/kamera.git
+cd kamera
+conda env create -f environment.yml
+conda activate kamera
+pip install -e .
+```
+
+Afterwards, `conda activate kamera` is all you need. Conda installs the CUDA
+build of pycolmap automatically with NVIDIA driver 575+ (CUDA 12.9),
+otherwise the CPU build; GPU only matters for full camera model calibration.
+
+### Docker images
+
+```bash
+# post-processing / flight summary image
 make postflight
 # Builds the core docker images for use in the onboard sytems
 make nuvo
