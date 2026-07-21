@@ -1,9 +1,9 @@
 ---
-version: '3.7'
 services:
   imageview:
     container_name: "imageview-${CAM_FOV}"
-    image: kitware/kamera:core
+    image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"
@@ -21,6 +21,6 @@ services:
       - "/mnt:/mnt"
       - "${PWD}/src:$DOCKER_KAMERA_DIR/src:ro"
     command: ["/entry/imageview.sh"]
-    restart: unless-stopped
+    restart: no
 ## ====================================================================
 ...

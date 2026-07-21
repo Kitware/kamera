@@ -1,22 +1,42 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
-from typing import Any, List, Dict, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
+from io import BytesIO
 import json
 from hashlib import md5
+from collections.abc import Mapping
+from json import JSONDecodeError
 
-from six import string_types, binary_type, PY2, PY3, BytesIO
-from benedict import benedict
-
-
-if PY2:
-    JSONDecodeError = ValueError
-    from collections import Mapping
-else:
-    from json import JSONDecodeError
-    from collections.abc import Mapping
 
 class MyTimeoutError(OSError):
     pass
+
+
+def _flatten(d, prefix="", sep="/"):
+    """Recursively flatten a nested dict with sep-joined keys."""
+    items = {}
+    for k, v in d.items():
+        new_key = prefix + sep + k if prefix else k
+        if isinstance(v, Mapping):
+            items.update(_flatten(v, new_key, sep))
+        else:
+            items[new_key] = v
+    return items
+
+
+def _unflatten(flat, sep="/"):
+    """Reconstruct a nested dict from a flat dict with sep-joined keys."""
+    result = {}
+    for key, value in flat.items():
+        parts = key.split(sep)
+        node = result
+        for part in parts[:-1]:
+            if not isinstance(node.get(part), dict):
+                node[part] = {}
+            node = node[part]
+        node[parts[-1]] = value
+    return result
+
 
 def hash_genpy_msg(msg):
     # type: (genpy.message.Message) -> bytes
@@ -40,23 +60,21 @@ def simple_hash_args(*args):
 
 
 def loader23(s):
-    # type: (binary_type) -> str
-    """Python"""
+    # type: (bytes) -> str
     if s is None:
         return None
-    if isinstance(s, binary_type):
+    if isinstance(s, bytes):
         return s.decode()
     return s
 
 
 def dumper23(val):
-    # type: (Union[str, binary_type, dict]) -> binary_type
-    """Python2/3 compatible encoder for redis"""
-    if isinstance(val, string_types):
+    # type: (Union[str, bytes, dict]) -> bytes
+    """Encode a value for storage in Redis"""
+    if isinstance(val, str):
         return val.encode()
-    elif isinstance(val, binary_type):
+    elif isinstance(val, bytes):
         return val
-
     return json.dumps(val).encode()
 
 
@@ -76,8 +94,8 @@ def flatten_fs(val, root="", sep="/"):
     """Flatten with forward slash separator.
     ROS-style KV space nesting with a leading forward slash for root"""
     if isinstance(val, Mapping):
-        bd = benedict(val).flatten(separator="/")
-        return {root + sep + k: v for k, v in bd.items()}
+        flat = _flatten(val, sep=sep)
+        return {root + sep + k: v for k, v in flat.items()}
     return val
 
 
@@ -97,49 +115,38 @@ def wildcard(pat, s):
     import re
     s = loader23(s)
     rpat = loader23(pat).replace('*', '.*').replace('?', '.')
-
     mat = re.search(rpat, s)
     return mat is not None
-    return rpat
 
 
-def demux_consul(box_values, key=None):
-    # type: (List[Dict[str, str]], Optional[str]) -> dict
+def filter_hosts_by_system(all_hosts, system_name=None):
+    """Return host names belonging to the current system.
+
+    Redis (/sys) can accumulate host entries from other systems; host
+    names are suffixed with the system name, e.g. "center0taiga".
     """
-    Unwraps and de-multiplexes a response from Consul so nested values are returned as nested dict.
-    :param box_values:
-    :param key:
-    :return:
-
-    Examples:
-    >>> bv = [{'Key': 'foo', 'Value': b'{"nest": {"num": 42, "spam": "eggs"}}'}]
-    >>> demux_consul(bv, 'foo')
-    {'nest': {'num': 42, 'spam': 'eggs'}}
-    >>> bv = [{'Key': 'nest1/nest2', 'Value': b'abc'},{'Key': 'nest1/nest3', 'Value': b'123'}]
-    >>> bv.extend([{'Key': 'nest1/nest3/nest33','Value': b'12345'}, {'Key': 'nest1/nest3/nest45','Value': b'12345'}])
-    >>> demux_consul(bv)
-    {'nest1': {'nest2': b'abc', 'nest3': {'nest33': 12345, 'nest45': 12345}}}
-    >>> demux_consul(bv, 'nest1')
-    {'nest2': b'abc', 'nest3': {'nest33': 12345, 'nest45': 12345}}
-
-    """
-    if len(box_values) == 1 and "/" not in box_values[0]["Key"]:
-        return try_jloads(box_values[0]["Value"])
-
-    bd = benedict({el["Key"]: try_jloads(el["Value"]) for el in box_values})
-    bd = bd.unflatten(separator="/")
-    if key is not None:
-        return bd[key]
-    return bd
+    import os
+    if system_name is None:
+        system_name = os.environ.get("SYSTEM_NAME")
+    all_hosts = sorted(all_hosts)
+    if system_name:
+        hosts = [h for h in all_hosts if h.endswith(system_name)]
+    else:
+        hosts = []
+    if not hosts:
+        # Fall back to every host if the naming convention doesn't match.
+        hosts = all_hosts
+    return hosts
 
 
 def redis_decode(keys, values, key=None, flatten=False, as_json=True):
     # type: (List[str], List[str], Optional[str], bool, bool) -> dict
     """
-    Unwraps and de-multiplexes a response from Consul so nested values are returned as nested dict.
+    Unwraps and de-multiplexes a Redis response so nested values are returned as a nested dict.
     :param keys: list of keys
     :param values: list of return values
     :param key: keypath prefix key
+    :param flatten: return the flat dict without unflattening
     :param as_json: Try to deserialize from json
     :return: nested dict from the keypath
 
@@ -149,30 +156,20 @@ def redis_decode(keys, values, key=None, flatten=False, as_json=True):
     {'nest': {'num': 42, 'spam': 'eggs'}}
     >>> keys_ = ['nest1/nest2', 'nest1/nest3', 'nest1/nest3/nest33', 'nest1/nest3/nest45']
     >>> vals = ['abc', '123', '12345', '12345']
-    >>> redis_decode(keys_, vals)
-    {'nest1': {'nest2': b'abc', 'nest3': {'nest33': 12345, 'nest45': 12345}}}
     >>> redis_decode(keys_, vals, 'nest1')
-    {'nest2': b'abc', 'nest3': {'nest33': 12345, 'nest45': 12345}}
+    {'nest2': 'abc', 'nest3': {'nest33': 12345, 'nest45': 12345}}
     >>> redis_decode(keys_, vals, 'nest1/nest3')
     {'nest33': 12345, 'nest45': 12345}
 
     """
-    if as_json:
-        loader = try_jloads
-    else:
-        loader = loader23
-    ## I think this is wrong
-    # if len(keys) == 1:
-        # return loader(values[0])
-
+    loader = try_jloads if as_json else loader23
     keys = [loader23(k) for k in keys]
     values = [loader(v) for v in values]
 
-    bd = benedict(zip(keys, values))
-
+    flat = dict(zip(keys, values))
     if flatten:
-        return bd
-    bd = bd.unflatten(separator="/")
+        return flat
+    bd = _unflatten(flat)
     if len(bd) == 1 and "" in bd:
         bd = bd[""]
     if key is None:
@@ -181,7 +178,6 @@ def redis_decode(keys, values, key=None, flatten=False, as_json=True):
         if not subkey:
             continue
         bd = bd[subkey]
-
     return bd
 
 

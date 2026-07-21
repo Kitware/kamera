@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Software License Agreement (BSD License)
@@ -205,7 +205,11 @@ class AvxClient(object):
         # GsofSpoofEventDispatch.add_publisher('event') # todo
         # recv-loop: When we're connected, keep receiving stuff until that fails
         counter = 0
-        spoof_events = bool(int(rc.get("/debug/spoof_events")))
+        spoof_events = rc.get("/debug/spoof_events")
+        if spoof_events is not None:
+            spoof_events = int(spoof_events)
+        else:
+            spoof_events = 0
         for rawdata in gen_packets(host, port):
             event_arrived = rospy.Time.now()
             if rospy.is_shutdown():
@@ -214,7 +218,11 @@ class AvxClient(object):
             raw_ins_path = self.archiver.get_raw_ins_path()
             if not (counter % 100):
                 rospy.loginfo('Ins path: {}'.format(raw_ins_path))
-                spoof_events = bool(int(rc.get("/debug/spoof_events")))
+                spoof_events = rc.get("/debug/spoof_events")
+                if spoof_events is not None:
+                    spoof_events = int(spoof_events)
+                else:
+                    spoof_events = 0
             counter += 1
 
             # todo: optionally archive stream
@@ -237,7 +245,6 @@ class AvxClient(object):
                     rospy.logerr("Some other exception in parsing: {}".format(err))
                 #aprint(dispatch.msg)
                 for d in dispatches:
-                    # print(d)
                     d.msg.sys_time = event_arrived
                     if isinstance(d, GsofEventDispatch) and spoof_events:
                         rospy.logwarn("WARNING: Not publishing events because /debug/spoof_events is true.")

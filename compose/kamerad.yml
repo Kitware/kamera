@@ -1,14 +1,17 @@
 ---
 ## Core processes
-version: '3.7'
 services:
   ## =========================== headless nodes =============================
   kamerad:
-    image: kitware/kamera:kamerad
+    image: ${KAMERA_KAMERAD_IMAGE}
+    init: true
     network_mode: host
     build: ../src/core/kamerad
     tty: true
     user: root
+    environment:
+      NODE_HOSTNAME: "${NODE_HOSTNAME}"
+      SYSTEM_NAME: "${SYSTEM_NAME}"
     volumes:
         - "/mnt:/mnt:ro,rshared"
     restart: unless-stopped

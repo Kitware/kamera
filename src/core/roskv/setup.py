@@ -3,11 +3,7 @@ from setuptools import find_packages, setup
 from catkin_pkg.python_setup import generate_distutils_setup
 
 deps = [
-    "python-benedict==0.23.2",
-    "python-fsutil==0.4.0",
-    "python-slugify==4.0.1",
     "typing",
-    "six",
 ]
 
 # this function uses information from package.xml to populate dict
@@ -18,7 +14,7 @@ d = generate_distutils_setup(
     install_requires=deps,
     # entry_points={"console_scripts": ["roskv=roskv.client:main"]},
     scripts=["scripts/roskv"],
-    extras_require={"consul": ["python-consul"], "redis": ["redis"]},
+    extras_require={"redis": ["redis"]},
 )
 
 setup(**d)

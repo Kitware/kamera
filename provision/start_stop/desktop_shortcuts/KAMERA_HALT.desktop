@@ -2,5 +2,6 @@
 Exec=gnome-terminal -e '/home/user/kw/kamera/scripts/kamera_halt.sh'
 Name=kamera_gui
 Terminal=true
+Icon=process-stop
 Type=Application
-Name[en_US]=KAMERA_HALT.desktop
+Name[en_US]=Stop\nKAMERA

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # This file is automatically edited at line 5
 #
 # VVVVVV this line is modified automatically

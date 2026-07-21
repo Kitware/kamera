@@ -1,0 +1,8 @@
+{
+    "enable": false,
+    "norespawn": false,
+    "rebuild": false,
+    "spoof_events": 0,
+    "spoof_gps": false,
+    "trigger_pps": 0
+}

@@ -1,10 +1,10 @@
 ---
 ## Bring up the core nodes (aside from roscore)
-version: '3.7'
 services:
   ins:
     container_name: ins
-    image: kitware/kamera:core
+    image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     devices:
       - "${PULSE_TTY}:${PULSE_TTY}"
@@ -27,5 +27,5 @@ services:
       - "/mnt:/mnt"
       - "${PWD}/src:$DOCKER_KAMERA_DIR/src:ro"
     command: ["/entry/ins.sh"]
-    restart: unless-stopped
+    restart: no
 ...

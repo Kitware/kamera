@@ -1,10 +1,10 @@
 ---
 ## Core processes
-version: '3.7'
 services:
   shapefile_monitor:
     container_name: shapefile_monitor
-    image: kitware/kamera:core
+    image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"
@@ -21,5 +21,5 @@ services:
       - "/mnt:/mnt"
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     command: ["/entry/shapefile_monitor.sh"]
-    restart: unless-stopped
+    restart: no
 ...

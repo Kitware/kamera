@@ -45,7 +45,7 @@ class FPSMonitor:
     def ingest_event(self, msg):
         time = msg.gps_time.to_sec()
         rospy.loginfo("Received event message, time %0.5f." % time)
-        is_archiving = self.envoy.kv.get("/sys/arch/is_archiving") == "1"
+        is_archiving = self.envoy.get("/sys/arch/is_archiving") == "1"
         # Skip the first event, so we don't accidentally report drops
         if is_archiving and self.previously_archiving:
             self.evt_queue.append(time)
@@ -133,13 +133,13 @@ class FPSMonitor:
 
             self.processed_times.append(time)
 
-        self.envoy.kv.set(f"/sys/arch/{hostname}/rgb/fps", rgb_fps)
-        self.envoy.kv.set(f"/sys/arch/{hostname}/ir/fps", ir_fps)
-        self.envoy.kv.set(f"/sys/arch/{hostname}/uv/fps", uv_fps)
+        self.envoy.set(f"/sys/arch/{hostname}/rgb/fps", rgb_fps)
+        self.envoy.set(f"/sys/arch/{hostname}/ir/fps", ir_fps)
+        self.envoy.set(f"/sys/arch/{hostname}/uv/fps", uv_fps)
 
-        self.envoy.kv.set(f"/sys/arch/{hostname}/rgb/dropped", self.rgb_drops)
-        self.envoy.kv.set(f"/sys/arch/{hostname}/ir/dropped", self.ir_drops)
-        self.envoy.kv.set(f"/sys/arch/{hostname}/uv/dropped", self.uv_drops)
+        self.envoy.set(f"/sys/arch/{hostname}/rgb/dropped", self.rgb_drops)
+        self.envoy.set(f"/sys/arch/{hostname}/ir/dropped", self.ir_drops)
+        self.envoy.set(f"/sys/arch/{hostname}/uv/dropped", self.uv_drops)
 
 
 def main():

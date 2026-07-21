@@ -17,10 +17,10 @@ import wx.xrc
 class MainFrame ( wx.Frame ):
 	
 	def __init__( self, parent ):
-		wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = u"System Configuration Editor", pos = wx.DefaultPosition, size = wx.Size( 994,969 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
+		wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = u"System Configuration Editor", pos = wx.DefaultPosition, size = wx.Size( 994,1080 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
 		
-		self.SetSizeHintsSz( wx.Size( 400,400 ), wx.DefaultSize )
-		self.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), 70, 90, 90, False, wx.EmptyString ) )
+		self.SetSizeHints( wx.Size( 400,400 ), wx.DefaultSize )
+		self.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 		self.SetForegroundColour( wx.SystemSettings.GetColour( wx.SYS_COLOUR_WINDOWTEXT ) )
 		
 		main_size = wx.BoxSizer( wx.VERTICAL )
@@ -30,7 +30,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText34 = wx.StaticText( self.m_panel2, wx.ID_ANY, u"System Configuration", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText34.Wrap( -1 )
-		self.m_staticText34.SetFont( wx.Font( 18, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText34.SetFont( wx.Font( 18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer22.Add( self.m_staticText34, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
@@ -38,7 +38,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText6 = wx.StaticText( self.m_panel2, wx.ID_ANY, u"Select\nConfiguration", wx.DefaultPosition, wx.DefaultSize, wx.ALIGN_CENTRE )
 		self.m_staticText6.Wrap( -1 )
-		self.m_staticText6.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText6.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer9.Add( self.m_staticText6, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -47,37 +47,25 @@ class MainFrame ( wx.Frame ):
 		bSizer9.Add( self.camera_config_combo, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
 		
-		bSizer9.AddSpacer( ( 20, 0), 1, wx.EXPAND, 5 )
+		bSizer9.Add( ( 20, 0), 1, wx.EXPAND, 5 )
 		
 		self.m_button4 = wx.Button( self.m_panel2, wx.ID_ANY, u"New", wx.DefaultPosition, wx.DefaultSize, 0 )
 		bSizer9.Add( self.m_button4, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
 		
-		bSizer9.AddSpacer( ( 20, 0), 1, wx.EXPAND, 5 )
+		bSizer9.Add( ( 20, 0), 1, wx.EXPAND, 5 )
 		
 		self.m_button41 = wx.Button( self.m_panel2, wx.ID_ANY, u"New from Current", wx.DefaultPosition, wx.Size( 150,-1 ), 0 )
 		bSizer9.Add( self.m_button41, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
 		
-		bSizer9.AddSpacer( ( 20, 0), 1, wx.EXPAND, 5 )
+		bSizer9.Add( ( 20, 0), 1, wx.EXPAND, 5 )
 		
 		self.m_button42 = wx.Button( self.m_panel2, wx.ID_ANY, u"Delete", wx.DefaultPosition, wx.DefaultSize, 0 )
 		bSizer9.Add( self.m_button42, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
 		
 		bSizer22.Add( bSizer9, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )
-		
-		bSizer23 = wx.BoxSizer( wx.HORIZONTAL )
-		
-		self.m_button7 = wx.Button( self.m_panel2, wx.ID_ANY, u"Finished Making Changes", wx.DefaultPosition, wx.DefaultSize, 0 )
-		bSizer23.Add( self.m_button7, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
-		
-		self.m_staticText20 = wx.StaticText( self.m_panel2, wx.ID_ANY, u"Make sure to save changes first", wx.DefaultPosition, wx.DefaultSize, 0 )
-		self.m_staticText20.Wrap( -1 )
-		bSizer23.Add( self.m_staticText20, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
-		
-		
-		bSizer22.Add( bSizer23, 1, wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
 		
 		self.m_panel2.SetSizer( bSizer22 )
@@ -92,7 +80,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText3412 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"System Configuration Name", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText3412.Wrap( -1 )
-		self.m_staticText3412.SetFont( wx.Font( 18, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText3412.SetFont( wx.Font( 18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer102.Add( self.m_staticText3412, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
@@ -109,7 +97,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText341 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Left-View System", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText341.Wrap( -1 )
-		self.m_staticText341.SetFont( wx.Font( 18, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText341.SetFont( wx.Font( 18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer10.Add( self.m_staticText341, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
@@ -120,7 +108,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText33 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Left RGB .yaml", wx.DefaultPosition, wx.Size( 190,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText33.Wrap( -1 )
-		self.m_staticText33.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText33.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer45.Add( self.m_staticText33, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -140,7 +128,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText332 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Left IR .yaml", wx.DefaultPosition, wx.Size( 190,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText332.Wrap( -1 )
-		self.m_staticText332.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText332.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer452.Add( self.m_staticText332, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -160,7 +148,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText331 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Left UV .yaml", wx.DefaultPosition, wx.Size( 190,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText331.Wrap( -1 )
-		self.m_staticText331.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText331.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer451.Add( self.m_staticText331, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -180,7 +168,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText3311 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Detection .pipe", wx.DefaultPosition, wx.Size( 190,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText3311.Wrap( -1 )
-		self.m_staticText3311.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText3311.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer4511.Add( self.m_staticText3311, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -203,7 +191,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText3411 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Center-View System", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText3411.Wrap( -1 )
-		self.m_staticText3411.SetFont( wx.Font( 18, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText3411.SetFont( wx.Font( 18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer101.Add( self.m_staticText3411, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
@@ -214,7 +202,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText3321 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Center RGB.yaml", wx.DefaultPosition, wx.Size( 190,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText3321.Wrap( -1 )
-		self.m_staticText3321.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText3321.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer4521.Add( self.m_staticText3321, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -234,7 +222,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText3322 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Center IR .yaml", wx.DefaultPosition, wx.Size( 190,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText3322.Wrap( -1 )
-		self.m_staticText3322.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText3322.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer4522.Add( self.m_staticText3322, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -254,7 +242,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText3323 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Center UV .yaml", wx.DefaultPosition, wx.Size( 190,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText3323.Wrap( -1 )
-		self.m_staticText3323.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText3323.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer4523.Add( self.m_staticText3323, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -274,7 +262,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText33111 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Detection .pipe", wx.DefaultPosition, wx.Size( 190,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText33111.Wrap( -1 )
-		self.m_staticText33111.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText33111.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer45111.Add( self.m_staticText33111, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -297,7 +285,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText34111 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Right-View System", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText34111.Wrap( -1 )
-		self.m_staticText34111.SetFont( wx.Font( 18, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText34111.SetFont( wx.Font( 18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer1011.Add( self.m_staticText34111, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
@@ -308,7 +296,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText3324 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Right RGB .yaml", wx.DefaultPosition, wx.Size( 190,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText3324.Wrap( -1 )
-		self.m_staticText3324.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText3324.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer4524.Add( self.m_staticText3324, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -328,7 +316,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText3325 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Right IR .yaml", wx.DefaultPosition, wx.Size( 190,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText3325.Wrap( -1 )
-		self.m_staticText3325.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText3325.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer4525.Add( self.m_staticText3325, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -348,7 +336,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText3326 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Right UV .yaml", wx.DefaultPosition, wx.Size( 190,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText3326.Wrap( -1 )
-		self.m_staticText3326.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText3326.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer4526.Add( self.m_staticText3326, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -368,7 +356,7 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText33112 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Detection .pipe", wx.DefaultPosition, wx.Size( 190,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText33112.Wrap( -1 )
-		self.m_staticText33112.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText33112.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer45112.Add( self.m_staticText33112, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
@@ -391,14 +379,14 @@ class MainFrame ( wx.Frame ):
 		
 		self.m_staticText334 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Configuration\nDescription", wx.DefaultPosition, wx.Size( -1,-1 ), wx.ALIGN_CENTRE )
 		self.m_staticText334.Wrap( -1 )
-		self.m_staticText334.SetFont( wx.Font( 14, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText334.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		bSizer454.Add( self.m_staticText334, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		
 		self.configuration_notes_txt_ctrl = wx.TextCtrl( self.m_panel33, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, wx.TE_MULTILINE )
-		self.configuration_notes_txt_ctrl.SetFont( wx.Font( 14, 70, 90, 90, False, wx.EmptyString ) )
+		self.configuration_notes_txt_ctrl.SetFont( wx.Font( 14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 		
-		bSizer454.Add( self.configuration_notes_txt_ctrl, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL|wx.EXPAND, 5 )
+		bSizer454.Add( self.configuration_notes_txt_ctrl, 1, wx.ALL|wx.EXPAND, 5 )
 		
 		
 		bSizer44.Add( bSizer454, 1, wx.EXPAND|wx.LEFT, 5 )
@@ -428,7 +416,6 @@ class MainFrame ( wx.Frame ):
 		self.m_button4.Bind( wx.EVT_BUTTON, self.on_new )
 		self.m_button41.Bind( wx.EVT_BUTTON, self.on_new_from_current )
 		self.m_button42.Bind( wx.EVT_BUTTON, self.on_delete )
-		self.m_button7.Bind( wx.EVT_BUTTON, self.on_done )
 		self.m_button18.Bind( wx.EVT_BUTTON, self.on_find_left_rgb_yaml )
 		self.m_button61.Bind( wx.EVT_BUTTON, self.on_clear_left_rgb_yaml )
 		self.m_button19.Bind( wx.EVT_BUTTON, self.on_find_left_ir_yaml )
@@ -461,7 +448,6 @@ class MainFrame ( wx.Frame ):
 		self.m_button4.Unbind( wx.EVT_BUTTON, None )
 		self.m_button41.Unbind( wx.EVT_BUTTON, None )
 		self.m_button42.Unbind( wx.EVT_BUTTON, None )
-		self.m_button7.Unbind( wx.EVT_BUTTON, None )
 		self.m_button18.Unbind( wx.EVT_BUTTON, None )
 		self.m_button61.Unbind( wx.EVT_BUTTON, None )
 		self.m_button19.Unbind( wx.EVT_BUTTON, None )
@@ -500,9 +486,6 @@ class MainFrame ( wx.Frame ):
 		event.Skip()
 	
 	def on_delete( self, event ):
-		event.Skip()
-	
-	def on_done( self, event ):
 		event.Skip()
 	
 	def on_find_left_rgb_yaml( self, event ):

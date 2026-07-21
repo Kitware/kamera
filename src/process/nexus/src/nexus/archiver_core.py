@@ -247,25 +247,25 @@ class ArchiverBase(object):
         print("\n\n VERSION CHECK 1 \n")
 
         self.envoy = RedisEnvoy(self._redis_host, client_name=node_host + "-nexus")
-        self.state_service = StateService(self.envoy.kv, node_host, "nexus")
+        self.state_service = StateService(self.envoy, node_host, "nexus")
 
         # Get Redis Params
-        arch = self.envoy.kv.get("/sys/arch")
+        arch = self.envoy.get("/sys/arch")
         self.set_arch(arch)
-        self._is_archiving = self.envoy.kv.get("/sys/arch/is_archiving")
+        self._is_archiving = self.envoy.get("/sys/arch/is_archiving")
         self._project = self.envoy.get("/sys/arch/project")
         fl = self.envoy.get("/sys/arch/flight")
         fl_number = "".join([d for d in str(fl) if d.isdigit()])
         self._flight = "fl{:0>2}".format(fl_number)
         self._effort = self.envoy.get("/sys/arch/effort")
-        self._save_every_x_image = self.envoy.kv.get(
+        self._save_every_x_image = self.envoy.get(
             f"/sys/effort_metadata_dict/{self._effort}/save_every_x_image"
         )
         self._field = os.environ.get("CAM_FOV", "default_view")
         self._collection_mode = self.envoy.get("/sys/collection_mode")
         self._template = self.envoy.get("/sys/arch/template")
-        self._base = self.envoy.kv.get("/sys/arch/base")
-        self._data_mount_point = self.envoy.kv.get(
+        self._base = self.envoy.get("/sys/arch/base")
+        self._data_mount_point = self.envoy.get(
             "/sys/arch/base", "/mnt/archiver_default"
         )
         self.disk_check(self._base, every_nth=1)
@@ -722,7 +722,7 @@ class ArchiverBase(object):
 
     @property
     def save_every_x_image(self):
-        self._save_every_x_image = self.envoy.kv.get(
+        self._save_every_x_image = self.envoy.get(
             f"/sys/effort_metadata_dict/{self.effort}/save_every_x_image"
         )
         return self._save_every_x_image

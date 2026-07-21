@@ -13,8 +13,9 @@ import rospy
 from cv_bridge import CvBridge, CvBridgeError
 
 from roskv.impl.redis_envoy import RedisEnvoy as ImplEnvoy
+from roskv.util import filter_hosts_by_system
 import wxpython_gui
-from wxpython_gui.utils import check_default
+import wxpython_gui.utils  # bind the submodule for wxpython_gui.utils.make_path()
 
 
 # Figure out relative positions
@@ -65,12 +66,16 @@ class Cfg(dict):
     #        kv
 
     def __setitem__(self, key, val):
-        # tic = time.time()
-        kv.put("%s/%s" % (self.ns, key), val)
-        # toc = time.time()
-        # print("Time to access was %s" % (toc - tic))
+        ns_key = "%s/%s" % (self.ns, key)
         if isinstance(val, dict):
-            val = Cfg(val, ns="%s/%s" % (self.ns, key))
+            # An empty dict has no leaves to flatten; kv.put would fall back to
+            # SET-ing a raw dict, which Redis rejects. Skip the write and keep
+            # the empty namespace in memory only.
+            if val:
+                kv.put(ns_key, val)
+            val = Cfg(val, ns=ns_key)
+        else:
+            kv.put(ns_key, val)
         super(Cfg, self).__setitem__(key, val)
 
     def __repr__(self):
@@ -85,99 +90,154 @@ class Cfg(dict):
             self[key] = other[key]
 
 
-# =================== LOADING GUI CONFIG =======================
-# This will attempt to load from redis first, and backfill from disk
-# Values are placed under "/sys/gui", with sys params under "/sys/gui/arch"
-# Location of the system configuration file dictionary.
+# =================== CONFIG RESOLUTION =======================
+# SYS_CFG is built by deep_merge-ing tiers low precedence to high; last wins:
+#   1. default_system_state.json        factory defaults
+#   2. <gui_cfg_dir>/system_state.json  last session (the only thing saved back)
+#   3. Redis /sys/*                      live runtime values
+#   4. config.yaml (USER_CFG)            static truth; ALWAYS WINS for its keys
+# camera_configurations.json owns SYS_CFG["camera_cfgs"].
+
+
+def deep_merge(base, override):
+    """Recursively merge ``override`` into ``base`` (later wins) and return it."""
+    for key, val in override.items():
+        if key in base and isinstance(base[key], dict) and isinstance(val, dict):
+            deep_merge(base[key], val)
+        else:
+            base[key] = val
+    return base
+
+
+# --- Tiers 1 & 2: factory defaults, then the cache (seeded from default) -----
 config_filename = os.path.join(USER_CFG["gui_cfg_dir"], "system_state.json")
-# create from template if it doesn't exist
+default_system_state_file = os.path.join(
+    REAL_KAM_REPO_DIR, "src/cfg", system_name, "default_system_state.json"
+)
+try:
+    with open(default_system_state_file, "r") as infile:
+        DEFAULT_STATE = json.load(infile)
+except Exception as e:
+    print(e)
+    DEFAULT_STATE = {}
 if not os.path.isfile(config_filename):
     wxpython_gui.utils.make_path(config_filename, from_file=True)
-    with open(os.path.join(PKG_DIR, "config/default_system_state.json"), "r") as infile:
-        with open(config_filename, "w") as outfile:
-            outfile.write(infile.read())
-            print("Created config from scratch: {}".format(config_filename))
+    with open(config_filename, "w") as outfile:
+        json.dump(DEFAULT_STATE, outfile, indent=4, sort_keys=True)
+        print("Created config from scratch: {}".format(config_filename))
 try:
-    GUI_ARCH_KV = kv.get_dict("/sys")
+    with open(config_filename, "r") as input_file:
+        CACHE_STATE = json.load(input_file)
 except Exception as e:
-    GUI_ARCH_KV = {}
-with open(config_filename, "r") as input_file:
-    GUI_ARCH_DEFAULT = json.load(input_file)
+    print(e)
+    CACHE_STATE = {}
 
-# Since we're grabbing everything, trim out camera configs for insert
+# --- Tier 3: live Redis state ------------------------------------------------
 try:
-    kv.delete_dict("/sys/camera_cfgs")
-except:
-    pass
-# Fill in any missing value in redis from disk
-GUI_ARCH = check_default(GUI_ARCH_KV, GUI_ARCH_DEFAULT)
+    REDIS_LIVE = kv.get_dict("/sys")
+except Exception as e:
+    print(e)
+    REDIS_LIVE = {}
+REDIS_LIVE.pop("camera_cfgs", None)  # presets come from the file below
 
-
-def save_config_settings():
-    print("Saving config settings.")
-    with open(config_filename, "w") as output_file:
-        json.dump(SYS_CFG, output_file, indent=4, sort_keys=True)
-
-
-# Fill in values that will change more frequently, not ones that are hardcoded
-# in the user-config.yml.
-# kv.put("/sys", GUI_ARCH)
-# =================== FINISHED GUI CONFIG =======================
-
-# =================== LOADING CAMERA CONFIG =======================
-# This will attempt to load from redis first, and backfill from disk
-# Location of the camera configuration file dictionary.
+# --- Camera presets (camera_configurations.json is authoritative) ------------
+# Mirrors the system_state cache: seed the runtime file from the in-repo default
+# the first time the GUI runs, then load it.
 camera_config_filename = os.path.join(
     USER_CFG["gui_cfg_dir"], "camera_configurations.json"
 )
-try:
-    CAMERA_CFGS_KV = kv.get_dict("/sys/camera_cfgs")
-except:
-    CAMERA_CFGS_KV = {}
+default_camera_config_file = os.path.join(
+    REAL_KAM_REPO_DIR, "src/cfg", system_name, "default_camera_configurations.json"
+)
+if not os.path.isfile(camera_config_filename):
+    try:
+        wxpython_gui.utils.make_path(camera_config_filename, from_file=True)
+        with open(default_camera_config_file, "r") as infile:
+            with open(camera_config_filename, "w") as outfile:
+                outfile.write(infile.read())
+    except Exception as e:
+        print(e)
 try:
     with open(camera_config_filename, "r") as input_file:
-        CAMERA_CFGS_DEFAULT = json.load(input_file)
+        CAMERA_PRESETS = json.load(input_file)
 except Exception as e:
     print(e)
-    CAMERA_CFGS_DEFAULT = {}
-# Fill in any missing value in redis from disk
-CAMERA_CFGS = {}
-CAMERA_CFGS["camera_cfgs"] = check_default(CAMERA_CFGS_KV, CAMERA_CFGS_DEFAULT)
-# kv.put("/sys/camera_cfgs", CAMERA_CFGS)
-# =================== FINISHED CAMERA CONFIG =======================
+    CAMERA_PRESETS = {}
+try:
+    kv.delete_dict("/sys/camera_cfgs")  # clear stale presets from Redis
+except Exception:
+    pass
 
-
-def merge_two_dicts(a, b, path=None):
-    "merges b into a"
-    if path is None:
-        path = []
-    for key in b:
-        if key in a:
-            if isinstance(a[key], dict) and isinstance(b[key], dict):
-                merge_two_dicts(a[key], b[key], path + [str(key)])
-            elif a[key] == b[key]:
-                pass  # same leaf value
-            else:
-                print("Warning: conflict at %s" % ".".join(path + [str(key)]))
-        else:
-            a[key] = b[key]
-    return a
-
-
-# Combine entries from user-config.yml, camera_configurations.json, and system_state.json
+# --- Resolve, lowest precedence first ----------------------------------------
 SYS_ARCH = {}
-SYS_ARCH = merge_two_dicts(SYS_ARCH, CAMERA_CFGS)
-SYS_ARCH = merge_two_dicts(SYS_ARCH, GUI_ARCH)
-# This is required since both files contain "arch" keys and otherwise
-# update won't merge properly
-USER_CFG["arch"] = merge_two_dicts(USER_CFG["arch"], GUI_ARCH["arch"])
-USER_CFG = merge_two_dicts(USER_CFG, GUI_ARCH)
-SYS_ARCH = merge_two_dicts(SYS_ARCH, USER_CFG)
-# kv.put("/sys", SYS_ARCH)
+deep_merge(SYS_ARCH, DEFAULT_STATE)  # 1. factory defaults
+deep_merge(SYS_ARCH, CACHE_STATE)    # 2. operator's last session
+deep_merge(SYS_ARCH, REDIS_LIVE)     # 3. live runtime values
+# 4. config.yaml OWNS the static keys it declares: replace rather than merge, so
+#    a key removed from the yaml (e.g. a dropped channel) can't survive from a
+#    lower tier. "arch" mixes static + mutable session subkeys, so only its
+#    static subkeys are replaced.
+for key, val in USER_CFG.items():
+    if key != "arch":
+        SYS_ARCH[key] = val
+SYS_ARCH.setdefault("arch", {})
+for sub, val in USER_CFG.get("arch", {}).items():
+    SYS_ARCH["arch"][sub] = val
+SYS_ARCH["camera_cfgs"] = CAMERA_PRESETS
 
-# Get the global configuration combining all 3 configurations above
+# Publish to Redis under /sys. First drop the static subtrees so keys removed
+# from config.yaml don't linger (put only sets keys, never deletes); the update
+# then republishes the authoritative values. arch.hosts is the only static dict
+# under "arch" -- the rest of /sys/arch holds mutable state we must not wipe.
+for key, val in USER_CFG.items():
+    if key != "arch" and isinstance(val, dict):
+        try:
+            kv.delete_dict("/sys/%s" % key)
+        except Exception:
+            pass
+try:
+    kv.delete_dict("/sys/arch/hosts")
+except Exception:
+    pass
 SYS_CFG = Cfg(ns="/sys")
 SYS_CFG.update(SYS_ARCH)
+
+
+# Keys excluded from the saved session state: YAML-owned (static), camera
+# presets, and live per-host / camera Redis echoes.
+_STATIC_TOP_KEYS = set(USER_CFG.keys())
+_STATIC_ARCH_KEYS = set(USER_CFG.get("arch", {}).keys())
+_HOST_KEYS = set(USER_CFG.get("arch", {}).get("hosts", {}).keys())
+_RUNTIME_ONLY_KEYS = {"actual_geni_params", "camera_cfgs"}
+
+
+def extract_state(cfg):
+    """Return only the operator-mutable session state from ``cfg``."""
+    state = {}
+    for key, val in cfg.items():
+        # arch is YAML-owned but mixes static and mutable subkeys, so split it.
+        if key == "arch" and isinstance(val, dict):
+            arch_state = {k: v for k, v in val.items() if k not in _STATIC_ARCH_KEYS}
+            if arch_state:
+                state["arch"] = arch_state
+            continue
+        if key in _STATIC_TOP_KEYS or key in _HOST_KEYS or key in _RUNTIME_ONLY_KEYS:
+            continue
+        state[key] = val
+    return state
+
+
+def save_config_settings():
+    """Snapshot the mutable session state to the on-disk cache.
+
+    Live values already stream into Redis via ``Cfg.__setitem__``; this just
+    persists the subset so it survives a reboot or Redis flush.
+    """
+    state = extract_state(SYS_CFG)
+    print("Saving config settings (session state).")
+    with open(config_filename, "w") as output_file:
+        json.dump(state, output_file, indent=4, sort_keys=True)
+# =================== FINISHED CONFIG RESOLUTION =======================
 
 
 # =================== DEFINE GLOBALS ===============================
@@ -191,7 +251,9 @@ TEXTCTRL_WHITE = (255, 255, 255)
 TEXTCTRL_DARK = (20, 20, 20)
 APP_GRAY = (220, 218, 213)  # Default application background
 FLAT_GRAY = (200, 200, 200)
+DISABLED_GRAY = (150, 150, 150)  # Darker fill for disabled input fields
 COLLECT_GREEN = (55, 120, 25)
+COLLECT_ALERT_RED = (215, 65, 65)  # alert red while collecting with a fault
 SHAPE_COLLECT_BLUE = (
     52,
     100,
@@ -212,36 +274,11 @@ geod = pygeodesy.geoids.GeoidPGM(geod_filename)
 PAT_BRACED = re.compile(r"\{(\w+)\}")
 
 
-LICENSE_STR = "".join(
-    [
-        "Copyright 2018 by Kitware, Inc.\n",
-        "All rights reserved.\n\n",
-        "Redistribution and use in source and binary forms, with or without ",
-        "modification, are permitted provided that the following conditions are met:",
-        "\n\n",
-        "* Redistributions of source code must retain the above copyright notice, ",
-        "this list of conditions and the following disclaimer.",
-        "\n\n",
-        "* Redistributions in binary form must reproduce the above copyright notice, ",
-        "this list of conditions and the following disclaimer in the documentation ",
-        "and/or other materials provided with the distribution.",
-        "\n\n",
-        "* Neither name of Kitware, Inc. nor the names of any contributors may be ",
-        "used to endorse or promote products derived from this software without ",
-        "specific prior written permission.",
-        "\n\n",
-        "THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ",
-        "'AS IS' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED ",
-        "TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR ",
-        "PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE ",
-        "LIABLE FORANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR ",
-        "CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF ",
-        "SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS ",
-        "INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN ",
-        "CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ",
-        "ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE ",
-        "POSSIBILITY OF SUCH DAMAGE.",
-    ]
+LICENSE_STR = (
+    "Licensed under the Apache License, Version 2.0 (the \"License\"); "
+    "you may not use this file except in compliance with the License. "
+    "You may obtain a copy of the License at "
+    "http://www.apache.org/licenses/LICENSE-2.0"
 )
 
 # =================== END GLOBALS ===============================
@@ -269,34 +306,34 @@ def get_arch_path():
     return tmpl.format(**fmt_dict)
 
 
-def sync_dicts(truth, sync):
-    assert len(truth.keys()) == len(sync.keys())
-    for k, v in truth.items():
-        if isinstance(v, dict):
-            sync_dicts(truth[k], sync[k])
-        if v != sync[k]:
-            sync[k] = v
-
-
 def pull_gui_state():
+    """Refresh the in-memory arch state from the live Redis values."""
     print("Pulling gui state")
     try:
-        d1 = kv.get_dict("/sys/arch")
+        live_arch = kv.get_dict("/sys/arch")
     except Exception as e:
         print(e)
-        d1 = {}
-    d2 = SYS_CFG["arch"]
-    d3 = check_default(d2, d1)
-    sync_dicts(d3, d2)
+        return
+    deep_merge(SYS_CFG["arch"], live_arch)
 
 
-def save_camera_config(curr_cfg=None):
+def _plain_dict(val):
+    """Recursively convert ``Cfg`` wrappers to plain dicts for JSON serialization."""
+    if isinstance(val, dict):
+        return {k: _plain_dict(v) for k, v in val.items()}
+    return val
+
+
+def save_camera_config(curr_cfg=None, camera_cfgs=None):
     print("Saving camera configuration")
+    presets = _plain_dict(
+        camera_cfgs if camera_cfgs is not None else SYS_CFG["camera_cfgs"]
+    )
     # Save to local cache
     if not os.path.isfile(camera_config_filename):
         wxpython_gui.utils.make_path(camera_config_filename, from_file=True)
     with open(camera_config_filename, "w") as outfile:
-        json.dump(SYS_CFG["camera_cfgs"], outfile, indent=4, sort_keys=True)
+        json.dump(presets, outfile, indent=4, sort_keys=True)
         print("Saved config: {}".format(camera_config_filename))
 
     # Saving specific camera config to dir
@@ -307,31 +344,39 @@ def save_camera_config(curr_cfg=None):
         if dirname is not None:
             fname = "%s/sys_config.json" % dirname
         else:
-            return
+            return camera_config_filename
         if not os.path.isfile(fname):
             wxpython_gui.utils.make_path(fname, from_file=True)
         with open(fname, "w") as outfile:
-            json.dump(
-                SYS_CFG["camera_cfgs"][curr_cfg], outfile, indent=4, sort_keys=True
-            )
+            json.dump(presets[curr_cfg], outfile, indent=4, sort_keys=True)
             print("Saved sys config: {}".format(fname))
         return dirname
     else:
         return camera_config_filename
 
 
+def _format_shutter_speed_label(exposure_us):
+    """Render Phase One shutter speed as a fractional stop (e.g. 1/2500)."""
+    if exposure_us is None:
+        return "Spd: ?"
+    seconds = float(exposure_us) * 1e-6
+    if seconds <= 0:
+        return "Spd: ?"
+    return "Spd: 1/%d" % int(round(1.0 / seconds))
+
+
 def format_status(
     timeval=None,
-    num_dropped=0,
+    num_dropped=None,
     exposure_us=None,
     gain=None,
     dt=0,
-    fps=0.0,
+    fps=None,
     chan=None,
     total=None,
     processed=None,
 ):
-    # type: (datetime.datetime, int, int, int, float, float, str) -> unicode
+    # type: (datetime.datetime, int, int, int, float, float, str) -> str
     """
     Render the status message.
     ☒☀⚠⍙
@@ -349,31 +394,38 @@ def format_status(
         return "☒ No image stream\n" + extra
     time_str = str(timeval.time())[3:11]
 
-    drop_str = (
-        "{} dropped".format(num_dropped)
-        if num_dropped < 10000
-        else "{:.0e} dropped".format(num_dropped)
+    if num_dropped is None:
+        drop_str = "? dropped"
+    elif num_dropped < 10000:
+        drop_str = "{} dropped".format(num_dropped)
+    else:
+        drop_str = "{:.0e} dropped".format(num_dropped)
+    gain_str = (
+        "ISO: ?"
+        if chan == "rgb" and gain is None
+        else "Gain: ?"
+        if gain is None
+        else ("ISO: {}" if chan == "rgb" else "Gain: {}").format(gain)
     )
-    gain_str = "Gain:?" if gain is None else "Gain:{}".format(gain)
-    # display N/N, even if internally it's N-1/N
-    # make sure processed isn't above total
-    if processed < total:
-        total = total - 1 if total > 0 else total
+    fps_str = "? fps" if fps is None else "{:4.2f} fps".format(fps)
     if total is not None and processed is not None:
         drop_str += " | DB: {}/{}".format(processed, total)
     processed_str = "" if processed is None else "{}".format(processed)
-    expo_str = (
-        "Exp: ? ms"
-        if exposure_us is None
-        else "Exp: {:0.2f} ms".format(float(exposure_us) * 1e-3)
-    )
-    if chan == "ir":
-        fmt = "{fps: 4.2f} fps\n{drop}"
-        out = fmt.format(fps=fps, drop=drop_str)
+    if chan == "rgb":
+        expo_str = _format_shutter_speed_label(exposure_us)
     else:
-        fmt = "{gain} | {fps: 4.2f} fps\n{expo}\n{drop}"
+        expo_str = (
+            "Exp: ? ms"
+            if exposure_us is None
+            else "Exp: {:0.2f} ms".format(float(exposure_us) * 1e-3)
+        )
+    if chan == "ir":
+        fmt = "{fps}\n{drop}"
+        out = fmt.format(fps=fps_str, drop=drop_str)
+    else:
+        fmt = "{gain} | {fps} | {expo}\n{drop}"
         out = fmt.format(
-            time=time_str, gain=gain_str, fps=fps, expo=expo_str, drop=drop_str
+            time=time_str, gain=gain_str, fps=fps_str, expo=expo_str, drop=drop_str
         )
     return out
 
@@ -385,9 +437,11 @@ def channel_format_status(fov, chan, timeval=None, dt=0):
     a = "actual_geni_params"
     param_ns = "/".join(["", "sys", a, host, chan])
     drop_ns = "/".join(["", "sys", "arch", host, chan, "dropped"])
-    num_dropped = int(kv.get(drop_ns))
+    dropped_val = kv.get(drop_ns, None)
+    num_dropped = int(dropped_val) if dropped_val is not None else None
     fps_ns = "/".join(["", "sys", "arch", host, chan, "fps"])
-    fps = float(kv.get(fps_ns))
+    fps_val = kv.get(fps_ns, None)
+    fps = float(fps_val) if fps_val is not None else None
     exposure_us = None
     gain = None
     total = None
@@ -396,11 +450,17 @@ def channel_format_status(fov, chan, timeval=None, dt=0):
         gain = kv.get(param_ns + "/GainValue", None)
         exposure_us = kv.get(param_ns + "/ExposureValue", None)
     elif chan == "rgb":
-        gain = int(float(kv.get(param_ns + "/ISO", None)) / 50.0)
-        # convert float point seconds to us
-        exposure_us = float(kv.get(param_ns + "/Shutter_Speed", None)) * 1e6
-        total = int(kv.get("/sys/" + host + "/p1debayerq/total"))
-        processed = int(kv.get("/sys/" + host + "/p1debayerq/processed"))
+        iso = kv.get(param_ns + "/ISO", None)
+        if iso is not None:
+            gain = int(float(iso))
+        shutter = kv.get(param_ns + "/Shutter_Speed", None)
+        if shutter is not None:
+            # convert float point seconds to us
+            exposure_us = float(shutter) * 1e6
+        total = kv.get("/sys/" + host + "/p1debayerq/total", None)
+        total = int(total) if total is not None else None
+        processed = kv.get("/sys/" + host + "/p1debayerq/processed", None)
+        processed = int(processed) if processed is not None else None
     try:
         dt = float(kv.get(param_ns + "/last_msg_time", None))
     except:
@@ -421,7 +481,26 @@ def channel_format_status(fov, chan, timeval=None, dt=0):
 def host_from_fov(fov):
     # type: (str) -> str
     hosts = SYS_CFG["arch"]["hosts"]
-    for host, attrs in hosts.items():
-        if fov == attrs["fov"]:
+    # Skip stale hosts left in redis from other systems.
+    for host in filter_hosts_by_system(hosts.keys()):
+        if fov == hosts[host]["fov"]:
             return host
     raise KeyError("FOV not found: '{}'".format(fov))
+
+
+def get_detector_pipefile(host, sys_cfg=None):
+    # type: (str, Optional[str]) -> Optional[str]
+    """Resolve a host's detector pipefile from the active camera config.
+
+    The pipefile is defined per-FOV in camera_cfgs as "<fov>_sys_pipe"; it is
+    read from there directly rather than duplicated into per-host state.
+    Returns None when unset or invalid.
+    """
+    if sys_cfg is None:
+        sys_cfg = SYS_CFG["arch"].get("sys_cfg")
+    try:
+        fov = SYS_CFG["arch"]["hosts"][host]["fov"]
+        pipe = SYS_CFG["camera_cfgs"][sys_cfg]["{}_sys_pipe".format(fov)]
+    except KeyError:
+        return None
+    return pipe if (pipe and pipe != "null") else None

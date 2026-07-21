@@ -1,6 +1,6 @@
 # This image contains the base of the ROS/CUDA for the system, plus
 # a bunch of utility packages
-FROM nvidia/cuda:12.6.2-devel-ubuntu20.04 as base_cuda_ubuntu
+FROM nvidia/cuda:12.6.2-devel-ubuntu20.04 AS base_cuda_ubuntu
 
 WORKDIR /root
 # setup environment
@@ -80,7 +80,6 @@ RUN     pip install --upgrade --no-cache-dir pip \
     &&  pip install --no-cache-dir \
             ipython \
             ipdb \
-            python-benedict \
             pyserial \
             typing \
             pathlib \

@@ -1,10 +1,10 @@
 ---
 ## Core processes
-version: '3.7'
 services:
   ## =========================== headless nodes =============================
   postproc:
-    image: kitware/kamera:postproc
+    image: ${KAMERA_POSTPROC_IMAGE}
+    init: true
     network_mode: host
     environment:
       REDIS_HOST: "${REDIS_HOST}"

@@ -2,15 +2,18 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-# Kills running containers and processes
-trap "{ echo Stopping session 'core'.; tmuxinator stop core; exit 0; }" EXIT
+cleanup() {
+    echo "Stopping session 'core'."
+    docker-compose -f "${KAMERA_DIR}/compose/core.yml" down
+    tmux kill-session -t core 2>/dev/null
+}
+trap cleanup EXIT
 
-source $DIR/../env.sh
+. "${DIR}/../startup.sh"
+export KAMERA_DIR="/home/user/kw/kamera"
 
 echo "Start session 'core'."
-ln -sf $DIR/config/core.yml ~/.tmuxinator/core.yml
+tmux new-session -d -s core -n webvideo -c "${KAMERA_DIR}" \
+    "bash -c 'source ${DIR}/../env.sh && docker-compose -f compose/core.yml up webvideo'"
 
-tmuxinator start -p $DIR/config/core.yml
-
-# Keep process alive for supervisor
 sleep infinity

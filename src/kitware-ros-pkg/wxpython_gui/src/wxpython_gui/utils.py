@@ -4,6 +4,7 @@ import errno
 import time
 import json
 from collections import OrderedDict
+from collections.abc import Iterable
 
 import rospy
 
@@ -64,7 +65,7 @@ def omap(func, maybe_itr):
     """Map over optional"""
     if maybe_itr is None:
         return None
-    if isinstance(maybe_itr, string_types):
+    if isinstance(maybe_itr, str):
         return func(maybe_itr)
     elif isinstance(maybe_itr, Iterable):
         return map(func, maybe_itr)

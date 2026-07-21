@@ -1,4 +1,6 @@
+import wx
 import wxpython_gui.system_control_panel.form_builder_output_system_startup as form_builder_output_system_startup
+from wxpython_gui.system_control_panel.gui_utils import unclip_static_text
 
 
 class SystemStartup(form_builder_output_system_startup.MainFrame):
@@ -15,6 +17,13 @@ class SystemStartup(form_builder_output_system_startup.MainFrame):
         self.hosts = system.scc.hosts
 
         self.Show()
+        # Unclip enlarged fonts (Phoenix), then grow the frame to fit all
+        # controls so the buttons don't overlap.
+        wx.CallAfter(self._finalize_layout)
+
+    def _finalize_layout(self):
+        unclip_static_text(self)
+        self.Fit()
         self.SetMinSize(self.GetSize())
 
     # -------------------------- All self.systems Commands ------------------------

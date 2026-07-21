@@ -1,12 +1,14 @@
 from __future__ import division, print_function
 import copy
+import os
 import wx
 import yaml
 import numpy as np
 import sys
-from wxpython_gui.camera_models import load_from_file
+from kamera.colmap_processing.camera_models import load_from_file
 import wxpython_gui.system_control_panel.form_builder_output_camera_configuration as fbocc
 from wxpython_gui.cfg import SYS_CFG, save_camera_config
+from wxpython_gui.system_control_panel.gui_utils import unclip_static_text
 
 class CameraConfiguration(fbocc.MainFrame):
     """Defines how the cameras are layed out.
@@ -22,6 +24,8 @@ class CameraConfiguration(fbocc.MainFrame):
         """
         # Initialize parent class
         fbocc.MainFrame.__init__(self, parent)
+        # Recompute enlarged title fonts so they are not clipped under Phoenix.
+        wx.CallAfter(unclip_static_text, self)
         self.parent = parent
         self.curr_cfg = sel_camera_config
 
@@ -56,7 +60,7 @@ class CameraConfiguration(fbocc.MainFrame):
             select_str - select this str after updating.
         """
         # First cache which camera configuration is currently selected.
-        if select_str is "":
+        if select_str == "":
             select_str = self.camera_config_combo.GetStringSelection()
 
         self.camera_config_combo.SetEditable(True)
@@ -123,23 +127,27 @@ class CameraConfiguration(fbocc.MainFrame):
         SYS_CFG["camera_cfgs"][key] = tmp
 
         self.curr_cfg = key
-        self.update_combo(select_str=key)
-        # Refresh current combo in parent in case it changed
-        self.parent.on_camera_config_combo()
-
-        # Remove a tmp definition if present.
         try:
             del SYS_CFG["camera_cfgs"]['']
         except KeyError:
             pass
 
-        self.save_camera_config_dict(SYS_CFG["camera_cfgs"])
+        self.update_combo(select_str=key)
+        save_path = save_camera_config(key, camera_cfgs=SYS_CFG["camera_cfgs"])
+        self.parent.set_camera_config_dict(select_str=key)
+        center_rgb_yaml = (tmp.get("center_rgb_yaml_path") or "").strip()
+        if center_rgb_yaml and os.path.isfile(center_rgb_yaml):
+            SYS_CFG["rgb_vfov"] = load_from_file(center_rgb_yaml).fov()[1]
+        SYS_CFG["arch"]["sys_cfg"] = key
+        self.parent.update_project_flight_params()
+        self.parent.add_to_event_log(
+            'Saved system configurations to {}.'.format(save_path)
+        )
+        self.Close()
 
     def save_camera_config_dict(self, config_dict):
         # Save camera config to only local config here, saved to /mnt in parent
-        dirname = save_camera_config()
-        self.parent.add_to_event_log('Saved system configurations to {}. '
-                .format(dirname))
+        return save_camera_config(self.curr_cfg, camera_cfgs=config_dict)
 
     def on_combo_select(self, event=None):
         select_str = self.camera_config_combo.GetStringSelection()
@@ -199,16 +207,23 @@ class CameraConfiguration(fbocc.MainFrame):
         txt = config_dict['description']
         self.configuration_notes_txt_ctrl.SetValue('' if txt is None else txt)
 
+    def _clear_config_combo_selection(self):
+        self.camera_config_combo.SetEditable(True)
+        self.camera_config_combo.SetValue('')
+        self.camera_config_combo.SetSelection(-1)
+        self.camera_config_combo.SetEditable(False)
+
     def on_new(self, event):
         self.config_name_txt_ctrl.Enable()
         tmpl = self.get_template()
         self.set_fields_to_camera_config_dict(tmpl)
         self.config_name_txt_ctrl.SetValue('')
-        self.camera_config_combo.SetSelection(-1)
+        self._clear_config_combo_selection()
 
     def on_new_from_current(self, event):
         self.config_name_txt_ctrl.Enable()
         self.config_name_txt_ctrl.SetValue('')
+        self._clear_config_combo_selection()
 
     # ----------------------------- File Pickers -----------------------------
     # Left-system pickers
@@ -300,7 +315,7 @@ class CameraConfiguration(fbocc.MainFrame):
 
     def file_picker(self, wildcard='*'):
         dialog = wx.FileDialog(None, "Choose a file", SYS_CFG["nas_mnt"], '',
-                               wildcard, wx.OPEN)
+                               wildcard, wx.FD_OPEN)
         if dialog.ShowModal() == wx.ID_OK:
             file_path = dialog.GetPath()
         else:
@@ -325,10 +340,4 @@ class CameraConfiguration(fbocc.MainFrame):
         self.parent.add_to_event_log('Deleted system configuration {}.'
                 .format(self.curr_cfg))
         self.save_camera_config_dict(SYS_CFG["camera_cfgs"])
-        self.parent.set_camera_config_dict()
-
-    def on_done(self, event=None):
-        """When the 'Cancel' button is selected.
-
-        """
-        self.Close()
+        self.parent.set_camera_config_dict(select_str=select_str)

@@ -1,0 +1,9 @@
+{
+    "insecure-registries": ["center0taiga:5000"],
+    "runtimes": {
+        "nvidia": {
+            "args": [],
+            "path": "nvidia-container-runtime"
+        }
+    }
+}

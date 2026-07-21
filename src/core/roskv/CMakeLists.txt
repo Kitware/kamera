@@ -15,7 +15,6 @@ find_package(catkin REQUIRED COMPONENTS
     roscpp
 )
 find_package(nlohmann_json REQUIRED)
-find_package(fmt REQUIRED)
 find_path(HIREDIS_HEADER hiredis)
 find_path(REDIS_PLUS_PLUS_HEADER sw)
 find_library(HIREDIS_LIB hiredis)
@@ -65,21 +64,17 @@ include_directories(include ${Boost_INCLUDE_DIR} ${catkin_INCLUDE_DIRS} ${roscpp
 add_library(roskv
         include/roskv/envoy.h
         include/roskv/archiver.h
-        include/roskv/roskv.h
         libroskv/envoy.cpp
         libroskv/archiver.cpp
-        libroskv/roskv.cpp
         )
 add_executable(test_roskv libroskv/test_roskv.cpp)
 target_link_libraries(roskv
-        fmt::fmt
         ${catkin_LIBRARIES}
         ${nlohmann_json_LIBRARIES}
         ${HIREDIS_LIB}
         ${REDIS_PLUS_PLUS_LIB})
 
 target_link_libraries(test_roskv
-        fmt::fmt
         ${catkin_LIBRARIES}
         ${nlohmann_json_LIBRARIES}
         ${HIREDIS_LIB}
@@ -140,5 +135,4 @@ install(
 # catkin_add_nosetests(test)
 cmake_print_variables(PROJECT_NAME)
 cmake_print_variables(CATKIN_PACKAGE_INCLUDE_DESTINATION catkin_LIBRARIES)
-cmake_print_variables(fmt_FOUND FMT_HEADER FMT_LIB fmt_LIBRARIES)
 cmake_print_variables(nlohmann_json_LIBRARIES REDIS_PLUS_PLUS_HEADER REDIS_PLUS_PLUS_LIB)

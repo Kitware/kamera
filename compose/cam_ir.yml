@@ -1,10 +1,10 @@
 ---
 ## Auxiliary node to attach to master
-version: '3.7'
 services:
   cam_ir:
     container_name: "cam-ir-${CAM_FOV}"
-    image: kitware/kamera:core
+    image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     environment:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"
@@ -23,5 +23,5 @@ services:
       - "/mnt:/mnt"
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     command: ["/entry/cam_ir.sh"]
-    restart: unless-stopped
+    restart: no
 ...

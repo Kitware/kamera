@@ -4,7 +4,6 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <sw/redis++/redis++.h>
-#include <roskv/roskv.h>
 #include <roskv/envoy.h>
 #include <roskv/archiver.h>
 #include <ros/ros.h>
@@ -136,7 +135,6 @@ bool test_json() {
 }
 
 bool test_roskv() {
-    hello_roskv();
     string redis_addr = RedisHelper::get_redis_uri();
     RedisHelper::assert_redis(redis_addr);
     ArchiverFormatter af{redis_addr, "/sys/arch", "center", "rgb"};

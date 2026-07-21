@@ -1,11 +1,11 @@
 ---
 ## Auxiliary node to attach to master
-version: '3.7'
 services:
   ## =========================== headless nodes =============================
   cam_rgb:
     container_name: "cam-rgb-${CAM_FOV}"
-    image: kitware/kamera:core
+    image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     environment:
       ROS_MASTER_URI: "${ROS_MASTER_URI}"
@@ -25,7 +25,7 @@ services:
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     command: ["/entry/cam_phaseone.sh"]
         #command: ["bash"]
-    restart: unless-stopped
+    restart: no
     deploy:
       resources:
         reservations:

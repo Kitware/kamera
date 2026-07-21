@@ -3,7 +3,7 @@ from __future__ import division, print_function
 import datetime
 import threading
 import rospy
-import StringIO
+from io import BytesIO
 import cv2
 import sys
 import time
@@ -163,7 +163,7 @@ class UpdateImageThread(threading.Thread):
         if len(image_msg.data) == 0:
             return
         if self._compressed:
-            sio = StringIO.StringIO(image_msg.data)
+            sio = BytesIO(image_msg.data)
             im = PILImage.open(sio)
             preview = np.array(im)
             raw_preview = preview.copy()
@@ -214,6 +214,11 @@ class UpdateImageThread(threading.Thread):
         try:
             homography, output_height, output_width = self.get_homography()
 
+            # py3 rospy is strict: int fields reject floats (incl. numpy).
+            output_height = int(output_height)
+            output_width = int(output_width)
+            contrast_strength = int(SYS_CFG["ir_contrast_strength"])
+
             # Invert and flatten
             homography_ = tuple(np.linalg.inv(homography).ravel())
             frame = "%s_%s_%s" % (self._fov, self._chan, self._id)
@@ -239,7 +244,7 @@ class UpdateImageThread(threading.Thread):
                     release=release,
                     frame=frame,
                     apply_clahe=self.apply_clahe,
-                    contrast_strength=SYS_CFG["ir_contrast_strength"],
+                    contrast_strength=contrast_strength,
                     show_saturated_pixels=SYS_CFG["show_saturated_pixels"],
                 )
             if not resp.success:
@@ -253,7 +258,7 @@ class UpdateImageThread(threading.Thread):
             if len(image_msg.data) == 0:
                 return
             if self._compressed:
-                sio = StringIO.StringIO(image_msg.data)
+                sio = BytesIO(image_msg.data)
                 im = PILImage.open(sio)
                 image = np.array(im)
                 image = image.copy()
@@ -281,21 +286,26 @@ class UpdateImageThread(threading.Thread):
             )
             return
 
-        except wx._core.PyDeadObjectError as e:
+        except RuntimeError as e:
             rospy.logwarn(e)
             return
 
     def update_status_msg(self, img_header):
-        # type: (std_msgs.msg.Header) -> unicode
+        # type: (std_msgs.msg.Header) -> str
         """Update the status bar for an image view"""
         t = img_header.stamp.to_sec()
         t = datetime.datetime.utcfromtimestamp(t)
         # string = format_status(timeval=t, num_dropped=0)
-        string = channel_format_status(
-            self._fov,
-            self._chan,
-            timeval=t,
-        )
+        # Don't let a missing redis key block imagery dispatch.
+        try:
+            string = channel_format_status(
+                self._fov,
+                self._chan,
+                timeval=t,
+            )
+        except Exception as e:
+            rospy.logwarn_throttle(10, "Could not format status: {}".format(e))
+            return None
         wx.CallAfter(self._parent.update_status_msg, string)
         return string
 

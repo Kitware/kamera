@@ -19,8 +19,8 @@ class MainFrame ( wx.Frame ):
 	def __init__( self, parent ):
 		wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = u"System Startup and Control Commands", pos = wx.DefaultPosition, size = wx.Size( 893,701 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
 		
-		self.SetSizeHintsSz( wx.Size( -1,-1 ), wx.DefaultSize )
-		self.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), 70, 90, 90, False, wx.EmptyString ) )
+		self.SetSizeHints( wx.Size( -1,-1 ), wx.DefaultSize )
+		self.SetFont( wx.Font( wx.NORMAL_FONT.GetPointSize(), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, wx.EmptyString ) )
 		self.SetForegroundColour( wx.SystemSettings.GetColour( wx.SYS_COLOUR_WINDOWTEXT ) )
 		
 		main_size = wx.BoxSizer( wx.HORIZONTAL )
@@ -33,16 +33,16 @@ class MainFrame ( wx.Frame ):
 		gSizer1 = wx.GridSizer( 4, 3, 0, 0 )
 		
 		
-		gSizer1.AddSpacer( ( 0, 0), 1, wx.EXPAND, 5 )
+		gSizer1.Add( ( 0, 0), 1, wx.EXPAND, 5 )
 		
 		self.m_staticText341 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Entire System", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText341.Wrap( -1 )
-		self.m_staticText341.SetFont( wx.Font( 18, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText341.SetFont( wx.Font( 18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		gSizer1.Add( self.m_staticText341, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
 		
-		gSizer1.AddSpacer( ( 0, 0), 1, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL, 5 )
+		gSizer1.Add( ( 0, 0), 1, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
 		self.m_button14211 = wx.Button( self.m_panel33, wx.ID_ANY, u"Start Entire System", wx.DefaultPosition, wx.DefaultSize, 0 )
 		gSizer1.Add( self.m_button14211, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
@@ -115,16 +115,16 @@ class MainFrame ( wx.Frame ):
 		gSizer11 = wx.GridSizer( 4, 3, 0, 0 )
 		
 		
-		gSizer11.AddSpacer( ( 0, 0), 1, wx.EXPAND, 5 )
+		gSizer11.Add( ( 0, 0), 1, wx.EXPAND, 5 )
 		
 		self.m_staticText3411 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Left-View Computer (sys1)", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText3411.Wrap( -1 )
-		self.m_staticText3411.SetFont( wx.Font( 18, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText3411.SetFont( wx.Font( 18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		gSizer11.Add( self.m_staticText3411, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
 		
-		gSizer11.AddSpacer( ( 0, 0), 1, wx.EXPAND, 5 )
+		gSizer11.Add( ( 0, 0), 1, wx.EXPAND, 5 )
 		
 		bSizer101 = wx.BoxSizer( wx.VERTICAL )
 		
@@ -191,16 +191,16 @@ class MainFrame ( wx.Frame ):
 		gSizer111 = wx.GridSizer( 4, 3, 0, 0 )
 		
 		
-		gSizer111.AddSpacer( ( 0, 0), 1, wx.EXPAND, 5 )
+		gSizer111.Add( ( 0, 0), 1, wx.EXPAND, 5 )
 		
 		self.m_staticText34111 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Center-View Computer (sys0)", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText34111.Wrap( -1 )
-		self.m_staticText34111.SetFont( wx.Font( 18, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText34111.SetFont( wx.Font( 18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		gSizer111.Add( self.m_staticText34111, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
 		
-		gSizer111.AddSpacer( ( 0, 0), 1, wx.EXPAND, 5 )
+		gSizer111.Add( ( 0, 0), 1, wx.EXPAND, 5 )
 		
 		bSizer1011 = wx.BoxSizer( wx.VERTICAL )
 		
@@ -267,16 +267,16 @@ class MainFrame ( wx.Frame ):
 		gSizer112 = wx.GridSizer( 4, 3, 0, 0 )
 		
 		
-		gSizer112.AddSpacer( ( 0, 0), 1, wx.EXPAND, 5 )
+		gSizer112.Add( ( 0, 0), 1, wx.EXPAND, 5 )
 		
 		self.m_staticText34112 = wx.StaticText( self.m_panel33, wx.ID_ANY, u"Right-View Computer (sys2)", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText34112.Wrap( -1 )
-		self.m_staticText34112.SetFont( wx.Font( 18, 70, 90, 92, False, wx.EmptyString ) )
+		self.m_staticText34112.SetFont( wx.Font( 18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, False, wx.EmptyString ) )
 		
 		gSizer112.Add( self.m_staticText34112, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
 		
-		gSizer112.AddSpacer( ( 0, 0), 1, wx.EXPAND, 5 )
+		gSizer112.Add( ( 0, 0), 1, wx.EXPAND, 5 )
 		
 		bSizer1012 = wx.BoxSizer( wx.VERTICAL )
 		

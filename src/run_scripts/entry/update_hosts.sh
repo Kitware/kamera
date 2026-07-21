@@ -3,7 +3,7 @@
 # Update /etc/hosts with our preconfigured ones
 # /etc/hosts will tolerate multiple duplicate entries. It just takes the first row as the IP resolve
 
-# $WS_DIR and $ROS_DISTRO should be provided by the container
+# $REPO_DIR and $ROS_DISTRO should be provided by the container
 
 # skip if we definitely know it's been appended with KAMERA entries
 if [[ -n `grep KAMERA /etc/hosts` ]] ; then

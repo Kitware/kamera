@@ -1,45 +1,54 @@
-CMD ?= bash
-runtime ?= runc
-network ?= host
-name ?= kamera
-DAQDEV ?= mcc_daq
-REPO_DIR ?= $(shell realpath ${PWD})
-REPO_DIR_BASEDIR ?= $(shell dirname $(REPO_DIR))
-ROS_MASTER_URI ?= not_set_your_config_is_bad
-## Docker buildkit - disable by setting to 0 if you have issues
+ROS_DISTRO ?= noetic
 
-DAQPATH = $(shell readlink -f "/dev/$(DAQDEV)")
-PROJ_DIR=/root/kamera
-WS_DIR=/root/kamera
-ROS_DISTRO=noetic
-BRANCH=latest
+.PHONY: build core viame gui postflight follower leader all clean
 
-.PHONY: info
-info:
-	@echo REPO_DIR_BASEDIR=$(REPO_DIR_BASEDIR)
-	@echo ROS_MASTER_URI=$(ROS_MASTER_URI)
-	@echo REDIS_HOST=$(REDIS_HOST)
-
-.PHONY: build
 build:
 	docker compose build
 
-.PHONY: nuvo
-nuvo:
-	docker compose --profile nuvo build
+## --- individual layer targets ---
 
-.PHONY: viame
+core:
+	docker compose --profile core build core-ros
+	docker compose --profile core build core-deps
+	docker compose --profile core build
+
 viame:
+	docker compose --profile viame build viame-base
 	docker compose --profile viame build
 
-.PHONY: gui
 gui:
-	ROS_DISTRO=kinetic docker compose --profile gui build
+	docker compose --profile gui build core-ros
+	docker compose --profile gui build core-deps
+	docker compose --profile gui build gui-deps
+	docker compose --profile gui build gui
 
-.PHONY: postflight
 postflight:
 	docker compose --profile pf build
 
-.PHONY: clean
+## --- deployment-target targets ---
+
+# Follower node: headless sensor node — core + VIAME + postproc
+follower:
+	docker compose --profile follower build core-ros
+	docker compose --profile follower build core-deps
+	docker compose --profile follower build viame-base
+	docker compose --profile follower build
+
+# Leader node: operator workstation — GUI + VIAME + postproc
+leader:
+	docker compose --profile leader build core-ros
+	docker compose --profile leader build core-deps
+	docker compose --profile leader build viame-base
+	docker compose --profile leader build gui-deps
+	docker compose --profile leader build
+
+# Everything
+all:
+	docker compose --profile all build core-ros
+	docker compose --profile all build core-deps
+	docker compose --profile all build viame-base
+	docker compose --profile all build gui-deps
+	docker compose --profile all build
+
 clean:
 	rm -rf .ros .catkin_tools .cmake .config build* devel* logs*

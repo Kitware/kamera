@@ -1,11 +1,11 @@
 ---
 ## Bring up the core nodes
-version: '3.7'
 services:
   ## =========================== headless nodes =============================
   roscore:
     container_name: roscore
-    image: kitware/kamera:core
+    image: ${KAMERA_CORE_IMAGE}
+    init: true
     tty: true
     network_mode: host
     environment:
@@ -22,6 +22,6 @@ services:
       - "/mnt:/mnt"
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"
     command: ["/entry/master.sh"]
-    restart: unless-stopped
+    restart: no
 ...
 

@@ -23,6 +23,12 @@ ping -c1 kameramaster
 # this is a rolling counter just for fun, and also serves as something any client can always grab
 REDIS_HOST=${REDIS_HOST:-nuvo0}
 redis-client -h ${REDIS_HOST} incr term
+
+# Seed Redis with the static system config before anything starts, so kamcore
+# nodes (cam_param_monitor, etc.) read /sys/arch from Redis without depending on
+# the GUI. Done before roscore so the --wait monitors can't start until it's up.
+rosrun kamcore seed_redis_config.py /cfg/${SYSTEM_NAME}/config.yaml
+
 # Start core and block until it's up, then bootstrap parameters
 roscore &
 

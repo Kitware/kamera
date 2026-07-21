@@ -2838,6 +2838,18 @@
                                             <event name="OnUpdateUI"></event>
                                         </object>
                                     </object>
+                                    <object class="sizeritem" expanded="0">
+                                        <property name="border">0</property>
+                                        <property name="flag"></property>
+                                        <property name="proportion">0</property>
+                                        <object class="spacer" expanded="1">
+                                            <property name="height">3</property>
+                                            <property name="minimum_size"></property>
+                                            <property name="name">m_staticSpacerCameraSettings</property>
+                                            <property name="permission">none</property>
+                                            <property name="width">0</property>
+                                        </object>
+                                    </object>
                                     <object class="sizeritem" expanded="1">
                                         <property name="border">5</property>
                                         <property name="flag">wxALIGN_CENTER_VERTICAL|wxRIGHT|wxLEFT|wxALIGN_CENTER_HORIZONTAL</property>
@@ -2922,8 +2934,8 @@
                                         </object>
                                     </object>
                                     <object class="sizeritem" expanded="1">
-                                        <property name="border">5</property>
-                                        <property name="flag">wxALIGN_CENTER_HORIZONTAL</property>
+                                        <property name="border">3</property>
+                                        <property name="flag">wxALIGN_CENTER_HORIZONTAL|wxBOTTOM</property>
                                         <property name="proportion">0</property>
                                         <object class="wxBoxSizer" expanded="1">
                                             <property name="minimum_size"></property>
@@ -3455,8 +3467,8 @@
                                         </object>
                                     </object>
                                     <object class="sizeritem" expanded="1">
-                                        <property name="border">5</property>
-                                        <property name="flag">wxALIGN_CENTER_HORIZONTAL</property>
+                                        <property name="border">3</property>
+                                        <property name="flag">wxALIGN_CENTER_HORIZONTAL|wxBOTTOM</property>
                                         <property name="proportion">0</property>
                                         <object class="wxBoxSizer" expanded="1">
                                             <property name="minimum_size"></property>
@@ -4101,7 +4113,7 @@
                                         </object>
                                     </object>
                                     <object class="sizeritem" expanded="1">
-                                        <property name="border">5</property>
+                                        <property name="border">6</property>
                                         <property name="flag">wxALIGN_CENTER_HORIZONTAL|wxTOP|wxRIGHT|wxLEFT</property>
                                         <property name="proportion">0</property>
                                         <object class="wxButton" expanded="1">
@@ -4189,8 +4201,8 @@
                                         </object>
                                     </object>
                                     <object class="sizeritem" expanded="1">
-                                        <property name="border">5</property>
-                                        <property name="flag">wxALIGN_CENTER_HORIZONTAL|wxRIGHT|wxLEFT</property>
+                                        <property name="border">6</property>
+                                        <property name="flag">wxALIGN_CENTER_HORIZONTAL|wxTOP|wxRIGHT|wxLEFT|wxBOTTOM</property>
                                         <property name="proportion">0</property>
                                         <object class="wxButton" expanded="1">
                                             <property name="BottomDockable">1</property>
@@ -5447,8 +5459,8 @@
                                                             </object>
                                                             <object class="sizeritem" expanded="1">
                                                                 <property name="border">5</property>
-                                                                <property name="flag">wxRIGHT|wxLEFT|wxALIGN_CENTER_VERTICAL</property>
-                                                                <property name="proportion">1</property>
+                                                                <property name="flag">wxALIGN_CENTER_VERTICAL|wxRIGHT</property>
+                                                                <property name="proportion">0</property>
                                                                 <object class="wxTextCtrl" expanded="1">
                                                                     <property name="BottomDockable">1</property>
                                                                     <property name="LeftDockable">1</property>
@@ -6563,7 +6575,7 @@
                                             <property name="gripper">0</property>
                                             <property name="hidden">0</property>
                                             <property name="id">wxID_ANY</property>
-                                            <property name="label">NAS Disk Space: ?</property>
+                                            <property name="label">NAS Space: ?</property>
                                             <property name="max_size"></property>
                                             <property name="maximize_button">0</property>
                                             <property name="maximum_size"></property>
