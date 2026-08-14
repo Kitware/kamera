@@ -148,6 +148,8 @@
         become: True
         lineinfile:
           path: /etc/fstab
+          # Key on the mount point so changes replace the line instead of appending
+          regexp: '^\S+\s+{{ data_dir | regex_escape() }}\s+nfs\s'
           line: kamera_nas:/volume1/kamera/flight_data {{ data_dir }} nfs vers=3,auto,nofail,noatime,nolock,intr,tcp,actimeo=1800   0   0
           state: present
           insertbefore: EOF
@@ -163,6 +165,8 @@
         become: True
         lineinfile:
           path: /etc/fstab
+          # keyed on the mount point for the same reason as the NAS entry
+          regexp: '^\S+\s+/mnt/data\s+ext4\s'
           line: /dev/disk/by-uuid/{{ ssd_id }}    /mnt/data          ext4     nofail,user,noatime   0   0
           state: present
           insertbefore: EOF
