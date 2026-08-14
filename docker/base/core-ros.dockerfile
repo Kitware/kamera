@@ -1,6 +1,9 @@
 # This image contains the base of the ROS/CUDA for the system, plus
 # a bunch of utility packages
-FROM nvidia/cuda:12.6.2-devel-ubuntu24.04 AS base_cuda_ubuntu
+# CUDA 13.0 = newest major with native support on the fleet's r580 drivers
+# (13.1+ would rely on minor-version compatibility on r580 hosts; every node
+# needs driver >= 580 before this image deploys).
+FROM nvidia/cuda:13.0.3-devel-ubuntu24.04 AS base_cuda_ubuntu
 
 WORKDIR /root
 # setup environment
