@@ -55,15 +55,31 @@ ssh_port_open() {
 kamera_power() {
 	local host=$1
 	local action=$2
-	local response
+	local response rc
 	echo "Requesting ${action} on ${host} via kamerad..."
 	# Fail fast if the host is unreachable (already off), but once connected
 	# give kamerad plenty of time to respond -- it stops the supervisor
 	# group (waiting) before triggering the power action.
-	if ! response=$(curl -s --connect-timeout 5 --max-time 120 -X POST "http://${host}:8987/power/${action}"); then
-		echo "ERROR: could not reach kamerad on ${host}" >&2
-		return 1
-	fi
+	set +e
+	response=$(curl -s --connect-timeout 5 --max-time 120 -X POST "http://${host}:8987/power/${action}")
+	rc=$?
+	set -e
+	case ${rc} in
+		0) ;;
+		18|52|56)
+			# Connected and sent the request, but the connection dropped
+			# before a (complete) reply arrived. kamerad triggers the power
+			# action as soon as it accepts the request, so the host going
+			# down underneath us is the expected cause -- let confirm_power
+			# (ping/SSH polling) be the arbiter rather than failing here.
+			echo "WARNING: kamerad on ${host} accepted the request but the connection dropped before it replied (curl exit ${rc}) -- host is most likely already going down; confirming via ping/SSH" >&2
+			return 0
+			;;
+		*)
+			echo "ERROR: could not reach kamerad on ${host} (curl exit ${rc})" >&2
+			return 1
+			;;
+	esac
 	echo "kamerad response: ${response}"
 	if [[ "${response}" != *'"ok": true'* && "${response}" != *'"ok":true'* ]]; then
 		echo "ERROR: kamerad on ${host} did not accept the ${action} request" >&2
