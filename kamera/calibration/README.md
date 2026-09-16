@@ -12,6 +12,8 @@ kamera-calibrate /data/052025_Calibration --max_frames 150 --frame_stride 3   # 
 kamera-calibrate --help
 ```
 
+For a plain-language walkthrough of every stage, see [how_it_works.md](how_it_works.md).
+
 ## Stages (each resumes from `<flight>/calibration/`)
 
 1. **frames** — `*_meta.json` grouped by trigger time into frames; camera names are
