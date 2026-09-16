@@ -621,7 +621,7 @@ def geocentric_rotation(sphi, cphi, slam, clam):
 
 
 def sincosd(x):
-    """
+    r"""
     * Evaluate the sine and cosine function with the argument in degrees
     *
     * @tparam T the type of the arguments.

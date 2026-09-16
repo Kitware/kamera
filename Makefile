@@ -1,12 +1,12 @@
 ROS_DISTRO ?= noetic
-PYTHON_VERSION ?= 3.10
+PYTHON_VERSION ?= 3.13
 
 .PHONY: install build core viame gui postflight follower leader all clean
 
 # Build .venv on top of an activated conda env from environment.yml
 install:
 	@echo "🚀 Creating virtual environment using uv"
-	@uv venv --system-site-packages --python=$(PYTHON_VERSION)
+	@uv venv --clear --system-site-packages --python=$(PYTHON_VERSION)
 	@uv sync --frozen --no-cache
 
 build:

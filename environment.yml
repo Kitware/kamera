@@ -4,8 +4,8 @@ name: kamera
 channels:
   - conda-forge
 dependencies:
-  - python=3.10  # must match PYTHON_VERSION in the Makefile
+  - python=3.13  # must match PYTHON_VERSION in the Makefile (pycolmap>=4.2 needs 3.11+)
   - gdal>=3.10
-  - pycolmap>=4.0
+  - pycolmap>=4.2
   - pip
   - uv

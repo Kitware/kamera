@@ -27,8 +27,11 @@ dependencies = [
     "rich>=13.9.1",
 ]
 
-# GDAL has no reliable cross-platform wheels; it comes from conda-forge
-# (environment.yml) and reaches .venv via --system-site-packages.
+# GDAL and pycolmap (>=4.2, CUDA build) have no reliable cross-platform wheels; they
+# come from conda-forge (environment.yml) and reach .venv via --system-site-packages.
+
+[project.scripts]
+kamera-calibrate = "kamera.calibration.cli:main"
 
 [dependency-groups]
 dev = [

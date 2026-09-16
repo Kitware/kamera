@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `kamera-calibrate`: multi-sensor rig calibration from a calibration flight
+  (`kamera/calibration`). One COLMAP model with trigger-synchronized frames, INS
+  position priors, rig bundle adjustment; writes camera model yamls, `rig.yaml`,
+  DIVE v2 registration JSON, GIFs and a PDF report.
+
+### Changed
+
+- Post-processing env moves to Python 3.13 and pycolmap 4.2 (conda-forge, CUDA build).
+- `make install` recreates `.venv` instead of failing when it exists.
+
+### Removed
+
+- Old per-camera calibration scripts under `kamera/postflight/scripts`.
+
 ## [0.5.0] - 2026-07-21
 
 ### Added

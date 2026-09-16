@@ -1,0 +1,121 @@
+"""``kamera-calibrate``: run the rig calibration pipeline stage by stage, resuming from disk."""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+
+import cv2
+import numpy as np
+import pycolmap as pc
+from rich import print
+
+from kamera.calibration import registration, rig, sfm
+from kamera.calibration.config import CalibrateConfig
+from kamera.calibration.flight import build_image_tree, discover_flight
+from kamera.calibration.report import write_report
+from kamera.colmap_processing.camera_models import StandardCamera
+
+# Homography pairs per channel, left -> right (DIVE registers the left onto the right).
+PAIRS = [("ir", "uv"), ("ir", "rgb"), ("uv", "rgb")]
+
+
+def main(argv=None) -> None:
+    cfg = CalibrateConfig.cli(argv=argv, strict=True)
+    work = cfg.work_dir or os.path.join(cfg.flight_dir, "calibration")
+    image_dir, db_path = os.path.join(work, "images"), os.path.join(work, "database.db")
+    pass1_dir, rig_dir, model_dir = os.path.join(work, "pass1"), os.path.join(work, "rig"), os.path.join(work, "models")
+    os.makedirs(work, exist_ok=True)
+
+    def done(path: str) -> bool:
+        return os.path.exists(path) and not cfg.force
+
+    print("[blue]Discovering frames[/blue]")
+    frames, ins, rig_name = discover_flight(cfg.flight_dir)
+    rig_name = cfg.rig_name or rig_name.replace("images_", "") or "rig"
+    full = [f for f in frames if len(f.images) == len({c for fr in frames for c in fr.images})]
+    stop = cfg.frame_start + cfg.max_frames * cfg.frame_stride if cfg.max_frames else None
+    frames = full[cfg.frame_start:stop:cfg.frame_stride]
+    print(f"{len(full)} frames with every camera, using {len(frames)}; INS median sample gap {np.median([ins.sample_gap(f.time) for f in frames]) * 1000:.1f} ms")
+    names = build_image_tree(frames, image_dir)
+    with open(os.path.join(work, "images.json"), "w") as f:
+        json.dump(names, f)
+
+    if not done(db_path):
+        print("[blue]Extracting features and writing INS priors[/blue]")
+        if os.path.exists(db_path):
+            os.remove(db_path)
+        sfm.extract_features(db_path, image_dir, names, cfg.focal_px, cfg.max_image_size, cfg.num_features)
+        sfm.write_pose_priors(db_path, names, ins, cfg.prior_std_m)
+    db = pc.Database.open(db_path)
+    matched = db.num_verified_image_pairs() > 0
+    db.close()
+    if not matched or cfg.force:
+        print("[blue]Matching[/blue]")
+        sfm.match_features(db_path, cfg.match_distance_m, cfg.match_neighbors)
+
+    if not done(pass1_dir):
+        print("[blue]Pass 1: mapping with independent cameras[/blue]")
+        sfm.run_mapping(db_path, image_dir, pass1_dir)
+    pass1 = sfm.load_models(pass1_dir)
+    for k, r in pass1.items():
+        print(f"  model {k}: {r.num_reg_images()} images, {r.num_points3D()} points, {r.compute_mean_reprojection_error():.2f} px")
+
+    if not done(rig_dir):
+        print("[blue]Pass 2: rig bundle adjustment[/blue]")
+        for name, v in sfm.derive_rig(pass1, names, cfg.reference_camera).items():
+            print(f"  {name}: {v['frames']} frames, rotation scatter {v['rotation_scatter_deg']:.3f} deg, translation std {np.round(v['translation_std_m'], 2)} m")
+        rig_in = os.path.join(work, "rig_init")
+        sfm.rigged_model(db_path, pass1, names, cfg.reference_camera, rig_in)
+        sfm.refine_rig(db_path, names, rig_in, rig_dir)
+    model = pc.Reconstruction(rig_dir)
+    print(f"  rig model: {model.num_reg_frames()} frames, {model.num_reg_images()} images, {model.compute_mean_reprojection_error():.2f} px")
+
+    print("[blue]Extracting camera models and boresight[/blue]")
+    cal = rig.calibrate_rig(model, names, ins, cfg.reference_camera, rig_name, os.path.basename(os.path.abspath(cfg.flight_dir)))
+    for p in rig.write_outputs(cal, model_dir):
+        print(f"  wrote {p}")
+
+    print("[blue]Fitting homographies and writing DIVE registration files[/blue]")
+    reg_dir = os.path.join(model_dir, "dive_registration")
+    cams = {n: StandardCamera(c.width, c.height, c.K, c.dist, cal.camera_position(n), cal.camera_quaternion(n)) for n, c in cal.cameras.items()}
+    pairs = []
+    for channel in sorted({n.split("_")[0] for n in cams}):
+        for left_mod, right_mod in PAIRS:
+            left, right = f"{channel}_{left_mod}", f"{channel}_{right_mod}"
+            if left not in cams or right not in cams:
+                continue
+            try:
+                h, stats = registration.model_homography(cams[left], cams[right])
+            except ValueError as e:
+                print(f"  [yellow]{left} -> {right}: {e}[/yellow]")
+                continue
+            path = registration.write_dive_registration(reg_dir, left, right, h, stats, registration.source_stamp(cfg.flight_dir, {"rig": rig_name}))
+            print(f"  wrote {path}  (fit rms {stats['rmsPx']:.2f} px)")
+            pairs.append({"left": left, "right": right, "h": h, "stats": stats, **write_gifs(frames, names, image_dir, left, right, h, os.path.join(model_dir, "gifs"), cfg.gif_frames)})
+
+    report_path = os.path.join(model_dir, f"{rig_name}_calibration_report.pdf")
+    write_report(report_path, cal, pairs)
+    print(f"[green]Report written to {report_path}[/green]")
+
+
+def write_gifs(frames, names, image_dir, left, right, h, gif_dir, count) -> dict:
+    """Flip GIFs of the left image warped onto the right for evenly spaced frames; returns report images from the middle one."""
+    os.makedirs(gif_dir, exist_ok=True)
+    by_time = {t: n for n, (c, t) in names.items() if c == left}
+    usable = [f for f in frames if left in f.images and right in f.images]
+    out = {}
+    chosen = usable[:: max(1, len(usable) // max(count, 1))][:count]
+    for k, frame in enumerate(chosen):
+        left_img = cv2.imread(os.path.join(image_dir, by_time[frame.time]), cv2.IMREAD_COLOR)
+        right_img = cv2.imread(frame.images[right], cv2.IMREAD_COLOR)
+        warped, ref = registration.warp_pair(left_img, right_img, h)
+        registration.write_gif(os.path.join(gif_dir, f"{left}_to_{right}_{k}.gif"), warped, ref)
+        if k == len(chosen) // 2:
+            out = {"warped_img": warped, "right_img": ref, "overlay_img": registration.blend_overlay(warped, ref)}
+    return out
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
