@@ -2,9 +2,10 @@
 
 Each ``<left>_to_<right>_registration.json`` holds one matrix-only pair whose
 ``leftToRight`` homography maps left-camera pixels onto right-camera pixels. The
-matrix is fit to the calibrated models by casting a grid of left pixels to
-effective infinity and projecting them into the right camera, so it is exact up to
-lens distortion and the (negligible) rig baseline; the fit residual is reported.
+matrix is fit to the calibrated models by casting a grid of left pixels to a nominal
+ground range and projecting them into the right camera. The range matters: cameras
+whose exposure lags the trigger sit an effective metre or so along track, and that
+baseline only vanishes at infinity. The fit residual is reported.
 """
 
 from __future__ import annotations
@@ -19,22 +20,21 @@ import PIL.Image
 
 DIVE_TYPE = "dive-camera-registration"
 DIVE_VERSION = 2
-RAY_DISTANCE = 1e6
 
 
-def model_homography(src_cm, dst_cm, grid: int = 40) -> tuple[np.ndarray, dict]:
-    """Least-squares homography from ``src_cm`` pixels to ``dst_cm`` pixels, plus fit stats."""
+def model_homography(src_cm, dst_cm, range_m: float, grid: int = 40) -> tuple[np.ndarray, dict]:
+    """Least-squares homography from ``src_cm`` pixels to ``dst_cm`` pixels for ground ``range_m`` away, plus fit stats."""
     xg, yg = np.meshgrid(np.linspace(0, src_cm.width - 1, grid), np.linspace(0, src_cm.height - 1, grid))
     src = np.vstack([xg.ravel(), yg.ravel()])
     ray_pos, ray_dir = src_cm.unproject(src, -np.inf)
-    dst = np.asarray(dst_cm.project(ray_pos + ray_dir * RAY_DISTANCE, -np.inf), dtype=np.float64)
+    dst = np.asarray(dst_cm.project(ray_pos + ray_dir * range_m, -np.inf), dtype=np.float64)
     inside = np.all(np.isfinite(dst), 0) & (dst[0] >= 0) & (dst[0] <= dst_cm.width) & (dst[1] >= 0) & (dst[1] <= dst_cm.height)
     if inside.sum() < 4:
         raise ValueError(f"only {inside.sum()} of {src.shape[1]} samples land in the destination image")
     h, _ = cv2.findHomography(src[:, inside].T, dst[:, inside].T, 0)
     err = np.linalg.norm(cv2.perspectiveTransform(src[:, inside].T.reshape(-1, 1, 2), h).reshape(-1, 2) - dst[:, inside].T, axis=1)
     stats = {"rmsPx": float(np.sqrt(np.mean(err**2))), "p95Px": float(np.percentile(err, 95)),
-             "maxPx": float(np.max(err)), "coverage": float(inside.mean())}
+             "maxPx": float(np.max(err)), "coverage": float(inside.mean()), "rangeM": float(range_m)}
     return h, stats
 
 

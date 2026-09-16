@@ -80,6 +80,9 @@ def main(argv=None) -> None:
     print("[blue]Fitting homographies and writing DIVE registration files[/blue]")
     reg_dir = os.path.join(model_dir, "dive_registration")
     cams = {n: StandardCamera(c.width, c.height, c.K, c.dist, cal.camera_position(n), cal.camera_quaternion(n)) for n, c in cal.cameras.items()}
+    range_m = cfg.registration_range_m or cal.scene_range_m
+    registered = {names[im.name][1] for im in model.images.values() if im.has_pose}
+    print(f"  homographies exact at {range_m:.0f} m range; ground speed {cal.ground_speed_mps:.0f} m/s")
     pairs = []
     for channel in sorted({n.split("_")[0] for n in cams}):
         for left_mod, right_mod in PAIRS:
@@ -87,13 +90,14 @@ def main(argv=None) -> None:
             if left not in cams or right not in cams:
                 continue
             try:
-                h, stats = registration.model_homography(cams[left], cams[right])
+                h, stats = registration.model_homography(cams[left], cams[right], range_m)
             except ValueError as e:
                 print(f"  [yellow]{left} -> {right}: {e}[/yellow]")
                 continue
             path = registration.write_dive_registration(reg_dir, left, right, h, stats, registration.source_stamp(cfg.flight_dir, {"rig": rig_name}))
             print(f"  wrote {path}  (fit rms {stats['rmsPx']:.2f} px)")
-            pairs.append({"left": left, "right": right, "h": h, "stats": stats, **write_gifs(frames, names, image_dir, left, right, h, os.path.join(model_dir, "gifs"), cfg.gif_frames)})
+            gif_frames = [f for f in frames if f.time in registered]
+            pairs.append({"left": left, "right": right, "h": h, "stats": stats, **write_gifs(gif_frames, names, image_dir, left, right, h, os.path.join(model_dir, "gifs"), cfg.gif_frames)})
 
     report_path = os.path.join(model_dir, f"{rig_name}_calibration_report.pdf")
     write_report(report_path, cal, pairs)
