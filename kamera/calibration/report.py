@@ -30,14 +30,23 @@ per-frame boresight scatter. The rig constraint removes the intra-frame freedom 
 the relative camera geometry (and therefore the homographies) is far better determined than
 the absolute boresight.
 
-Lever arms. At the flight ranges of 400 to 900 m a 30 cm baseline subtends less than one IR
-pixel, so the rig translations are estimated only weakly and the reported standard
-deviations should be read as such. The INS lever arm is likewise noise dominated; it is the
-median offset of the rig origin from the INS position over all frames.
+Exposure timing. A camera whose exposure midpoint lags the shared trigger sees the ground
+further along track by ground speed x delay, and a bundle adjustment on a translating rig
+cannot tell that from a camera mounted that far forward. The rig table's "delay ms" column
+reads the forward offset of each camera back into a delay at the flight's ground speed; an
+IR core with a 30 ms integration shows about 15 ms. The camera yaml positions carry this
+offset, which is correct at similar ground speeds.
 
-Homographies. A single homography represents the model-to-model mapping exactly only for a
-pure rotation with no lens distortion. The fit residual (rms and p95, in right-image pixels)
-quantifies what the distortion costs; the warped overlays show it visually.
+Lever arms. Beyond that timing signal, at 400 to 900 m a 30 cm baseline subtends less than one
+IR pixel, so the rig translations are weakly determined and the reported standard deviations
+should be read as such. The INS lever arm is the median offset of the rig origin from the INS
+position over all frames.
+
+Homographies. A homography maps one camera onto another exactly only for a plane at one
+range, and the timing baseline above makes the range matter. Each pair is fit for the range
+in its title (the survey AGL if given, else the calibration flight's median scene range); the
+fit residual (rms and p95, in right-image pixels) then measures the lens distortion a single
+matrix cannot carry, and the warped overlays show it visually.
 """
 
 
@@ -81,8 +90,8 @@ def rig_page(pdf: PdfPages, cal: RigCalibration) -> None:
     for name in sorted(cal.cameras):
         rel = ref.rig_from_cam.inv() * cal.cameras[name].rig_from_cam
         rv, c = rel.as_rotvec(degrees=True), cal.cameras[name].center_in_rig
-        rows.append([name, f"{np.degrees(rel.magnitude()):.3f}", f"{rv[0]:+.3f} {rv[1]:+.3f} {rv[2]:+.3f}", f"{c[0]:+.2f} {c[1]:+.2f} {c[2]:+.2f}"])
-    t = ax.table(cellText=rows, colLabels=["camera", "angle deg", "rotvec deg (ref axes)", "centre m (rig)"], loc="center", cellLoc="center", colWidths=[0.16, 0.16, 0.4, 0.36])
+        rows.append([name, f"{np.degrees(rel.magnitude()):.3f}", f"{rv[0]:+.3f} {rv[1]:+.3f} {rv[2]:+.3f}", f"{c[0]:+.2f} {c[1]:+.2f} {c[2]:+.2f}", f"{cal.implied_delay_ms(name):+.0f}"])
+    t = ax.table(cellText=rows, colLabels=["camera", "angle deg", "rotvec deg (ref axes)", "centre m (rig)", "delay ms"], loc="center", cellLoc="center", colWidths=[0.14, 0.14, 0.36, 0.3, 0.14])
     t.auto_set_font_size(False)
     t.set_fontsize(7.5)
     t.scale(1, 1.6)
@@ -125,7 +134,7 @@ def boresight_page(pdf: PdfPages, cal: RigCalibration) -> None:
 def homography_page(pdf: PdfPages, pair: dict) -> None:
     s = pair["stats"]
     fig = plt.figure(figsize=PAGE)
-    fig.suptitle(f"{pair['left']} -> {pair['right']}: fit rms {s['rmsPx']:.2f} px, p95 {s['p95Px']:.2f} px, max {s['maxPx']:.2f} px, "
+    fig.suptitle(f"{pair['left']} -> {pair['right']} at {s['rangeM']:.0f} m: fit rms {s['rmsPx']:.2f} px, p95 {s['p95Px']:.2f} px, max {s['maxPx']:.2f} px, "
                  f"coverage {100 * s['coverage']:.0f}%", fontsize=11, weight="bold")
     for i, (key, title) in enumerate([("warped_img", f"{pair['left']} warped into {pair['right']}"), ("right_img", pair["right"]), ("overlay_img", "overlay (magenta/green)")]):
         ax = fig.add_subplot(1, 3, i + 1)

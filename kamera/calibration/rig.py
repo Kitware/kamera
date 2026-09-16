@@ -49,6 +49,8 @@ class RigCalibration:
     rotation_residual_deg: np.ndarray  # (N, 3) rotvec of each frame's boresight about the mean, rig axes
     position_residual_m: np.ndarray  # (N, 3) rig origin relative to INS, body axes, minus the lever arm
     ins_gap_s: np.ndarray  # (N,) staleness of the INS sample behind each frame
+    ground_speed_mps: float
+    scene_range_m: float  # median distance from the reference camera to its 3D points
     inlier: np.ndarray = field(default_factory=lambda: np.zeros(0, bool))
 
     def camera_quaternion(self, name: str) -> np.ndarray:
@@ -57,6 +59,10 @@ class RigCalibration:
 
     def camera_position(self, name: str) -> np.ndarray:
         return self.lever_arm_m + self.ins_from_rig.apply(self.cameras[name].center_in_rig)
+
+    def implied_delay_ms(self, name: str) -> float:
+        """Exposure delay after the trigger that a camera's forward offset from the reference implies."""
+        return 1000.0 * float(self.ins_from_rig.apply(self.cameras[name].center_in_rig)[0]) / self.ground_speed_mps
 
 
 def per_camera_reprojection(model: pc.Reconstruction, names: dict) -> dict[str, list[float]]:
@@ -110,10 +116,15 @@ def calibrate_rig(model: pc.Reconstruction, names: dict, ins: InsTrajectory, ref
     rotations = Rotation.from_quat(np.array(ins_from_rig)[order])
     lever = np.array(lever)[order]
     mean_rot, mean_lever, _, keep = robust_mean(rotations, lever)
+    positions = np.array([ins.pose(t)[0] for t in np.array(times)[order]])
+    speed = float(np.median(np.linalg.norm(np.diff(positions, axis=0), axis=1) / np.diff(np.array(times)[order])))
+    ranges = [np.linalg.norm(model.points3D[p.point3D_id].xyz - im.projection_center()) for im in model.images.values()
+              if im.has_pose and names[im.name][0] == reference for p in im.points2D[::50] if p.has_point3D()]
     return RigCalibration(
         rig=rig_name, flight=flight, reference=reference, cameras=cameras, ins_from_rig=mean_rot, lever_arm_m=mean_lever,
         frame_times=np.array(times)[order], rotation_residual_deg=(mean_rot.inv() * rotations).as_rotvec(degrees=True),
-        position_residual_m=lever - mean_lever, ins_gap_s=np.array(gaps)[order], inlier=keep)
+        position_residual_m=lever - mean_lever, ins_gap_s=np.array(gaps)[order], ground_speed_mps=speed,
+        scene_range_m=float(np.median(ranges)), inlier=keep)
 
 
 def _floats(a) -> list[float]:
@@ -150,13 +161,15 @@ def write_rig_yaml(cal: RigCalibration, path: str) -> None:
         rel = ref.rig_from_cam.inv() * cam.rig_from_cam
         cams[name] = {"cam_from_rig": {"quaternion_xyzw": _floats(cam.cam_from_rig.rotation.quat), "translation_m": _floats(cam.cam_from_rig.translation)},
                       "rotation_from_reference_deg": _floats(rel.as_rotvec(degrees=True)), "angle_from_reference_deg": float(np.degrees(rel.magnitude())),
-                      "centre_in_rig_m": _floats(cam.center_in_rig), "frames": cam.frames, "reprojection_rms_px": cam.reproj_rms_px}
+                      "centre_in_rig_m": _floats(cam.center_in_rig), "centre_in_ins_body_m": _floats(cal.ins_from_rig.apply(cam.center_in_rig)),
+                      "implied_exposure_delay_ms": cal.implied_delay_ms(name), "frames": cam.frames, "reprojection_rms_px": cam.reproj_rms_px}
     keep = cal.inlier
     res = np.linalg.norm(cal.rotation_residual_deg[keep], axis=1)
     body = {
         "rig": cal.rig, "flight": cal.flight, "reference_camera": cal.reference, "generated": datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
         "ins_from_rig": {"quaternion_xyzw": _floats(cal.ins_from_rig.as_quat()), "rotvec_deg": _floats(cal.ins_from_rig.as_rotvec(degrees=True)),
                          "euler_zyx_deg": _floats(cal.ins_from_rig.as_euler("ZYX", degrees=True)), "lever_arm_m": _floats(cal.lever_arm_m)},
+        "flight_stats": {"ground_speed_mps": cal.ground_speed_mps, "scene_range_m": cal.scene_range_m},
         "boresight_quality": {"frames": int(keep.sum()), "frames_rejected": int((~keep).sum()),
                               "rotation_scatter_deg": {"median": float(np.median(res)), "p90": float(np.percentile(res, 90)), "max": float(res.max())},
                               "rotation_axis_std_deg": _floats(cal.rotation_residual_deg[keep].std(0)),
@@ -165,7 +178,8 @@ def write_rig_yaml(cal: RigCalibration, path: str) -> None:
         "cameras": cams,
     }
     with open(path, "w") as f:
-        f.write("# Rig geometry (cam_from_rig maps rig -> camera, COLMAP convention) and INS boresight (ins_from_rig maps rig -> INS body).\n")
+        f.write("# Rig geometry (cam_from_rig maps rig -> camera, COLMAP convention) and INS boresight (ins_from_rig maps rig -> INS body).\n"
+                "# A camera whose exposure lags the trigger sits ahead along track by speed x delay; implied_exposure_delay_ms reads that off.\n")
         yaml.safe_dump(body, f, sort_keys=False)
 
 
