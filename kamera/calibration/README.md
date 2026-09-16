@@ -45,6 +45,12 @@ kamera-calibrate --help
 - `<rig>_rig.yaml` — `cam_from_rig` per camera, `ins_from_rig`, lever arm, quality statistics.
 - `dive_registration/<left>_to_<right>_registration.json`, `gifs/`, `<rig>_calibration_report.pdf`.
 
+## Exposure timing
+
+The cameras do not expose at the same instant after the shared trigger; see
+[exposure_timing.md](exposure_timing.md) for the measurements, the manuals, and what the
+pipeline does about it.
+
 ## Conventions
 
 - `camera_quaternion` (x, y, z, w) rotates camera vectors into the INS body frame
