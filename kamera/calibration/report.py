@@ -30,12 +30,13 @@ per-frame boresight scatter. The rig constraint removes the intra-frame freedom 
 the relative camera geometry (and therefore the homographies) is far better determined than
 the absolute boresight.
 
-Exposure timing. A camera whose exposure midpoint lags the shared trigger sees the ground
-further along track by ground speed x delay, and a bundle adjustment on a translating rig
-cannot tell that from a camera mounted that far forward. The rig table's "delay ms" column
-reads the forward offset of each camera back into a delay at the flight's ground speed; an
-IR core with a 30 ms integration shows about 15 ms. The camera yaml positions carry this
-offset, which is correct at similar ground speeds.
+Exposure timing. A camera whose exposure midpoint differs from the reference camera's sees
+the ground further along track by ground speed x time difference, and a bundle adjustment on a
+translating rig cannot tell that from a camera mounted that far forward. The rig table's
+"exposure vs ref" column reads each camera's forward offset back into a time difference at
+the flight's ground speed (negative = earlier than the reference). Only the relative timing is
+observable: the position priors absorb any delay shared by the whole rig. The camera yaml
+positions carry these offsets, which is correct at similar ground speeds.
 
 Lever arms. Beyond that timing signal, at 400 to 900 m a 30 cm baseline subtends less than one
 IR pixel, so the rig translations are weakly determined and the reported standard deviations
@@ -91,7 +92,7 @@ def rig_page(pdf: PdfPages, cal: RigCalibration) -> None:
         rel = ref.rig_from_cam.inv() * cal.cameras[name].rig_from_cam
         rv, c = rel.as_rotvec(degrees=True), cal.cameras[name].center_in_rig
         rows.append([name, f"{np.degrees(rel.magnitude()):.3f}", f"{rv[0]:+.3f} {rv[1]:+.3f} {rv[2]:+.3f}", f"{c[0]:+.2f} {c[1]:+.2f} {c[2]:+.2f}", f"{cal.implied_delay_ms(name):+.0f}"])
-    t = ax.table(cellText=rows, colLabels=["camera", "angle deg", "rotvec deg (ref axes)", "centre m (rig)", "delay ms"], loc="center", cellLoc="center", colWidths=[0.14, 0.14, 0.36, 0.3, 0.14])
+    t = ax.table(cellText=rows, colLabels=["camera", "angle deg", "rotvec deg (ref axes)", "centre m (rig)", "exposure vs ref ms"], loc="center", cellLoc="center", colWidths=[0.14, 0.14, 0.36, 0.3, 0.14])
     t.auto_set_font_size(False)
     t.set_fontsize(7.5)
     t.scale(1, 1.6)

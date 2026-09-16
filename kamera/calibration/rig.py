@@ -61,7 +61,11 @@ class RigCalibration:
         return self.lever_arm_m + self.ins_from_rig.apply(self.cameras[name].center_in_rig)
 
     def implied_delay_ms(self, name: str) -> float:
-        """Exposure delay after the trigger that a camera's forward offset from the reference implies."""
+        """Exposure midpoint of a camera relative to the reference camera's, from its along-track offset.
+
+        Positive means it exposes later than the reference. Only this relative timing is
+        observable: the position priors absorb any delay common to the whole rig.
+        """
         return 1000.0 * float(self.ins_from_rig.apply(self.cameras[name].center_in_rig)[0]) / self.ground_speed_mps
 
 
@@ -162,7 +166,7 @@ def write_rig_yaml(cal: RigCalibration, path: str) -> None:
         cams[name] = {"cam_from_rig": {"quaternion_xyzw": _floats(cam.cam_from_rig.rotation.quat), "translation_m": _floats(cam.cam_from_rig.translation)},
                       "rotation_from_reference_deg": _floats(rel.as_rotvec(degrees=True)), "angle_from_reference_deg": float(np.degrees(rel.magnitude())),
                       "centre_in_rig_m": _floats(cam.center_in_rig), "centre_in_ins_body_m": _floats(cal.ins_from_rig.apply(cam.center_in_rig)),
-                      "implied_exposure_delay_ms": cal.implied_delay_ms(name), "frames": cam.frames, "reprojection_rms_px": cam.reproj_rms_px}
+                      "exposure_offset_from_reference_ms": cal.implied_delay_ms(name), "frames": cam.frames, "reprojection_rms_px": cam.reproj_rms_px}
     keep = cal.inlier
     res = np.linalg.norm(cal.rotation_residual_deg[keep], axis=1)
     body = {
@@ -179,7 +183,7 @@ def write_rig_yaml(cal: RigCalibration, path: str) -> None:
     }
     with open(path, "w") as f:
         f.write("# Rig geometry (cam_from_rig maps rig -> camera, COLMAP convention) and INS boresight (ins_from_rig maps rig -> INS body).\n"
-                "# A camera whose exposure lags the trigger sits ahead along track by speed x delay; implied_exposure_delay_ms reads that off.\n")
+                "# A camera exposing later than the reference sits ahead along track by speed x delay; exposure_offset_from_reference_ms reads that off.\n")
         yaml.safe_dump(body, f, sort_keys=False)
 
 
