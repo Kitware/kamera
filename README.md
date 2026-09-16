@@ -24,7 +24,7 @@ KAMERA, or the **K**nowledge-guided Image **A**cquisition **M**anag**ER** and **
 
 ### Post-processing (native, Windows or Linux)
 
-GDAL and pycolmap come from conda-forge; [uv](https://docs.astral.sh/uv/)
+GDAL and pycolmap come from conda-forge (Python 3.13); [uv](https://docs.astral.sh/uv/)
 installs the rest into `.venv`. Requires
 [conda](https://conda-forge.org/download/).
 
@@ -52,6 +52,12 @@ pip install -e .
 Afterwards, `conda activate kamera` is all you need. Conda installs the CUDA
 build of pycolmap automatically with NVIDIA driver 575+ (CUDA 12.9),
 otherwise the CPU build; GPU only matters for full camera model calibration.
+
+### Rig calibration
+
+`kamera-calibrate <flight_dir>` calibrates every camera on the rig from a calibration
+flight and writes camera models, the rig geometry, DIVE registration files and a PDF
+report. See [kamera/calibration/README.md](kamera/calibration/README.md).
 
 ### Docker images
 
