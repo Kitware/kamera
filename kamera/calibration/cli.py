@@ -19,7 +19,8 @@ from kamera.calibration.report import write_report
 from kamera.colmap_processing.camera_models import StandardCamera
 
 # Homography pairs per channel, left -> right (DIVE registers the left onto the right).
-PAIRS = [("ir", "uv"), ("ir", "rgb"), ("uv", "rgb")]
+# Only the pairs DIVE uses; ir->uv follows from the other two and only adds noise.
+PAIRS = [("ir", "rgb"), ("uv", "rgb")]
 
 # A rig seed is trusted only when the per-frame estimates behind it agree. The rig
 # bundle adjustment drops tracks over 4 px of reprojection error (about 0.13 deg for
