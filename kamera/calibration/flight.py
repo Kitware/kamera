@@ -45,7 +45,12 @@ class InsTrajectory:
         self.lat0 = float(np.median(self.llh[:, 0]) if lat0 is None else lat0)
         self.lon0 = float(np.median(self.llh[:, 1]) if lon0 is None else lon0)
         self.h0 = float(h0)
-        self.enu = np.array([llh_to_enu(*r, self.lat0, self.lon0, self.h0, in_degrees=True) for r in self.llh])
+        self.enu = np.array(
+            [
+                llh_to_enu(*r, self.lat0, self.lon0, self.h0, in_degrees=True)
+                for r in self.llh
+            ]
+        )
         self.rotations = NED_TO_ENU * Rotation.from_euler("ZYX", hpr)
 
     @classmethod
@@ -55,7 +60,11 @@ class InsTrajectory:
 
     def pose(self, t: float) -> tuple[np.ndarray, Rotation]:
         i = int(np.clip(bisect.bisect(self.times, t), 1, len(self.times) - 1))
-        w = float(np.clip((t - self.times[i - 1]) / (self.times[i] - self.times[i - 1]), 0.0, 1.0))
+        w = float(
+            np.clip(
+                (t - self.times[i - 1]) / (self.times[i] - self.times[i - 1]), 0.0, 1.0
+            )
+        )
         pos = (1 - w) * self.enu[i - 1] + w * self.enu[i]
         rot = Slerp([0.0, 1.0], self.rotations[[i - 1, i]])([w])[0]
         return pos, rot
@@ -83,7 +92,9 @@ def discover_flight(flight_dir: str) -> tuple[list[Frame], InsTrajectory, str]:
     frames: dict[float, Frame] = {}
     samples: dict[float, tuple] = {}
     rig_name = ""
-    for meta in glob.glob(os.path.join(flight_dir, "**", "*_view", "*_meta.json"), recursive=True):
+    for meta in glob.glob(
+        os.path.join(flight_dir, "**", "*_view", "*_meta.json"), recursive=True
+    ):
         with open(meta) as f:
             d = json.load(f)
         channel = os.path.basename(os.path.dirname(meta)).split("_")[0][0].upper()
@@ -94,12 +105,22 @@ def discover_flight(flight_dir: str) -> tuple[list[Frame], InsTrajectory, str]:
             if os.path.exists(stem + f"_{modality}{ext}"):
                 frame.images[f"{channel}_{modality}"] = stem + f"_{modality}{ext}"
         ins = d["ins"]
-        samples[float(ins["time"])] = (ins["latitude"], ins["longitude"], ins["altitude"],
-                                       ins["heading"], ins["pitch"], ins["roll"])
+        samples[float(ins["time"])] = (
+            ins["latitude"],
+            ins["longitude"],
+            ins["altitude"],
+            ins["heading"],
+            ins["pitch"],
+            ins["roll"],
+        )
         rig_name = rig_name or d.get("sys_cfg", "")
     if not frames:
         raise FileNotFoundError(f"No *_meta.json files found under {flight_dir}")
-    return [frames[k] for k in sorted(frames)], InsTrajectory.from_meta(samples), rig_name
+    return (
+        [frames[k] for k in sorted(frames)],
+        InsTrajectory.from_meta(samples),
+        rig_name,
+    )
 
 
 def normalize(src: str, dst: str) -> None:
@@ -107,10 +128,16 @@ def normalize(src: str, dst: str) -> None:
     im = cv2.imread(src, cv2.IMREAD_UNCHANGED).astype(np.float32)
     lo, hi = np.percentile(im, [0.1, 99.9])
     im = np.clip((im - lo) / max(hi - lo, 1.0) * 255.0, 0, 255).astype(np.uint8)
-    cv2.imwrite(dst, cv2.createCLAHE(clipLimit=1.0, tileGridSize=(5, 5)).apply(im), [cv2.IMWRITE_JPEG_QUALITY, 95])
+    cv2.imwrite(
+        dst,
+        cv2.createCLAHE(clipLimit=1.0, tileGridSize=(5, 5)).apply(im),
+        [cv2.IMWRITE_JPEG_QUALITY, 95],
+    )
 
 
-def build_image_tree(frames: list[Frame], image_dir: str) -> dict[str, tuple[str, float]]:
+def build_image_tree(
+    frames: list[Frame], image_dir: str
+) -> dict[str, tuple[str, float]]:
     """Lay frames out as ``image_dir/<camera>/<frame time>.jpg`` for COLMAP's per-folder cameras.
 
     COLMAP groups images into rig frames by identical file names across folders, hence the
@@ -128,7 +155,9 @@ def build_image_tree(frames: list[Frame], image_dir: str) -> dict[str, tuple[str
             names[name] = (camera, frame.time)
             if os.path.exists(dst):
                 continue
-            jobs.append((src, dst)) if stretch else os.symlink(os.path.abspath(src), dst)
+            jobs.append((src, dst)) if stretch else os.symlink(
+                os.path.abspath(src), dst
+            )
     with ProcessPoolExecutor() as pool:
         list(pool.map(normalize, *zip(*jobs)) if jobs else [])
     return names

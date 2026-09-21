@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Post-processing env moves to Python 3.13 and pycolmap 4.2 (conda-forge, CUDA build).
 - `make install` recreates `.venv` instead of failing when it exists.
+- ruff (line length 88) is the project formatter and linter, installed with the `dev` group.
 
 ### Removed
 
