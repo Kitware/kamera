@@ -26,16 +26,19 @@ def extract_features(
     image_dir: str,
     names: dict,
     focal_px: dict,
+    distortion: dict,
     max_image_size: int,
     num_features: int,
 ) -> None:
-    """SIFT per camera folder, seeding each camera with its modality's focal length."""
+    """SIFT per camera folder, seeding each camera with its modality's intrinsics."""
     for camera in sorted({c for c, _ in names.values()}):
         image_names = sorted(n for n in names if n.startswith(camera + "/"))
         w, h = PIL.Image.open(os.path.join(image_dir, image_names[0])).size
-        f = focal_px[camera.split("_")[1]]
+        modality = camera.split("_")[1]
+        f, (k1, k2) = focal_px[modality], distortion[modality]
         reader = pc.ImageReaderOptions(
-            camera_model=CAMERA_MODEL, camera_params=f"{f},{f},{w / 2},{h / 2},0,0,0,0"
+            camera_model=CAMERA_MODEL,
+            camera_params=f"{f},{f},{w / 2},{h / 2},{k1},{k2},0,0",
         )
         # Each thread decodes a full-resolution image; large sensors get fewer threads.
         opts = pc.FeatureExtractionOptions(
@@ -119,7 +122,8 @@ def mapping_options(refine_rig: bool) -> pc.IncrementalPipelineOptions:
         # Distortion cannot be recovered from two or three views of flat ground: on
         # the May 2025 flight, refining it from the initial pair drove L_ir to a 30%
         # focal error and k2 of -3, so no L_ir model ever grew past three images.
-        # Pass 2 refines the full intrinsics once the whole rig is posed.
+        # It stays at the per-modality seed; pass 2 refines the full intrinsics once
+        # the whole rig is posed.
         ba_refine_extra_params=False,
     )
     # Nadir aerial pairs subtend small angles; the default 16 deg init threshold

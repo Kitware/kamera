@@ -30,6 +30,12 @@ class CalibrateConfig(scfg.DataConfig):
         {"rgb": 31363.0, "uv": 14120.0, "ir": 1712.0},
         help="Initial focal length per modality in pixels; refined by SfM",
     )
+    distortion = scfg.Value(
+        {"rgb": [0.065, -0.13], "uv": [-0.22, 0.0], "ir": [-0.24, -0.4]},
+        help="Initial OpenCV k1, k2 per modality. Held fixed while the pass 1 model "
+        "grows (flat ground cannot pin distortion down from a few views) and refined "
+        "with the whole rig in pass 2",
+    )
     max_image_size = scfg.Value(
         3200, help="Images are downsampled to this longest side for SIFT"
     )

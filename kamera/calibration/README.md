@@ -18,7 +18,7 @@ For a plain-language walkthrough of every stage, see [how_it_works.md](how_it_wo
 
 1. **frames** — `*_meta.json` grouped by trigger time into frames; camera names are
    `<channel>_<modality>` (`C_rgb`, `L_ir`, ...). IR is stretched to 8 bit; EO is symlinked.
-2. **features** — SIFT per camera with an initial focal length per modality, then an INS
+2. **features** — SIFT per camera with an initial focal length and distortion per modality, then an INS
    position prior per image (`InsTrajectory` interpolates the meta.json samples).
 3. **match** — spatial matching from the priors, across all cameras, so figure-eight
    crossovers are matched as well as neighbours in time. Thermal-to-visible pairs are dropped:
