@@ -1,10 +1,10 @@
 # Binary deps (GDAL, pycolmap) with no reliable cross-platform wheels.
-# `make install` layers the rest on top; see README.md for setup.
+# `make install` layers the rest on top. See README.md for setup.
 name: kamera
 channels:
   - conda-forge
 dependencies:
-  - python=3.13  # must match PYTHON_VERSION in the Makefile (pycolmap>=4.2 needs 3.11+)
+  - python=3.13  # must match PYTHON_VERSION in the Makefile
   - gdal>=3.10
   - pycolmap>=4.2
   - pip
