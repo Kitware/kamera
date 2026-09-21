@@ -116,6 +116,11 @@ def mapping_options(refine_rig: bool) -> pc.IncrementalPipelineOptions:
         use_prior_position=True,
         ba_refine_sensor_from_rig=refine_rig,
         extract_colors=False,
+        # Distortion cannot be recovered from two or three views of flat ground: on
+        # the May 2025 flight, refining it from the initial pair drove L_ir to a 30%
+        # focal error and k2 of -3, so no L_ir model ever grew past three images.
+        # Pass 2 refines the full intrinsics once the whole rig is posed.
+        ba_refine_extra_params=False,
     )
     # Nadir aerial pairs subtend small angles; the default 16 deg init threshold
     # rejects them.
