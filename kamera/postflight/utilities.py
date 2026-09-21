@@ -1577,7 +1577,9 @@ def get_basename_to_time(flight_dir) -> dict:
     return basename_to_time
 
 
-def create_flight_summary(flight_dir, save_shapefile_per_image=False):
+def create_flight_summary(
+    flight_dir, save_shapefile_per_image=False, output_dir=None
+):
     """Create flight summary for a flight directory.
 
     A flight directory contains a folder structure where different
@@ -1592,7 +1594,12 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
     <flight_dir>/<sys_config>/right_view
     <flight_dir>/<sys_config>/center_view
 
+    Results are written under ``output_dir``, by default
+    <flight_dir>/processed_results.
+
     """
+    if output_dir is None:
+        output_dir = "%s/processed_results" % flight_dir
     top_tic = time.time()
     flight_id = os.path.basename(flight_dir)
     project_id = os.path.basename(os.path.dirname(flight_dir))
@@ -1784,7 +1791,7 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
 
     # ------------------------------------------------------------------------
     # Save homographies estimated by INS.
-    homog_dir = "%s/processed_results/homographies_img_to_lonlat" % (flight_dir)
+    homog_dir = "%s/homographies_img_to_lonlat" % (output_dir)
 
     for sys_str in fnames_by_system:
         homog_dir2 = "%s/%s" % (homog_dir, sys_str)
@@ -1887,7 +1894,7 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
             shape_img_basenames.append(os.path.split(img_fname)[1])
             shp_shapes_fnames.append(img_fname)
         if len(shp_shapes) > 0:
-            shapefile_dir = "%s/processed_results/fov_shapefiles/" % flight_dir
+            shapefile_dir = "%s/fov_shapefiles/" % output_dir
 
             try:
                 os.makedirs(shapefile_dir)
@@ -1950,8 +1957,8 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
 
             if save_shapefile_per_image:
                 # Write each individual frame as a seperate shapefile.
-                shapefile_dir = "%s/processed_results/fov_shapefiles/%s_fovs" % (
-                    flight_dir,
+                shapefile_dir = "%s/fov_shapefiles/%s_fovs" % (
+                    output_dir,
                     sys_str,
                 )
 
@@ -2020,7 +2027,7 @@ def create_flight_summary(flight_dir, save_shapefile_per_image=False):
 
     # Convert INS tracks to CSVs
     # ------------------------------------------------------------------------
-    dir_out = "%s/processed_results/ins_csvs" % flight_dir
+    dir_out = "%s/ins_csvs" % output_dir
     try:
         os.makedirs(dir_out)
     except OSError:
