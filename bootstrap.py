@@ -34,15 +34,24 @@ def read_environment_yml() -> tuple[str, str]:
 
 def find_conda() -> str:
     """CONDA_EXE if it still points at a real conda (a shell can carry a stale one
-    after an uninstall), else whatever conda is on PATH."""
+    after an uninstall), else whatever conda is on PATH, else micromamba (the docker
+    image has nothing else)."""
     conda = os.environ.get("CONDA_EXE", "")
     if not os.path.isfile(conda):
         conda = shutil.which("conda")
+    if not conda:
+        conda = os.environ.get("MAMBA_EXE", "")
+        if not os.path.isfile(conda):
+            conda = shutil.which("micromamba")
     if not conda:
         sys.exit(
             "conda not found; install Miniforge from https://conda-forge.org/download/"
         )
     return conda
+
+
+def is_micromamba(conda: str) -> bool:
+    return "micromamba" in os.path.basename(conda).lower()
 
 
 def run(cmd: list[str], dry_run: bool) -> None:
@@ -68,14 +77,16 @@ def main() -> None:
     args = parser.parse_args()
 
     conda = find_conda()
-    if conda_env_exists(conda, args.name):
-        run([conda, "env", "update", "-n", args.name, "-f", ENV_FILE], args.dry_run)
-    else:
-        run([conda, "env", "create", "-n", args.name, "-f", ENV_FILE], args.dry_run)
+    # micromamba prompts before installing unless told not to; conda env does not.
+    yes = ["-y"] if is_micromamba(conda) else []
+    verb = "update" if conda_env_exists(conda, args.name) else "create"
+    run([conda, "env", verb, "-n", args.name, "-f", ENV_FILE] + yes, args.dry_run)
 
     # uv runs inside the conda env so .venv is built on the conda python and sees
-    # the conda GDAL and pycolmap through --system-site-packages.
-    uv = [conda, "run", "-n", args.name, "--no-capture-output", "uv"]
+    # the conda GDAL and pycolmap through --system-site-packages. micromamba run
+    # never captures output and rejects conda's flag for that.
+    stream = [] if is_micromamba(conda) else ["--no-capture-output"]
+    uv = [conda, "run", "-n", args.name] + stream + ["uv"]
     run(
         uv
         + ["venv", "--clear", "--system-site-packages", f"--python={python_version}"],
@@ -86,9 +97,10 @@ def main() -> None:
     activate = (
         r".venv\Scripts\activate" if os.name == "nt" else "source .venv/bin/activate"
     )
+    tool = "micromamba" if is_micromamba(conda) else "conda"
     print(
         "\nInstallation finished. To use kamera:"
-        f"\n    conda activate {args.name}\n    {activate}"
+        f"\n    {tool} activate {args.name}\n    {activate}"
     )
 
 

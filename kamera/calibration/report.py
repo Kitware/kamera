@@ -245,7 +245,9 @@ def homography_page(pdf: PdfPages, pair: dict) -> None:
     ]
     for i, (key, title) in enumerate(panels):
         ax = fig.add_subplot(1, 3, i + 1)
-        ax.imshow(pair[key])
+        # No GIF frame had both images (or --gif_frames 0): keep the page for its fit.
+        if key in pair:
+            ax.imshow(pair[key])
         ax.set_title(title, fontsize=9)
         ax.axis("off")
     h_text = np.array2string(
