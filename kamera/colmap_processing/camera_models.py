@@ -254,6 +254,8 @@ class Camera(object):
 
     """
 
+    model_type = "standard"
+
     def __init__(self, width, height, platform_pose_provider=None):
         """
         :param width: Width of the image provided by the imaging sensor,
@@ -279,7 +281,6 @@ class Camera(object):
             self._platform_pose_provider = platform_pose_provider
 
         self._depth_map = None
-        self.model_type = "standard"
 
     @property
     def width(self):
@@ -706,7 +707,6 @@ class StandardCamera(Camera):
         self._cam_quat = np.array(cam_quat, dtype=np.float64)
         self._cam_quat /= np.linalg.norm(self._cam_quat)
         self._min_ray_cos = None
-        self.model_type = "standard"
 
     def __str__(self):
         string = [f"model_type: {self.model_type}\n"]
@@ -788,72 +788,73 @@ class StandardCamera(Camera):
 
         return cls(width, height, K, dist, cam_pos, cam_quat)
 
+    def _write_intrinsics(self, f, extra=""):
+        """Write the yaml fields every camera model shares: model type, image
+        dimensions, any ``extra`` lines, intrinsics and distortion."""
+        f.write(
+            "".join(
+                [
+                    "# The type of camera model.\n",
+                    f"model_type: {self.model_type}\n\n",
+                    "# Image dimensions\n",
+                ]
+            )
+        )
+
+        f.write("".join(["image_width: ", to_str(self.width), "\n"]))
+        f.write("".join(["image_height: ", to_str(self.height), "\n\n"]))
+
+        f.write(extra)
+
+        f.write("# Focal length along the image's x-axis.\n")
+        f.write("".join(["fx: ", to_str(self.K[0, 0]), "\n\n"]))
+
+        f.write("# Focal length along the image's y-axis.\n")
+        f.write("".join(["fy: ", to_str(self.K[1, 1]), "\n\n"]))
+
+        f.write("# Principal point is located at (cx,cy).\n")
+        f.write("".join(["cx: ", to_str(self.K[0, 2]), "\n"]))
+        f.write("".join(["cy: ", to_str(self.K[1, 2]), "\n\n"]))
+
+        f.write("# Distortion coefficients following OpenCv's convention\n")
+        f.write("".join(["distortion_coefficients: ", to_str(self.dist), "\n\n"]))
+
+    def _write_pose(self, f):
+        """Write the camera's orientation and position on the platform."""
+        f.write(
+            "".join(
+                [
+                    "# Quaternion (x, y, z, w) specifying the ",
+                    "orientation of the camera relative to\n# the ",
+                    "platform coordinate system. The quaternion ",
+                    "represents a coordinate\n# system rotation that ",
+                    "takes the platform coordinate system and ",
+                    "rotates it\n# into the camera coordinate ",
+                    "system.\ncamera_quaternion: ",
+                    to_str(self.cam_quat),
+                    "\n\n",
+                ]
+            )
+        )
+
+        f.write(
+            "".join(
+                [
+                    "# Position of the camera's center of ",
+                    "projection within the navigation\n# coordinate ",
+                    "system.\n",
+                    "camera_position: ",
+                    to_str(self.cam_pos),
+                    "\n\n",
+                ]
+            )
+        )
+
     def save_to_file(self, filename):
         """See base class Camera documentation."""
         with open(filename, "w") as f:
-            f.write(
-                "".join(
-                    [
-                        "# The type of camera model.\n",
-                        f"model_type: {self.model_type}\n\n",
-                        "# Image dimensions\n",
-                    ]
-                )
-            )
-
-            f.write("".join(["image_width: ", to_str(self.width), "\n"]))
-            f.write("".join(["image_height: ", to_str(self.height), "\n\n"]))
-
-            f.write("# Focal length along the image's x-axis.\n")
-            f.write("".join(["fx: ", to_str(self.K[0, 0]), "\n\n"]))
-
-            f.write("# Focal length along the image's y-axis.\n")
-            f.write("".join(["fy: ", to_str(self.K[1, 1]), "\n\n"]))
-
-            f.write("# Principal point is located at (cx,cy).\n")
-            f.write("".join(["cx: ", to_str(self.K[0, 2]), "\n"]))
-            f.write("".join(["cy: ", to_str(self.K[1, 2]), "\n\n"]))
-
-            f.write(
-                "".join(
-                    ["# Distortion coefficients following OpenCv's ", "convention\n"]
-                )
-            )
-
-            dist = self.dist
-            if np.all(dist == 0):
-                dist = "None"
-
-            f.write("".join(["distortion_coefficients: ", to_str(self.dist), "\n\n"]))
-
-            f.write(
-                "".join(
-                    [
-                        "# Quaternion (x, y, z, w) specifying the ",
-                        "orientation of the camera relative to\n# the ",
-                        "platform coordinate system. The quaternion ",
-                        "represents a coordinate\n# system rotation that ",
-                        "takes the platform coordinate system and ",
-                        "rotates it\n# into the camera coordinate ",
-                        "system.\ncamera_quaternion: ",
-                        to_str(self.cam_quat),
-                        "\n\n",
-                    ]
-                )
-            )
-
-            f.write(
-                "".join(
-                    [
-                        "# Position of the camera's center of ",
-                        "projection within the navigation\n# coordinate ",
-                        "system.\n",
-                        "camera_position: ",
-                        to_str(self.cam_pos),
-                        "\n\n",
-                    ]
-                )
-            )
+            self._write_intrinsics(f)
+            self._write_pose(f)
 
     @property
     def K(self):
@@ -1123,6 +1124,8 @@ class RollingShutterCamera(StandardCamera):
 
     """
 
+    model_type = "rolling_shutter"
+
     def __init__(
         self,
         width,
@@ -1144,8 +1147,7 @@ class RollingShutterCamera(StandardCamera):
         self.shutter_roll_time = shutter_roll_time
 
     def __str__(self):
-        string = ["model_type: rolling_shutter\n"]
-        string.append(super(RollingShutterCamera, self).__str__())
+        string = [super(RollingShutterCamera, self).__str__()]
         string.append("shutter_roll_time: %s\n" % self.shutter_roll_time)
         return "".join(string)
 
@@ -1189,73 +1191,13 @@ class RollingShutterCamera(StandardCamera):
     def save_to_file(self, filename):
         """See base class Camera documentation."""
         with open(filename, "w") as f:
-            f.write(
+            self._write_intrinsics(
+                f,
                 "".join(
-                    [
-                        "# The type of camera model.\n",
-                        "model_type: rolling_shutter\n\n",
-                        "# Image dimensions\n",
-                    ]
-                )
+                    ["shutter_roll_time: ", to_str(self.shutter_roll_time), "\n\n"]
+                ),
             )
-
-            f.write("".join(["image_width: ", to_str(self.width), "\n"]))
-            f.write("".join(["image_height: ", to_str(self.height), "\n\n"]))
-
-            f.write(
-                "".join(["shutter_roll_time: ", to_str(self.shutter_roll_time), "\n\n"])
-            )
-
-            f.write("# Focal length along the image's x-axis.\n")
-            f.write("".join(["fx: ", to_str(self.K[0, 0]), "\n\n"]))
-
-            f.write("# Focal length along the image's y-axis.\n")
-            f.write("".join(["fy: ", to_str(self.K[1, 1]), "\n\n"]))
-
-            f.write("# Principal point is located at (cx,cy).\n")
-            f.write("".join(["cx: ", to_str(self.K[0, 2]), "\n"]))
-            f.write("".join(["cy: ", to_str(self.K[1, 2]), "\n\n"]))
-
-            f.write(
-                "".join(
-                    ["# Distortion coefficients following OpenCv's ", "convention\n"]
-                )
-            )
-
-            dist = self.dist
-            if np.all(dist == 0):
-                dist = "None"
-
-            f.write("".join(["distortion_coefficients: ", to_str(self.dist), "\n\n"]))
-
-            f.write(
-                "".join(
-                    [
-                        "# Quaternion (x, y, z, w) specifying the ",
-                        "orientation of the camera relative to\n# the ",
-                        "platform coordinate system. The quaternion ",
-                        "represents a coordinate\n# system rotation that ",
-                        "takes the platform coordinate system and ",
-                        "rotates it\n# into the camera coordinate ",
-                        "system.\ncamera_quaternion: ",
-                        to_str(self.cam_quat),
-                        "\n\n",
-                    ]
-                )
-            )
-
-            f.write(
-                "".join(
-                    [
-                        "# Position of the camera's center of ",
-                        "projection within the navigation\n# coordinate ",
-                        "system.\n",
-                        "camera_position: ",
-                        to_str(self.cam_pos),
-                        "\n\n",
-                    ]
-                )
-            )
+            self._write_pose(f)
 
     def project(self, points, t=None):
         """See Camera.project documentation."""
@@ -1371,6 +1313,8 @@ class RollingShutterCamera(StandardCamera):
 class DepthCamera(StandardCamera):
     """Camera with depth map."""
 
+    model_type = "depth"
+
     def __init__(
         self,
         width,
@@ -1396,7 +1340,6 @@ class DepthCamera(StandardCamera):
             platform_pose_provider=platform_pose_provider,
         )
         self._depth_map = depth_map
-        self.model_type = "depth"
 
     @classmethod
     def load_from_file(cls, filename, platform_pose_provider=None):
@@ -1436,69 +1379,8 @@ class DepthCamera(StandardCamera):
     def save_to_file(self, filename, save_depth_viz=True):
         """See base class Camera documentation."""
         with open(filename, "w") as f:
-            f.write(
-                "".join(
-                    [
-                        "# The type of camera model.\n",
-                        "model_type: depth\n\n",
-                        "# Image dimensions\n",
-                    ]
-                )
-            )
-
-            f.write("".join(["image_width: ", to_str(self.width), "\n"]))
-            f.write("".join(["image_height: ", to_str(self.height), "\n\n"]))
-
-            f.write("# Focal length along the image's x-axis.\n")
-            f.write("".join(["fx: ", to_str(self.K[0, 0]), "\n\n"]))
-
-            f.write("# Focal length along the image's y-axis.\n")
-            f.write("".join(["fy: ", to_str(self.K[1, 1]), "\n\n"]))
-
-            f.write("# Principal point is located at (cx,cy).\n")
-            f.write("".join(["cx: ", to_str(self.K[0, 2]), "\n"]))
-            f.write("".join(["cy: ", to_str(self.K[1, 2]), "\n\n"]))
-
-            f.write(
-                "".join(
-                    ["# Distortion coefficients following OpenCv's ", "convention\n"]
-                )
-            )
-
-            dist = self.dist
-            if np.all(dist == 0):
-                dist = "None"
-
-            f.write("".join(["distortion_coefficients: ", to_str(self.dist), "\n\n"]))
-
-            f.write(
-                "".join(
-                    [
-                        "# Quaternion (x, y, z, w) specifying the ",
-                        "orientation of the camera relative to\n# the ",
-                        "navigation coordinate system. The quaternion ",
-                        "represents a coordinate\n# system rotation that ",
-                        "takes the navigation coordinate system and ",
-                        "rotates it\n# into the camera coordinate ",
-                        "system.\n camera_quaternion: ",
-                        to_str(self.cam_quat),
-                        "\n\n",
-                    ]
-                )
-            )
-
-            f.write(
-                "".join(
-                    [
-                        "# Position of the camera's center of ",
-                        "projection within the navigation\n# coordinate ",
-                        "system.\n",
-                        "camera_position: ",
-                        to_str(self.cam_pos),
-                        "\n\n",
-                    ]
-                )
-            )
+            self._write_intrinsics(f)
+            self._write_pose(f)
 
         if self.depth_map is not None:
             im = PIL.Image.fromarray(
@@ -1508,14 +1390,13 @@ class DepthCamera(StandardCamera):
             im.save(depth_map_fname)
 
             if save_depth_viz:
-                depth_viz_fname = (
-                    "%s/depth_vizualization.png" % os.path.splitext(filename)[0]
+                depth_viz_fname = os.path.join(
+                    os.path.dirname(filename), "depth_vizualization.png"
                 )
                 self.save_depth_viz(depth_viz_fname)
 
     def __str__(self):
-        string = ["model_type: depth\n"]
-        string.append(super(DepthCamera, self).__str__())
+        string = [super(DepthCamera, self).__str__()]
         string.append("\n")
         string.append("".join(["fx: ", repr(self._K[0, 0]), "\n"]))
         string.append("".join(["fy: ", repr(self._K[1, 1]), "\n"]))
@@ -1616,6 +1497,8 @@ class GeoStaticCamera(DepthCamera):
 
     """
 
+    model_type = "static"
+
     def __init__(
         self, width, height, K, dist, depth_map, latitude, longitude, altitude, R
     ):
@@ -1667,8 +1550,7 @@ class GeoStaticCamera(DepthCamera):
         self._camera_pose = np.hstack([R, self._tvec])
 
     def __str__(self):
-        string = ["model_type: static\n"]
-        string.append(super(GeoStaticCamera, self).__str__())
+        string = [super(GeoStaticCamera, self).__str__()]
         string.append("\n")
         string.append("".join(["fx: ", repr(self._K[0, 0]), "\n"]))
         string.append("".join(["fy: ", repr(self._K[1, 1]), "\n"]))
@@ -1720,40 +1602,7 @@ class GeoStaticCamera(DepthCamera):
     def save_to_file(self, filename):
         """See base class Camera documentation."""
         with open(filename, "w") as f:
-            f.write(
-                "".join(
-                    [
-                        "# The type of camera model.\n",
-                        "model_type: static\n\n",
-                        "# Image dimensions\n",
-                    ]
-                )
-            )
-
-            f.write("".join(["image_width: ", to_str(self.width), "\n"]))
-            f.write("".join(["image_height: ", to_str(self.height), "\n\n"]))
-
-            f.write("# Focal length along the image's x-axis.\n")
-            f.write("".join(["fx: ", to_str(self._K[0, 0]), "\n\n"]))
-
-            f.write("# Focal length along the image's y-axis.\n")
-            f.write("".join(["fy: ", to_str(self._K[1, 1]), "\n\n"]))
-
-            f.write("# Principal point is located at (cx,cy).\n")
-            f.write("".join(["cx: ", to_str(self._K[0, 2]), "\n"]))
-            f.write("".join(["cy: ", to_str(self._K[1, 2]), "\n\n"]))
-
-            f.write(
-                "".join(
-                    ["# Distortion coefficients following OpenCv's ", "convention\n"]
-                )
-            )
-
-            dist = self._dist
-            if np.all(dist == 0):
-                dist = "None"
-
-            f.write("".join(["distortion_coefficients: ", to_str(self._dist), "\n\n"]))
+            self._write_intrinsics(f)
 
             f.write(
                 "".join(
