@@ -22,7 +22,7 @@ The meta json holds the trigger time (`evt.time`), the INS reading nearest to it
 
 ## What comes out
 
-Everything lands in `<flight_dir>/calibration/models/`:
+Everything lands in `<flight_dir>/calibration/camera_models/`:
 
 - one yaml per camera (`<rig>_<camera>.yaml`), readable by the existing
   `camera_models.load_from_file`

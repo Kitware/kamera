@@ -66,10 +66,10 @@ def main(argv=None) -> None:
     cfg = CalibrateConfig.cli(argv=argv, strict=True)
     work = cfg.work_dir or os.path.join(cfg.flight_dir, "calibration")
     image_dir, db_path = os.path.join(work, "images"), os.path.join(work, "database.db")
-    pass1_dir, rig_dir, model_dir = (
+    pass1_dir, rig_dir, camera_model_dir = (
         os.path.join(work, "pass1"),
         os.path.join(work, "rig"),
-        os.path.join(work, "models"),
+        os.path.join(work, "camera_models"),
     )
     os.makedirs(work, exist_ok=True)
 
@@ -187,19 +187,19 @@ def main(argv=None) -> None:
             f"  {name}: {c.frames} frames, {c.observations} observations, "
             f"{c.reproj_rms_px:.2f} px rms"
         )
-    for p in rig.write_outputs(cal, model_dir):
+    for p in rig.write_outputs(cal, camera_model_dir):
         print(f"  wrote {p}")
     # <sys_cfg>/<view>_view/<image>: postflight reads <sys_cfg>/sys_config.json.
     config_dirs = {
         os.path.dirname(os.path.dirname(p)) for f in frames for p in f.images.values()
     }
     for p in rig.write_sys_configs(
-        cal, model_dir, sorted(config_dirs), cfg.install_sys_config
+        cal, camera_model_dir, sorted(config_dirs), cfg.install_sys_config
     ):
         print(f"  wrote {p}")
 
     print("[blue]Fitting homographies and writing DIVE registration files[/blue]")
-    reg_dir = os.path.join(model_dir, "dive_registration")
+    reg_dir = os.path.join(camera_model_dir, "dive_registration")
     cams = {
         n: StandardCamera(
             c.width,
@@ -214,7 +214,7 @@ def main(argv=None) -> None:
     range_m = cfg.registration_range_m or cal.scene_range_m
     registered = {names[im.name][1] for im in model.images.values() if im.has_pose}
     gif_frames = [f for f in frames if f.time in registered]
-    gif_dir = os.path.join(model_dir, "gifs")
+    gif_dir = os.path.join(camera_model_dir, "gifs")
     print(
         f"  homographies exact at {range_m:.0f} m range; "
         f"ground speed {cal.ground_speed_mps:.0f} m/s"
@@ -244,7 +244,7 @@ def main(argv=None) -> None:
                 {"left": left, "right": right, "h": h, "stats": stats, **images}
             )
 
-    report_path = os.path.join(model_dir, f"{rig_name}_calibration_report.pdf")
+    report_path = os.path.join(camera_model_dir, f"{rig_name}_calibration_report.pdf")
     write_report(report_path, cal, pairs)
     print(f"[green]Report written to {report_path}[/green]")
 
