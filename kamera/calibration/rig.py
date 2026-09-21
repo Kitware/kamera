@@ -26,6 +26,9 @@ class CameraCalibration:
     cam_from_rig: pc.Rigid3d
     colmap_params: dict
     frames: int
+    # 2D features with a 3D point. Collapses for a camera whose rig seed was too far
+    # off for its tracks to survive triangulation, while reproj_rms_px stays small.
+    observations: int
     reproj_rms_px: float
 
     @property
@@ -155,6 +158,7 @@ def calibrate_rig(
                     "params": [float(v) for v in cam.params],
                 },
                 frames=0,
+                observations=len(errors.get(name, [])),
                 reproj_rms_px=float(
                     np.sqrt(np.mean(np.square(errors.get(name, [np.nan]))))
                 ),
@@ -247,6 +251,7 @@ def write_camera_yaml(cal: RigCalibration, name: str, path: str) -> None:
             "flight": cal.flight,
             "generated": _today(),
             "frames": cam.frames,
+            "observations": cam.observations,
             "reprojection_rms_px": cam.reproj_rms_px,
             "ifov_deg": float(np.degrees(1.0 / cam.K[0, 0])),
         },
@@ -277,6 +282,7 @@ def write_rig_yaml(cal: RigCalibration, path: str) -> None:
             "centre_in_ins_body_m": _floats(cal.center_in_ins_body(name)),
             "exposure_offset_from_reference_ms": cal.implied_delay_ms(name),
             "frames": cam.frames,
+            "observations": cam.observations,
             "reprojection_rms_px": cam.reproj_rms_px,
         }
     keep = cal.inlier

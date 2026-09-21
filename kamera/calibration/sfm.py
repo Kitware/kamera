@@ -284,6 +284,7 @@ def derive_rig(
         rig[camera] = {
             "cam_from_rig": pc.Rigid3d(pc.Rotation3d(rot.as_quat()), trans),
             "frames": int(keep.sum()),
+            "frames_total": len(rel),
             "rotation_scatter_deg": float(np.median(angles[keep])),
             "translation_std_m": translations[keep].std(0),
         }

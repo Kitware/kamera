@@ -20,6 +20,12 @@ from kamera.colmap_processing.camera_models import StandardCamera
 # Homography pairs per channel, left -> right (DIVE registers the left onto the right).
 PAIRS = [("ir", "uv"), ("ir", "rgb"), ("uv", "rgb")]
 
+# A rig seed is trusted only when the per-frame estimates behind it agree. The rig
+# bundle adjustment drops tracks over 4 px of reprojection error (about 0.13 deg for
+# the IR cameras), so a seed a degree off stalls near the seed instead of converging.
+SEED_MAX_SCATTER_DEG = 0.5
+SEED_MIN_CLUSTER_FRACTION = 0.5
+
 
 def write_gifs(frames, names, image_dir, left, right, h, gif_dir, count) -> dict:
     """Flip GIFs of the left image warped onto the right, for evenly spaced frames.
@@ -114,11 +120,23 @@ def main(argv=None) -> None:
     if not done(rig_dir):
         print("[blue]Pass 2: rig bundle adjustment[/blue]")
         for name, v in sfm.derive_rig(pass1, names, cfg.reference_camera).items():
+            fraction = v["frames"] / v["frames_total"]
             print(
-                f"  {name}: {v['frames']} frames, "
+                f"  {name}: {v['frames']}/{v['frames_total']} frames in cluster, "
                 f"rotation scatter {v['rotation_scatter_deg']:.3f} deg, "
                 f"translation std {np.round(v['translation_std_m'], 2)} m"
             )
+            if (
+                v["rotation_scatter_deg"] > SEED_MAX_SCATTER_DEG
+                or fraction < SEED_MIN_CLUSTER_FRACTION
+            ):
+                print(
+                    f"  [yellow]{name}: rig seed is unreliable (scatter over "
+                    f"{SEED_MAX_SCATTER_DEG} deg or under "
+                    f"{SEED_MIN_CLUSTER_FRACTION:.0%} of frames in the cluster). "
+                    "Pass 2 may stall near this seed: check its observation count "
+                    "below and its registration GIFs.[/yellow]"
+                )
         rig_in = os.path.join(work, "rig_init")
         sfm.rigged_model(db_path, pass1, names, cfg.reference_camera, rig_in)
         sfm.refine_rig(db_path, names, rig_in, rig_dir)
@@ -138,6 +156,12 @@ def main(argv=None) -> None:
         rig_name,
         os.path.basename(os.path.abspath(cfg.flight_dir)),
     )
+    for name in sorted(cal.cameras):
+        c = cal.cameras[name]
+        print(
+            f"  {name}: {c.frames} frames, {c.observations} observations, "
+            f"{c.reproj_rms_px:.2f} px rms"
+        )
     for p in rig.write_outputs(cal, model_dir):
         print(f"  wrote {p}")
 
