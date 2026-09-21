@@ -1,4 +1,4 @@
-"""PDF report: camera table, rig geometry, INS boresight residuals, homography overlays, error budget."""
+"""PDF report: cameras, rig geometry, boresight residuals, overlays, error budget."""
 
 from __future__ import annotations
 
@@ -18,36 +18,38 @@ PAGE = (11, 8.5)
 ERROR_NOTES = """\
 Error budget and what limits it
 
-INS attitude at the trigger. Each meta.json carries one 100 Hz INS sample taken before the
-event, so the attitude used here is up to 10 ms stale (median gap reported above). At the
-turn rates of a figure-eight (about 5 deg/s) that is up to 0.05 deg, or roughly 25 RGB
-pixels, and it enters every frame's boresight estimate as noise. A hardware event-stamped
-INS sample or a full-rate log removes it; InsTrajectory accepts either without code changes.
+INS attitude at the trigger. Each meta.json carries one 100 Hz INS sample taken before
+the event, so the attitude used here is up to 10 ms stale (median gap reported above).
+At the turn rates of a figure-eight (about 5 deg/s) that is up to 0.05 deg, or roughly
+25 RGB pixels, and it enters every frame's boresight estimate as noise. A hardware
+event-stamped INS sample or a full-rate log removes it; InsTrajectory accepts either
+without code changes.
 
-SfM drift. Bundle adjustment with INS position priors pins scale, heading and position to
-the INS, but the relative orientation drift of the model over the flight is what dominates the
-per-frame boresight scatter. The rig constraint removes the intra-frame freedom entirely, so
-the relative camera geometry (and therefore the homographies) is far better determined than
-the absolute boresight.
+SfM drift. Bundle adjustment with INS position priors pins scale, heading and position
+to the INS, but the relative orientation drift of the model over the flight is what
+dominates the per-frame boresight scatter. The rig constraint removes the intra-frame
+freedom entirely, so the relative camera geometry (and therefore the homographies) is
+far better determined than the absolute boresight.
 
-Exposure timing. A camera whose exposure midpoint differs from the reference camera's sees
-the ground further along track by ground speed x time difference, and a bundle adjustment on a
-translating rig cannot tell that from a camera mounted that far forward. The rig table's
-"exposure vs ref" column reads each camera's forward offset back into a time difference at
-the flight's ground speed (negative = earlier than the reference). Only the relative timing is
-observable: the position priors absorb any delay shared by the whole rig. The camera yaml
-positions carry these offsets, which is correct at similar ground speeds.
+Exposure timing. A camera whose exposure midpoint differs from the reference camera's
+sees the ground further along track by ground speed x time difference, and a bundle
+adjustment on a translating rig cannot tell that from a camera mounted that far forward.
+The rig table's "exposure vs ref" column reads each camera's forward offset back into a
+time difference at the flight's ground speed (negative = earlier than the reference).
+Only the relative timing is observable: the position priors absorb any delay shared by
+the whole rig. The camera yaml positions carry these offsets, which is correct at
+similar ground speeds.
 
-Lever arms. Beyond that timing signal, at 400 to 900 m a 30 cm baseline subtends less than one
-IR pixel, so the rig translations are weakly determined and the reported standard deviations
-should be read as such. The INS lever arm is the median offset of the rig origin from the INS
-position over all frames.
+Lever arms. Beyond that timing signal, at 400 to 900 m a 30 cm baseline subtends less
+than one IR pixel, so the rig translations are weakly determined and the reported
+standard deviations should be read as such. The INS lever arm is the median offset of
+the rig origin from the INS position over all frames.
 
 Homographies. A homography maps one camera onto another exactly only for a plane at one
-range, and the timing baseline above makes the range matter. Each pair is fit for the range
-in its title (the survey AGL if given, else the calibration flight's median scene range); the
-fit residual (rms and p95, in right-image pixels) then measures the lens distortion a single
-matrix cannot carry, and the warped overlays show it visually.
+range, and the timing baseline above makes the range matter. Each pair is fit for the
+range in its title (the survey AGL if given, else the calibration flight's median scene
+range); the fit residual (rms and p95, in right-image pixels) then measures the lens
+distortion a single matrix cannot carry, and the warped overlays show it visually.
 """
 
 
@@ -118,7 +120,6 @@ def camera_page(pdf: PdfPages, cal: RigCalibration) -> None:
 
 
 def rig_page(pdf: PdfPages, cal: RigCalibration) -> None:
-    ref = cal.cameras[cal.reference]
     fig = plt.figure(figsize=PAGE)
     fig.suptitle(
         f"Rig geometry relative to {cal.reference}",
@@ -131,7 +132,7 @@ def rig_page(pdf: PdfPages, cal: RigCalibration) -> None:
     ax.axis("off")
     rows = []
     for name in sorted(cal.cameras):
-        rel = ref.rig_from_cam.inv() * cal.cameras[name].rig_from_cam
+        rel = cal.rotation_from_reference(name)
         rv, c = rel.as_rotvec(degrees=True), cal.cameras[name].center_in_rig
         rows.append(
             [
@@ -142,15 +143,16 @@ def rig_page(pdf: PdfPages, cal: RigCalibration) -> None:
                 f"{cal.implied_delay_ms(name):+.0f}",
             ]
         )
+    header = [
+        "camera",
+        "angle deg",
+        "rotvec deg (ref axes)",
+        "centre m (rig)",
+        "exposure vs ref ms",
+    ]
     t = ax.table(
         cellText=rows,
-        colLabels=[
-            "camera",
-            "angle deg",
-            "rotvec deg (ref axes)",
-            "centre m (rig)",
-            "exposure vs ref ms",
-        ],
+        colLabels=header,
         loc="center",
         cellLoc="center",
         colWidths=[0.14, 0.14, 0.36, 0.3, 0.14],
@@ -164,12 +166,14 @@ def rig_page(pdf: PdfPages, cal: RigCalibration) -> None:
         ax3.quiver(
             0, 0, 0, *z, length=1.0, label=name, arrow_length_ratio=0.08, color=f"C{i}"
         )
-    ax3.set_xlim(-1, 1)
-    ax3.set_ylim(-1, 1)
-    ax3.set_zlim(0, 1)
-    ax3.set_xlabel("rig x")
-    ax3.set_ylabel("rig y")
-    ax3.set_zlabel("rig z (optical)")
+    ax3.set(
+        xlim=(-1, 1),
+        ylim=(-1, 1),
+        zlim=(0, 1),
+        xlabel="rig x",
+        ylabel="rig y",
+        zlabel="rig z (optical)",
+    )
     ax3.set_title("optical axes in the rig frame", fontsize=10)
     ax3.legend(fontsize=6, loc="upper left")
     pdf.savefig(fig)
@@ -183,9 +187,11 @@ def boresight_page(pdf: PdfPages, cal: RigCalibration) -> None:
     mag = np.linalg.norm(res[keep], axis=1)
     fig, axes = plt.subplots(2, 2, figsize=PAGE)
     e = cal.ins_from_rig.as_euler("ZYX", degrees=True)
+    lever = cal.lever_arm_m
     fig.suptitle(
-        f"INS boresight: ins_from_rig euler ZYX = ({e[0]:.4f}, {e[1]:.4f}, {e[2]:.4f}) deg, lever arm = "
-        f"({cal.lever_arm_m[0]:.2f}, {cal.lever_arm_m[1]:.2f}, {cal.lever_arm_m[2]:.2f}) m; "
+        f"INS boresight: ins_from_rig euler ZYX = "
+        f"({e[0]:.4f}, {e[1]:.4f}, {e[2]:.4f}) deg, "
+        f"lever arm = ({lever[0]:.2f}, {lever[1]:.2f}, {lever[2]:.2f}) m; "
         f"{keep.sum()} frames, {(~keep).sum()} rejected",
         fontsize=10,
         weight="bold",
@@ -197,15 +203,16 @@ def boresight_page(pdf: PdfPages, cal: RigCalibration) -> None:
         title="per-frame boresight residual (deg, rig axes)",
         xlabel="s since first frame",
     )
-    axes[0, 0].legend(fontsize=7)
     axes[1, 0].set(
         title="rig origin vs INS minus lever arm (m, body axes)",
         xlabel="s since first frame",
     )
+    axes[0, 0].legend(fontsize=7)
     axes[1, 0].legend(fontsize=7)
     axes[0, 1].hist(mag, bins=50, color="gray")
     axes[0, 1].set(
-        title=f"residual magnitude: median {np.median(mag):.3f}, p90 {np.percentile(mag, 90):.3f} deg",
+        title=f"residual magnitude: median {np.median(mag):.3f}, "
+        f"p90 {np.percentile(mag, 90):.3f} deg",
         xlabel="deg",
     )
     axes[1, 1].hist(cal.ins_gap_s * 1000, bins=40, color="gray")
@@ -222,31 +229,28 @@ def homography_page(pdf: PdfPages, pair: dict) -> None:
     s = pair["stats"]
     fig = plt.figure(figsize=PAGE)
     fig.suptitle(
-        f"{pair['left']} -> {pair['right']} at {s['rangeM']:.0f} m: fit rms {s['rmsPx']:.2f} px, p95 {s['p95Px']:.2f} px, max {s['maxPx']:.2f} px, "
+        f"{pair['left']} -> {pair['right']} at {s['rangeM']:.0f} m: "
+        f"fit rms {s['rmsPx']:.2f} px, p95 {s['p95Px']:.2f} px, "
+        f"max {s['maxPx']:.2f} px, "
         f"coverage {100 * s['coverage']:.0f}%",
         fontsize=11,
         weight="bold",
     )
-    for i, (key, title) in enumerate(
-        [
-            ("warped_img", f"{pair['left']} warped into {pair['right']}"),
-            ("right_img", pair["right"]),
-            ("overlay_img", "overlay (magenta/green)"),
-        ]
-    ):
+    panels = [
+        ("warped_img", f"{pair['left']} warped into {pair['right']}"),
+        ("right_img", pair["right"]),
+        ("overlay_img", "overlay (magenta/green)"),
+    ]
+    for i, (key, title) in enumerate(panels):
         ax = fig.add_subplot(1, 3, i + 1)
         ax.imshow(pair[key])
         ax.set_title(title, fontsize=9)
         ax.axis("off")
+    h_text = np.array2string(
+        np.asarray(pair["h"]), precision=5, suppress_small=True, max_line_width=200
+    ).replace("\n", " ")
     fig.text(
-        0.06,
-        0.04,
-        "H (left -> right) = "
-        + np.array2string(
-            np.asarray(pair["h"]), precision=5, suppress_small=True, max_line_width=200
-        ).replace("\n", " "),
-        fontsize=7,
-        family="monospace",
+        0.06, 0.04, "H (left -> right) = " + h_text, fontsize=7, family="monospace"
     )
     pdf.savefig(fig)
     plt.close(fig)

@@ -39,14 +39,16 @@ class CalibrateConfig(scfg.DataConfig):
     )
     match_neighbors = scfg.Value(
         90,
-        help="Spatial matching neighbours per image (about 10 frames times the number of cameras)",
+        help="Spatial matching neighbours per image "
+        "(about 10 frames times the number of cameras)",
     )
     prior_std_m = scfg.Value(
         2.0, help="Standard deviation assigned to INS position priors"
     )
     registration_range_m = scfg.Value(
         0.0,
-        help="Ground range the homographies are exact at; 0 = median scene range of the calibration model. Set to the survey AGL",
+        help="Ground range the homographies are exact at; 0 = median scene range of "
+        "the calibration model. Set to the survey AGL",
     )
     gif_frames = scfg.Value(5, help="Registration GIFs written per camera pair")
     force = scfg.Value(

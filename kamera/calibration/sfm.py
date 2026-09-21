@@ -29,7 +29,7 @@ def extract_features(
     max_image_size: int,
     num_features: int,
 ) -> None:
-    """SIFT per camera folder, seeding each camera with its modality's prior focal length."""
+    """SIFT per camera folder, seeding each camera with its modality's focal length."""
     for camera in sorted({c for c, _ in names.values()}):
         image_names = sorted(n for n in names if n.startswith(camera + "/"))
         w, h = PIL.Image.open(os.path.join(image_dir, image_names[0])).size
@@ -37,7 +37,7 @@ def extract_features(
         reader = pc.ImageReaderOptions(
             camera_model=CAMERA_MODEL, camera_params=f"{f},{f},{w / 2},{h / 2},0,0,0,0"
         )
-        # Each thread decodes a full-resolution image, so large sensors get fewer threads.
+        # Each thread decodes a full-resolution image; large sensors get fewer threads.
         opts = pc.FeatureExtractionOptions(
             max_image_size=max_image_size,
             use_gpu=pc.has_cuda,
@@ -56,7 +56,7 @@ def extract_features(
 
 
 def write_pose_priors(db_path: str, names: dict, ins, std_m: float) -> None:
-    """Attach the INS ENU position at each image's trigger time as a COLMAP pose prior."""
+    """Attach the INS ENU position at each image's trigger time as a pose prior."""
     db = pc.Database.open(db_path)
     for image in db.read_all_images():
         prior = pc.PosePrior(
@@ -72,7 +72,10 @@ def write_pose_priors(db_path: str, names: dict, ins, std_m: float) -> None:
 
 
 def match_features(db_path: str, max_distance_m: float, max_neighbors: int) -> None:
-    """Match each image against its spatial neighbours (from the priors), across all cameras."""
+    """Match each image against its spatial neighbours (from the priors).
+
+    Pairs are formed across all cameras.
+    """
     pairing = pc.SpatialPairingOptions(
         max_num_neighbors=max_neighbors, max_distance=max_distance_m, ignore_z=True
     )
@@ -86,7 +89,10 @@ def match_features(db_path: str, max_distance_m: float, max_neighbors: int) -> N
 
 
 def prune_cross_spectral(db_path: str) -> int:
-    """Drop thermal-to-visible pairs: SIFT cannot match them, so their few 'inliers' only mislead the mapper."""
+    """Drop thermal-to-visible pairs.
+
+    SIFT cannot match them, so their few 'inliers' only mislead the mapper.
+    """
     db = pc.Database.open(db_path)
     is_ir = {
         im.image_id: im.name.split("/")[0].endswith("_ir")
@@ -105,15 +111,17 @@ def prune_cross_spectral(db_path: str) -> int:
 
 
 def mapping_options(refine_rig: bool) -> pc.IncrementalPipelineOptions:
-    # Colours are unused and extracting them re-decodes every 100 MP frame; keep memory down.
+    # Colours are unused and extracting them re-decodes every 100 MP frame.
     opts = pc.IncrementalPipelineOptions(
         use_prior_position=True,
         ba_refine_sensor_from_rig=refine_rig,
         extract_colors=False,
     )
-    # Nadir aerial pairs subtend small angles; the default 16 deg init threshold rejects them.
+    # Nadir aerial pairs subtend small angles; the default 16 deg init threshold
+    # rejects them.
     opts.mapper.init_min_tri_angle = 4.0
-    # Global BA every 30% of growth instead of 10%: it dominates runtime on thousands of frames.
+    # Global BA every 30% of growth instead of 10%: it dominates runtime on thousands
+    # of frames.
     opts.ba_global_frames_ratio = opts.ba_global_points_ratio = 1.3
     opts.ba_global_max_refinements = 2
     return opts
@@ -133,7 +141,10 @@ def run_mapping(
 def rig_bundle_adjust(
     model: pc.Reconstruction, priors: list, refine_intrinsics: bool, max_iterations: int
 ) -> str:
-    """Refine rig poses, sensor_from_rig and optionally intrinsics, anchored to the INS position priors."""
+    """Refine rig poses, sensor_from_rig and optionally intrinsics.
+
+    Anchored to the INS position priors.
+    """
     opts = pc.BundleAdjustmentOptions(
         refine_sensor_from_rig=True,
         refine_rig_from_world=True,
@@ -159,11 +170,15 @@ def rig_bundle_adjust(
 def refine_rig(
     db_path: str, names: dict, init_dir: str, out_dir: str, max_iterations: int = 200
 ) -> pc.Reconstruction:
-    """Pass 2: triangulate every image from the rig poses, bundle adjust, retriangulate, and bundle
-    adjust again with the intrinsics free. Returns the final model, also written to ``out_dir``."""
+    """Pass 2: triangulate every image from the rig poses, bundle adjust, retriangulate,
+    and bundle adjust again with the intrinsics free.
+
+    Returns the final model, also written to ``out_dir``.
+    """
     shutil.rmtree(out_dir, ignore_errors=True)
     os.makedirs(out_dir)
-    # The triangulator always colours points from disk; 8x8 stand-ins spare it the 100 MP frames.
+    # The triangulator always colours points from disk; 8x8 stand-ins spare it the
+    # 100 MP frames.
     image_dir = os.path.join(os.path.dirname(out_dir), "placeholders")
     for name in names:
         os.makedirs(os.path.dirname(os.path.join(image_dir, name)), exist_ok=True)
@@ -174,6 +189,8 @@ def refine_rig(
     opts = mapping_options(refine_rig=True)
     model = pc.Reconstruction(init_dir)
     for refine_intrinsics in (False, True):
+        # Intrinsics are only ever refined in the rig bundle adjustment below, never by
+        # the triangulator.
         model = pc.triangulate_points(
             model,
             db_path,
@@ -184,7 +201,8 @@ def refine_rig(
             refine_intrinsics=False,
         )
         print(
-            f"  triangulated {model.num_points3D()} points, {model.compute_mean_reprojection_error():.2f} px",
+            f"  triangulated {model.num_points3D()} points, "
+            f"{model.compute_mean_reprojection_error():.2f} px",
             flush=True,
         )
         print(
@@ -206,7 +224,10 @@ def load_models(out_dir: str) -> dict[int, pc.Reconstruction]:
 def image_poses(
     models: dict[int, pc.Reconstruction], names: dict
 ) -> dict[tuple[str, float], pc.Rigid3d]:
-    """``{(camera, time): cam_from_world}`` over every posed image in every model (all in INS ENU)."""
+    """``{(camera, time): cam_from_world}`` over every posed image in every model.
+
+    All models are in INS ENU.
+    """
     return {
         names[im.name]: im.cam_from_world()
         for r in models.values()
@@ -221,9 +242,9 @@ def robust_mean(
     """Mean rotation of the densest cluster and median translation over its members.
 
     Seeds from the sample with the most neighbours within ``cluster_deg``, so a wrongly
-    registered majority (a folded sub-model) cannot drag the estimate; then keeps everything
-    within 3x that cluster's median residual. Returns mean, translation, per-sample residual
-    angles (deg) and the inlier mask.
+    registered majority (a folded sub-model) cannot drag the estimate; then keeps
+    everything within 3x that cluster's median residual. Returns mean, translation,
+    per-sample residual angles (deg) and the inlier mask.
     """
     q = rotations.as_quat()
     pairwise = np.degrees(2.0 * np.arccos(np.clip(np.abs(q @ q.T), 0.0, 1.0)))
@@ -243,7 +264,7 @@ def robust_mean(
 def derive_rig(
     models: dict[int, pc.Reconstruction], names: dict, reference: str
 ) -> dict[str, dict]:
-    """Initial ``cam_from_rig`` per camera from frames where it and the reference camera are both posed."""
+    """Initial ``cam_from_rig`` per camera from frames shared with the reference."""
     poses = image_poses(models, names)
     rig = {}
     for camera in sorted({c for c, _ in names.values()}):
@@ -254,17 +275,17 @@ def derive_rig(
         ]
         if len(rel) < 3:
             raise RuntimeError(
-                f"{camera}: only {len(rel)} frames shared with {reference}; cannot initialise the rig"
+                f"{camera}: only {len(rel)} frames shared with {reference}; "
+                "cannot initialise the rig"
             )
-        rot, trans, angles, keep = robust_mean(
-            Rotation.from_quat([x.rotation.quat for x in rel]),
-            np.array([x.translation for x in rel]),
-        )
+        rotations = Rotation.from_quat([x.rotation.quat for x in rel])
+        translations = np.array([x.translation for x in rel])
+        rot, trans, angles, keep = robust_mean(rotations, translations)
         rig[camera] = {
             "cam_from_rig": pc.Rigid3d(pc.Rotation3d(rot.as_quat()), trans),
             "frames": int(keep.sum()),
             "rotation_scatter_deg": float(np.median(angles[keep])),
-            "translation_std_m": np.array([x.translation for x in rel])[keep].std(0),
+            "translation_std_m": translations[keep].std(0),
         }
     return rig
 
@@ -288,12 +309,12 @@ def rigged_model(
     reference: str,
     out_dir: str,
 ) -> pc.Reconstruction:
-    """Put the rig onto the largest pass-1 model and complete its frames with every sensor's image.
+    """Put the rig onto the largest pass-1 model and fill its frames with every image.
 
-    Writes the rig and frames into the database, copies each registered frame's pose from the
-    model, and adds the images (IR, typically) that pass 1 never posed: they inherit their pose
-    from the frame through the initial ``cam_from_rig``. The result is written to ``out_dir`` as
-    the starting point for the rig-refining mapping pass.
+    Writes the rig and frames into the database, copies each registered frame's pose
+    from the model, and adds the images (IR, typically) that pass 1 never posed: they
+    inherit their pose from the frame through the initial ``cam_from_rig``. The result
+    is written to ``out_dir`` as the starting point for the rig-refining mapping pass.
     """
     rig = derive_rig(models, names, reference)
     cameras = model_cameras(models, names)
