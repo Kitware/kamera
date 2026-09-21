@@ -1,4 +1,4 @@
-"""``kamera-calibrate``: run the rig calibration pipeline stage by stage, resuming from disk."""
+"""``kamera-calibrate``: run the calibration pipeline stage by stage, resumable."""
 
 from __future__ import annotations
 
@@ -21,6 +21,34 @@ from kamera.colmap_processing.camera_models import StandardCamera
 PAIRS = [("ir", "uv"), ("ir", "rgb"), ("uv", "rgb")]
 
 
+def write_gifs(frames, names, image_dir, left, right, h, gif_dir, count) -> dict:
+    """Flip GIFs of the left image warped onto the right, for evenly spaced frames.
+
+    Returns the report images (warped, right, overlay) from the middle frame.
+    """
+    os.makedirs(gif_dir, exist_ok=True)
+    by_time = {t: n for n, (c, t) in names.items() if c == left}
+    usable = [f for f in frames if left in f.images and right in f.images]
+    out = {}
+    chosen = usable[:: max(1, len(usable) // max(count, 1))][:count]
+    for k, frame in enumerate(chosen):
+        left_img = cv2.imread(
+            os.path.join(image_dir, by_time[frame.time]), cv2.IMREAD_COLOR
+        )
+        right_img = cv2.imread(frame.images[right], cv2.IMREAD_COLOR)
+        warped, ref = registration.warp_pair(left_img, right_img, h)
+        registration.write_gif(
+            os.path.join(gif_dir, f"{left}_to_{right}_{k}.gif"), warped, ref
+        )
+        if k == len(chosen) // 2:
+            out = {
+                "warped_img": warped,
+                "right_img": ref,
+                "overlay_img": registration.blend_overlay(warped, ref),
+            }
+    return out
+
+
 def main(argv=None) -> None:
     cfg = CalibrateConfig.cli(argv=argv, strict=True)
     work = cfg.work_dir or os.path.join(cfg.flight_dir, "calibration")
@@ -38,17 +66,16 @@ def main(argv=None) -> None:
     print("[blue]Discovering frames[/blue]")
     frames, ins, rig_name = discover_flight(cfg.flight_dir)
     rig_name = cfg.rig_name or rig_name.replace("images_", "") or "rig"
-    full = [
-        f
-        for f in frames
-        if len(f.images) == len({c for fr in frames for c in fr.images})
-    ]
+    all_cameras = {camera for frame in frames for camera in frame.images}
+    full = [f for f in frames if len(f.images) == len(all_cameras)]
     stop = (
         cfg.frame_start + cfg.max_frames * cfg.frame_stride if cfg.max_frames else None
     )
     frames = full[cfg.frame_start : stop : cfg.frame_stride]
+    median_gap_ms = 1000 * np.median([ins.sample_gap(f.time) for f in frames])
     print(
-        f"{len(full)} frames with every camera, using {len(frames)}; INS median sample gap {np.median([ins.sample_gap(f.time) for f in frames]) * 1000:.1f} ms"
+        f"{len(full)} frames with every camera, using {len(frames)}; "
+        f"INS median sample gap {median_gap_ms:.1f} ms"
     )
     names = build_image_tree(frames, image_dir)
     with open(os.path.join(work, "images.json"), "w") as f:
@@ -80,21 +107,26 @@ def main(argv=None) -> None:
     pass1 = sfm.load_models(pass1_dir)
     for k, r in pass1.items():
         print(
-            f"  model {k}: {r.num_reg_images()} images, {r.num_points3D()} points, {r.compute_mean_reprojection_error():.2f} px"
+            f"  model {k}: {r.num_reg_images()} images, {r.num_points3D()} points, "
+            f"{r.compute_mean_reprojection_error():.2f} px"
         )
 
     if not done(rig_dir):
         print("[blue]Pass 2: rig bundle adjustment[/blue]")
         for name, v in sfm.derive_rig(pass1, names, cfg.reference_camera).items():
             print(
-                f"  {name}: {v['frames']} frames, rotation scatter {v['rotation_scatter_deg']:.3f} deg, translation std {np.round(v['translation_std_m'], 2)} m"
+                f"  {name}: {v['frames']} frames, "
+                f"rotation scatter {v['rotation_scatter_deg']:.3f} deg, "
+                f"translation std {np.round(v['translation_std_m'], 2)} m"
             )
         rig_in = os.path.join(work, "rig_init")
         sfm.rigged_model(db_path, pass1, names, cfg.reference_camera, rig_in)
         sfm.refine_rig(db_path, names, rig_in, rig_dir)
     model = pc.Reconstruction(rig_dir)
     print(
-        f"  rig model: {model.num_reg_frames()} frames, {model.num_reg_images()} images, {model.compute_mean_reprojection_error():.2f} px"
+        f"  rig model: {model.num_reg_frames()} frames, "
+        f"{model.num_reg_images()} images, "
+        f"{model.compute_mean_reprojection_error():.2f} px"
     )
 
     print("[blue]Extracting camera models and boresight[/blue]")
@@ -124,8 +156,11 @@ def main(argv=None) -> None:
     }
     range_m = cfg.registration_range_m or cal.scene_range_m
     registered = {names[im.name][1] for im in model.images.values() if im.has_pose}
+    gif_frames = [f for f in frames if f.time in registered]
+    gif_dir = os.path.join(model_dir, "gifs")
     print(
-        f"  homographies exact at {range_m:.0f} m range; ground speed {cal.ground_speed_mps:.0f} m/s"
+        f"  homographies exact at {range_m:.0f} m range; "
+        f"ground speed {cal.ground_speed_mps:.0f} m/s"
     )
     pairs = []
     for channel in sorted({n.split("_")[0] for n in cams}):
@@ -140,63 +175,21 @@ def main(argv=None) -> None:
             except ValueError as e:
                 print(f"  [yellow]{left} -> {right}: {e}[/yellow]")
                 continue
+            source = registration.source_stamp(cfg.flight_dir, {"rig": rig_name})
             path = registration.write_dive_registration(
-                reg_dir,
-                left,
-                right,
-                h,
-                stats,
-                registration.source_stamp(cfg.flight_dir, {"rig": rig_name}),
+                reg_dir, left, right, h, stats, source
             )
             print(f"  wrote {path}  (fit rms {stats['rmsPx']:.2f} px)")
-            gif_frames = [f for f in frames if f.time in registered]
+            images = write_gifs(
+                gif_frames, names, image_dir, left, right, h, gif_dir, cfg.gif_frames
+            )
             pairs.append(
-                {
-                    "left": left,
-                    "right": right,
-                    "h": h,
-                    "stats": stats,
-                    **write_gifs(
-                        gif_frames,
-                        names,
-                        image_dir,
-                        left,
-                        right,
-                        h,
-                        os.path.join(model_dir, "gifs"),
-                        cfg.gif_frames,
-                    ),
-                }
+                {"left": left, "right": right, "h": h, "stats": stats, **images}
             )
 
     report_path = os.path.join(model_dir, f"{rig_name}_calibration_report.pdf")
     write_report(report_path, cal, pairs)
     print(f"[green]Report written to {report_path}[/green]")
-
-
-def write_gifs(frames, names, image_dir, left, right, h, gif_dir, count) -> dict:
-    """Flip GIFs of the left image warped onto the right for evenly spaced frames; returns report images from the middle one."""
-    os.makedirs(gif_dir, exist_ok=True)
-    by_time = {t: n for n, (c, t) in names.items() if c == left}
-    usable = [f for f in frames if left in f.images and right in f.images]
-    out = {}
-    chosen = usable[:: max(1, len(usable) // max(count, 1))][:count]
-    for k, frame in enumerate(chosen):
-        left_img = cv2.imread(
-            os.path.join(image_dir, by_time[frame.time]), cv2.IMREAD_COLOR
-        )
-        right_img = cv2.imread(frame.images[right], cv2.IMREAD_COLOR)
-        warped, ref = registration.warp_pair(left_img, right_img, h)
-        registration.write_gif(
-            os.path.join(gif_dir, f"{left}_to_{right}_{k}.gif"), warped, ref
-        )
-        if k == len(chosen) // 2:
-            out = {
-                "warped_img": warped,
-                "right_img": ref,
-                "overlay_img": registration.blend_overlay(warped, ref),
-            }
-    return out
 
 
 if __name__ == "__main__":

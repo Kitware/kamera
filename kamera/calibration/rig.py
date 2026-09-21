@@ -1,5 +1,5 @@
-"""Turn the rigged reconstruction into the deliverables: per-camera models (in the INS frame),
-the rig geometry, and the INS boresight with its per-frame residuals."""
+"""Turn the rigged reconstruction into the deliverables: per-camera models (in the INS
+frame), the rig geometry, and the INS boresight with its per-frame residuals."""
 
 from __future__ import annotations
 
@@ -58,25 +58,30 @@ class RigCalibration:
     inlier: np.ndarray = field(default_factory=lambda: np.zeros(0, bool))
 
     def camera_quaternion(self, name: str) -> np.ndarray:
-        """(x, y, z, w) rotating camera vectors into the INS body frame, the KAMERA yaml convention."""
+        """(x, y, z, w) rotating camera vectors into the INS body frame (yaml order)."""
         return (self.ins_from_rig * self.cameras[name].rig_from_cam).as_quat()
 
+    def center_in_ins_body(self, name: str) -> np.ndarray:
+        """Camera centre in INS body axes (forward, right, down) from the rig origin."""
+        return self.ins_from_rig.apply(self.cameras[name].center_in_rig)
+
     def camera_position(self, name: str) -> np.ndarray:
-        return self.lever_arm_m + self.ins_from_rig.apply(
-            self.cameras[name].center_in_rig
+        return self.lever_arm_m + self.center_in_ins_body(name)
+
+    def rotation_from_reference(self, name: str) -> Rotation:
+        """Rotation of a camera relative to the reference camera, in reference axes."""
+        return (
+            self.cameras[self.reference].rig_from_cam.inv()
+            * self.cameras[name].rig_from_cam
         )
 
     def implied_delay_ms(self, name: str) -> float:
-        """Exposure midpoint of a camera relative to the reference camera's, from its along-track offset.
+        """Exposure midpoint relative to the reference camera, from the forward offset.
 
         Positive means it exposes later than the reference. Only this relative timing is
         observable: the position priors absorb any delay common to the whole rig.
         """
-        return (
-            1000.0
-            * float(self.ins_from_rig.apply(self.cameras[name].center_in_rig)[0])
-            / self.ground_speed_mps
-        )
+        return 1000.0 * float(self.center_in_ins_body(name)[0]) / self.ground_speed_mps
 
 
 def per_camera_reprojection(
@@ -97,6 +102,23 @@ def per_camera_reprojection(
     return errors
 
 
+def reference_scene_ranges(
+    model: pc.Reconstruction, names: dict, reference: str, stride: int = 50
+) -> list[float]:
+    """Distance from the reference camera to every ``stride``-th of its 3D points."""
+    ranges = []
+    for im in model.images.values():
+        if not im.has_pose or names[im.name][0] != reference:
+            continue
+        center = im.projection_center()
+        for p in im.points2D[::stride]:
+            if p.has_point3D():
+                ranges.append(
+                    float(np.linalg.norm(model.points3D[p.point3D_id].xyz - center))
+                )
+    return ranges
+
+
 def calibrate_rig(
     model: pc.Reconstruction,
     names: dict,
@@ -105,49 +127,50 @@ def calibrate_rig(
     rig_name: str,
     flight: str,
 ) -> RigCalibration:
-    """Read the rig geometry out of the reconstruction and solve the INS boresight over all frames."""
+    """Read the rig geometry out of the reconstruction and solve the INS boresight."""
     rig = next(iter(model.rigs.values()))
     errors = per_camera_reprojection(model, names)
-    cameras = {}
-    frames_per_camera: dict[str, int] = {}
+    cameras: dict[str, CameraCalibration] = {}
     for im in model.images.values():
-        if im.has_pose:
-            frames_per_camera[names[im.name][0]] = (
-                frames_per_camera.get(names[im.name][0], 0) + 1
-            )
-    for im in model.images.values():
-        name = names[im.name][0]
-        if name in cameras or not im.has_pose:
+        if not im.has_pose:
             continue
-        cam = model.cameras[im.camera_id]
-        cam_from_rig = (
-            pc.Rigid3d()
-            if rig.is_ref_sensor(cam.sensor_id)
-            else rig.sensor_from_rig(cam.sensor_id)
-        )
-        fx, fy, cx, cy, k1, k2, p1, p2 = cam.params
-        cameras[name] = CameraCalibration(
-            name=name,
-            width=cam.width,
-            height=cam.height,
-            K=np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]]),
-            dist=np.array([k1, k2, p1, p2]),
-            cam_from_rig=cam_from_rig,
-            colmap_params={
-                "model": cam.model_name,
-                "params": [float(v) for v in cam.params],
-            },
-            frames=frames_per_camera[name],
-            reproj_rms_px=float(
-                np.sqrt(np.mean(np.square(errors.get(name, [np.nan]))))
-            ),
-        )
+        name = names[im.name][0]
+        if name not in cameras:
+            cam = model.cameras[im.camera_id]
+            cam_from_rig = (
+                pc.Rigid3d()
+                if rig.is_ref_sensor(cam.sensor_id)
+                else rig.sensor_from_rig(cam.sensor_id)
+            )
+            fx, fy, cx, cy, k1, k2, p1, p2 = cam.params
+            cameras[name] = CameraCalibration(
+                name=name,
+                width=cam.width,
+                height=cam.height,
+                K=np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]]),
+                dist=np.array([k1, k2, p1, p2]),
+                cam_from_rig=cam_from_rig,
+                colmap_params={
+                    "model": cam.model_name,
+                    "params": [float(v) for v in cam.params],
+                },
+                frames=0,
+                reproj_rms_px=float(
+                    np.sqrt(np.mean(np.square(errors.get(name, [np.nan]))))
+                ),
+            )
+        cameras[name].frames += 1
 
+    # Per frame: the boresight (INS body <- rig) and the rig origin relative to the INS
+    # position, in body axes.
     times, ins_from_rig, lever, gaps = [], [], [], []
     for frame in model.frames.values():
         if not frame.has_pose():
             continue
-        t = names[model.images[next(iter(frame.data_ids)).id].name][1]
+        any_image = model.images[
+            next(iter(frame.data_ids)).id
+        ]  # every image in a frame shares the trigger time
+        t = names[any_image.name][1]
         world_from_rig = frame.rig_from_world.inverse()
         pos, enu_from_body = ins.pose(t)
         times.append(t)
@@ -159,23 +182,15 @@ def calibrate_rig(
         lever.append(enu_from_body.inv().apply(world_from_rig.translation - pos))
         gaps.append(ins.sample_gap(t))
     order = np.argsort(times)
+    times = np.array(times)[order]
     rotations = Rotation.from_quat(np.array(ins_from_rig)[order])
     lever = np.array(lever)[order]
+    gaps = np.array(gaps)[order]
     mean_rot, mean_lever, _, keep = robust_mean(rotations, lever)
-    positions = np.array([ins.pose(t)[0] for t in np.array(times)[order]])
+    positions = np.array([ins.pose(t)[0] for t in times])
     speed = float(
-        np.median(
-            np.linalg.norm(np.diff(positions, axis=0), axis=1)
-            / np.diff(np.array(times)[order])
-        )
+        np.median(np.linalg.norm(np.diff(positions, axis=0), axis=1) / np.diff(times))
     )
-    ranges = [
-        np.linalg.norm(model.points3D[p.point3D_id].xyz - im.projection_center())
-        for im in model.images.values()
-        if im.has_pose and names[im.name][0] == reference
-        for p in im.points2D[::50]
-        if p.has_point3D()
-    ]
     return RigCalibration(
         rig=rig_name,
         flight=flight,
@@ -183,12 +198,12 @@ def calibrate_rig(
         cameras=cameras,
         ins_from_rig=mean_rot,
         lever_arm_m=mean_lever,
-        frame_times=np.array(times)[order],
+        frame_times=times,
         rotation_residual_deg=(mean_rot.inv() * rotations).as_rotvec(degrees=True),
         position_residual_m=lever - mean_lever,
-        ins_gap_s=np.array(gaps)[order],
+        ins_gap_s=gaps,
         ground_speed_mps=speed,
-        scene_range_m=float(np.median(ranges)),
+        scene_range_m=float(np.median(reference_scene_ranges(model, names, reference))),
         inlier=keep,
     )
 
@@ -197,8 +212,15 @@ def _floats(a) -> list[float]:
     return [float(v) for v in np.asarray(a).ravel()]
 
 
+def _today() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+
+
 def write_camera_yaml(cal: RigCalibration, name: str, path: str) -> None:
-    """KAMERA ``standard`` camera model plus rig and calibration provenance (loader ignores the extras)."""
+    """KAMERA ``standard`` camera model plus rig and calibration provenance.
+
+    The loader ignores the extra keys.
+    """
     cam = cal.cameras[name]
     body = {
         "model_type": "standard",
@@ -223,18 +245,17 @@ def write_camera_yaml(cal: RigCalibration, name: str, path: str) -> None:
         "colmap_camera": cam.colmap_params,
         "calibration": {
             "flight": cal.flight,
-            "generated": datetime.datetime.now(datetime.timezone.utc)
-            .date()
-            .isoformat(),
+            "generated": _today(),
             "frames": cam.frames,
             "reprojection_rms_px": cam.reproj_rms_px,
             "ifov_deg": float(np.degrees(1.0 / cam.K[0, 0])),
         },
     }
     header = (
-        "# KAMERA camera model. camera_quaternion (x, y, z, w) rotates camera vectors into the INS body\n"
-        "# frame; camera_position is the camera centre in that frame (metres). distortion_coefficients\n"
-        "# follow OpenCV (k1, k2, p1, p2). The extra keys record the rig calibration this came from.\n"
+        "# KAMERA camera model. camera_quaternion (x, y, z, w) rotates camera\n"
+        "# vectors into the INS body frame; camera_position is the camera centre in\n"
+        "# that frame (metres). distortion_coefficients follow OpenCV (k1, k2, p1,\n"
+        "# p2). The extra keys record the rig calibration this came from.\n"
     )
     with open(path, "w") as f:
         f.write(header)
@@ -242,10 +263,9 @@ def write_camera_yaml(cal: RigCalibration, name: str, path: str) -> None:
 
 
 def write_rig_yaml(cal: RigCalibration, path: str) -> None:
-    ref = cal.cameras[cal.reference]
     cams = {}
     for name, cam in cal.cameras.items():
-        rel = ref.rig_from_cam.inv() * cam.rig_from_cam
+        rel = cal.rotation_from_reference(name)
         cams[name] = {
             "cam_from_rig": {
                 "quaternion_xyzw": _floats(cam.cam_from_rig.rotation.quat),
@@ -254,7 +274,7 @@ def write_rig_yaml(cal: RigCalibration, path: str) -> None:
             "rotation_from_reference_deg": _floats(rel.as_rotvec(degrees=True)),
             "angle_from_reference_deg": float(np.degrees(rel.magnitude())),
             "centre_in_rig_m": _floats(cam.center_in_rig),
-            "centre_in_ins_body_m": _floats(cal.ins_from_rig.apply(cam.center_in_rig)),
+            "centre_in_ins_body_m": _floats(cal.center_in_ins_body(name)),
             "exposure_offset_from_reference_ms": cal.implied_delay_ms(name),
             "frames": cam.frames,
             "reprojection_rms_px": cam.reproj_rms_px,
@@ -265,7 +285,7 @@ def write_rig_yaml(cal: RigCalibration, path: str) -> None:
         "rig": cal.rig,
         "flight": cal.flight,
         "reference_camera": cal.reference,
-        "generated": datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
+        "generated": _today(),
         "ins_from_rig": {
             "quaternion_xyzw": _floats(cal.ins_from_rig.as_quat()),
             "rotvec_deg": _floats(cal.ins_from_rig.as_rotvec(degrees=True)),
@@ -295,18 +315,23 @@ def write_rig_yaml(cal: RigCalibration, path: str) -> None:
     }
     with open(path, "w") as f:
         f.write(
-            "# Rig geometry (cam_from_rig maps rig -> camera, COLMAP convention) and INS boresight (ins_from_rig maps rig -> INS body).\n"
-            "# A camera exposing later than the reference sits ahead along track by speed x delay; exposure_offset_from_reference_ms reads that off.\n"
+            "# Rig geometry (cam_from_rig maps rig -> camera, COLMAP convention) and\n"
+            "# INS boresight (ins_from_rig maps rig -> INS body). A camera exposing\n"
+            "# later than the reference sits ahead along track by speed x delay;\n"
+            "# exposure_offset_from_reference_ms reads that off.\n"
         )
         yaml.safe_dump(body, f, sort_keys=False)
 
 
 def write_outputs(cal: RigCalibration, out_dir: str) -> list[str]:
+    """Write one yaml per camera plus the rig yaml; returns the paths written."""
     os.makedirs(out_dir, exist_ok=True)
     paths = []
     for name in sorted(cal.cameras):
-        paths.append(os.path.join(out_dir, f"{cal.rig}_{name}.yaml"))
-        write_camera_yaml(cal, name, paths[-1])
-    paths.append(os.path.join(out_dir, f"{cal.rig}_rig.yaml"))
-    write_rig_yaml(cal, paths[-1])
+        path = os.path.join(out_dir, f"{cal.rig}_{name}.yaml")
+        write_camera_yaml(cal, name, path)
+        paths.append(path)
+    rig_path = os.path.join(out_dir, f"{cal.rig}_rig.yaml")
+    write_rig_yaml(cal, rig_path)
+    paths.append(rig_path)
     return paths

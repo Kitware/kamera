@@ -1,4 +1,4 @@
-"""Inter-camera homographies: DIVE camera-registration JSON (format v2) and GIF overlays.
+"""Inter-camera homographies: DIVE camera-registration JSON (v2) and GIF overlays.
 
 Each ``<left>_to_<right>_registration.json`` holds one matrix-only pair whose
 ``leftToRight`` homography maps left-camera pixels onto right-camera pixels. The
@@ -25,7 +25,10 @@ DIVE_VERSION = 2
 def model_homography(
     src_cm, dst_cm, range_m: float, grid: int = 40
 ) -> tuple[np.ndarray, dict]:
-    """Least-squares homography from ``src_cm`` pixels to ``dst_cm`` pixels for ground ``range_m`` away, plus fit stats."""
+    """Least-squares homography from ``src_cm`` pixels to ``dst_cm`` pixels.
+
+    Exact for ground ``range_m`` away from the source camera. Also returns fit stats.
+    """
     xg, yg = np.meshgrid(
         np.linspace(0, src_cm.width - 1, grid), np.linspace(0, src_cm.height - 1, grid)
     )
@@ -43,7 +46,7 @@ def model_homography(
     )
     if inside.sum() < 4:
         raise ValueError(
-            f"only {inside.sum()} of {src.shape[1]} samples land in the destination image"
+            f"only {inside.sum()} of {src.shape[1]} samples land in the destination"
         )
     h, _ = cv2.findHomography(src[:, inside].T, dst[:, inside].T, 0)
     err = np.linalg.norm(
@@ -103,7 +106,10 @@ def source_stamp(flight_dir: str, extra: dict | None = None) -> dict:
 def warp_pair(
     left_img: np.ndarray, right_img: np.ndarray, h: np.ndarray, width: int = 1280
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Warp the left image into the right image's pixels; both returned resized to ``width`` wide, RGB."""
+    """Warp the left image into the right image's pixels.
+
+    Both are returned resized to ``width`` wide, RGB.
+    """
     scale = width / right_img.shape[1]
     size = (width, round(right_img.shape[0] * scale))
     s = np.diag([scale, scale, 1.0])
