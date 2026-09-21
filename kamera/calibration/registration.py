@@ -22,29 +22,65 @@ DIVE_TYPE = "dive-camera-registration"
 DIVE_VERSION = 2
 
 
-def model_homography(src_cm, dst_cm, range_m: float, grid: int = 40) -> tuple[np.ndarray, dict]:
+def model_homography(
+    src_cm, dst_cm, range_m: float, grid: int = 40
+) -> tuple[np.ndarray, dict]:
     """Least-squares homography from ``src_cm`` pixels to ``dst_cm`` pixels for ground ``range_m`` away, plus fit stats."""
-    xg, yg = np.meshgrid(np.linspace(0, src_cm.width - 1, grid), np.linspace(0, src_cm.height - 1, grid))
+    xg, yg = np.meshgrid(
+        np.linspace(0, src_cm.width - 1, grid), np.linspace(0, src_cm.height - 1, grid)
+    )
     src = np.vstack([xg.ravel(), yg.ravel()])
     ray_pos, ray_dir = src_cm.unproject(src, -np.inf)
-    dst = np.asarray(dst_cm.project(ray_pos + ray_dir * range_m, -np.inf), dtype=np.float64)
-    inside = np.all(np.isfinite(dst), 0) & (dst[0] >= 0) & (dst[0] <= dst_cm.width) & (dst[1] >= 0) & (dst[1] <= dst_cm.height)
+    dst = np.asarray(
+        dst_cm.project(ray_pos + ray_dir * range_m, -np.inf), dtype=np.float64
+    )
+    inside = (
+        np.all(np.isfinite(dst), 0)
+        & (dst[0] >= 0)
+        & (dst[0] <= dst_cm.width)
+        & (dst[1] >= 0)
+        & (dst[1] <= dst_cm.height)
+    )
     if inside.sum() < 4:
-        raise ValueError(f"only {inside.sum()} of {src.shape[1]} samples land in the destination image")
+        raise ValueError(
+            f"only {inside.sum()} of {src.shape[1]} samples land in the destination image"
+        )
     h, _ = cv2.findHomography(src[:, inside].T, dst[:, inside].T, 0)
-    err = np.linalg.norm(cv2.perspectiveTransform(src[:, inside].T.reshape(-1, 1, 2), h).reshape(-1, 2) - dst[:, inside].T, axis=1)
-    stats = {"rmsPx": float(np.sqrt(np.mean(err**2))), "p95Px": float(np.percentile(err, 95)),
-             "maxPx": float(np.max(err)), "coverage": float(inside.mean()), "rangeM": float(range_m)}
+    err = np.linalg.norm(
+        cv2.perspectiveTransform(src[:, inside].T.reshape(-1, 1, 2), h).reshape(-1, 2)
+        - dst[:, inside].T,
+        axis=1,
+    )
+    stats = {
+        "rmsPx": float(np.sqrt(np.mean(err**2))),
+        "p95Px": float(np.percentile(err, 95)),
+        "maxPx": float(np.max(err)),
+        "coverage": float(inside.mean()),
+        "rangeM": float(range_m),
+    }
     return h, stats
 
 
-def write_dive_registration(out_dir: str, left: str, right: str, h: np.ndarray, stats: dict, source: dict) -> str:
+def write_dive_registration(
+    out_dir: str, left: str, right: str, h: np.ndarray, stats: dict, source: dict
+) -> str:
     """Write one matrix-only v2 pair file and return its path."""
     inv = np.linalg.inv(h)
-    pair = {"left": left, "right": right, "transformType": "homography",
-            "leftToRight": h.tolist(), "rightToLeft": (inv / inv[2, 2]).tolist(), "observations": [],
-            "stats": {f"modelFit{k[0].upper()}{k[1:]}": v for k, v in stats.items()}}
-    body = {"type": DIVE_TYPE, "version": DIVE_VERSION, "source": source, "pairs": [pair]}
+    pair = {
+        "left": left,
+        "right": right,
+        "transformType": "homography",
+        "leftToRight": h.tolist(),
+        "rightToLeft": (inv / inv[2, 2]).tolist(),
+        "observations": [],
+        "stats": {f"modelFit{k[0].upper()}{k[1:]}": v for k, v in stats.items()},
+    }
+    body = {
+        "type": DIVE_TYPE,
+        "version": DIVE_VERSION,
+        "source": source,
+        "pairs": [pair],
+    }
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"{left}_to_{right}_registration.json")
     with open(path, "w") as f:
@@ -53,12 +89,20 @@ def write_dive_registration(out_dir: str, left: str, right: str, h: np.ndarray, 
 
 
 def source_stamp(flight_dir: str, extra: dict | None = None) -> dict:
-    stamp = {"producer": "kamera-rig-calibration", "flight": os.path.basename(os.path.abspath(flight_dir)),
-             "generated": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")}
+    stamp = {
+        "producer": "kamera-rig-calibration",
+        "flight": os.path.basename(os.path.abspath(flight_dir)),
+        "generated": datetime.datetime.now(datetime.timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z"),
+    }
     return {**stamp, **(extra or {})}
 
 
-def warp_pair(left_img: np.ndarray, right_img: np.ndarray, h: np.ndarray, width: int = 1280) -> tuple[np.ndarray, np.ndarray]:
+def warp_pair(
+    left_img: np.ndarray, right_img: np.ndarray, h: np.ndarray, width: int = 1280
+) -> tuple[np.ndarray, np.ndarray]:
     """Warp the left image into the right image's pixels; both returned resized to ``width`` wide, RGB."""
     scale = width / right_img.shape[1]
     size = (width, round(right_img.shape[0] * scale))
@@ -72,7 +116,13 @@ def _rgb(im: np.ndarray) -> np.ndarray:
 
 
 def write_gif(path: str, a: np.ndarray, b: np.ndarray, duration_ms: int = 400) -> None:
-    PIL.Image.fromarray(a).save(path, save_all=True, append_images=[PIL.Image.fromarray(b)], duration=duration_ms, loop=0)
+    PIL.Image.fromarray(a).save(
+        path,
+        save_all=True,
+        append_images=[PIL.Image.fromarray(b)],
+        duration=duration_ms,
+        loop=0,
+    )
 
 
 def blend_overlay(a: np.ndarray, b: np.ndarray) -> np.ndarray:

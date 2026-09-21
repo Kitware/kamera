@@ -479,8 +479,7 @@ class Camera(object):
 
         if lat0 is None or lon0 is None or h0 is None:
             raise Exception(
-                "'platform_pose_provider' must have 'lat0', "
-                "'lon0', and 'ho' defined."
+                "'platform_pose_provider' must have 'lat0', 'lon0', and 'ho' defined."
             )
 
         points = np.array(points)
@@ -1137,7 +1136,7 @@ class StandardCamera(Camera):
 
         if normalize_ray_dir:
             # Normalize
-            ray_dir /= np.sqrt(np.sum(ray_dir ** 2, 0))
+            ray_dir /= np.sqrt(np.sum(ray_dir**2, 0))
 
         return ray_pos, ray_dir
 
@@ -1899,7 +1898,7 @@ class GeoStaticCamera(DepthCamera):
         ray_dir = np.dot(self.R.T, ray_dir)
 
         if normalize_ray_dir:
-            ray_dir /= np.sqrt(np.sum(ray_dir ** 2, 0))
+            ray_dir /= np.sqrt(np.sum(ray_dir**2, 0))
 
         ray_pos = np.zeros_like(ray_dir)
 
