@@ -77,8 +77,8 @@ instead of thousands. This runs in parallel because there are thousands of files
 SIFT features are extracted per camera folder on the GPU, with the image downsampled
 to 3200 px on the long side (a 12768 px RGB frame gives about 12,000 features). Each
 camera folder gets one COLMAP camera with the OPENCV model (focal length, principal
-point, k1, k2, p1, p2), seeded with a rough focal length per modality from the config
-so the first frames register cleanly.
+point, k1, k2, p1, p2), seeded with a rough focal length and k1, k2 per modality from
+the config so the first frames register cleanly.
 
 Then every image gets a **position prior**: the INS position at its trigger time, with a
 2 m standard deviation. COLMAP uses these priors in two ways later: to decide which
@@ -117,11 +117,15 @@ overlap is under 50%, so those legs only register through crossovers with higher
 passes. And the global bundle adjustment is set to run every 30% of growth instead of
 10%, which halved the run time on the full flight (about 2.5 hours for 8,800 images).
 
-Lens distortion is held at zero throughout pass 1, with only the focal length free.
-Two or three views of flat ground cannot pin distortion down, and on a 250-frame subset
-refining it from the initial pair drove the L_ir camera to a focal length 30% off and
-a k2 of -3, so no L_ir model ever grew past three images while C_ir and R_ir happened
-to survive. Pass 2 refines the full intrinsics once every camera is posed on the rig.
+Lens distortion is held at its per-modality seed throughout pass 1, with only the
+focal length free. Two or three views of flat ground cannot pin distortion down, and
+on a 250-frame subset refining it from the initial pair drove the L_ir camera to a
+focal length 30% off and a k2 of -3, so no L_ir model ever grew past three images
+while C_ir and R_ir happened to survive. Holding it at zero instead is not enough:
+these lenses put the RGB corners about 25 px off, the mapper then drops the corner
+observations, and the rig seed comes out several times looser. The seeds are rounded
+from the May 2025 calibration and land within a few pixels for every camera. Pass 2
+refines the full intrinsics once every camera is posed on the rig.
 
 ## Step 6: work out the rig from pass 1 (`sfm.py`, `derive_rig`, `robust_mean`)
 

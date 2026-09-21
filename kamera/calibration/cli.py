@@ -118,6 +118,7 @@ def main(argv=None) -> None:
             image_dir,
             names,
             cfg.focal_px,
+            cfg.distortion,
             cfg.max_image_size,
             cfg.num_features,
         )
