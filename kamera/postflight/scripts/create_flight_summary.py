@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 from __future__ import division, print_function
 import argparse
-import os
-import pathlib
 
 # Custom package imports.
 from kamera.postflight import utilities
@@ -22,7 +20,7 @@ def main():
     )
     parser.add_argument(
         "-output_dir",
-        help="Output directory (defaults to 'processed_results'.).",
+        help="Output directory (defaults to <flight_dir>/processed_results).",
         type=str,
         default=None,
     )
@@ -36,14 +34,10 @@ def main():
     # flight_dir = '/example_flight_dir'
     # output_dir = '/example_output_dir'
 
-    if not output_dir:
-      base_dir = pathlib.Path(flight_dir).parents[0]
-      output_dir = os.path.join(base_dir, "processed_results")
-
     if not flight_dir:
       raise SystemError("No flight dir specified! Please pass one as an argument or hardcode one in the file.")
 
-    utilities.create_flight_summary(flight_dir, output_dir)
+    utilities.create_flight_summary(flight_dir, output_dir=output_dir)
 
 
 if __name__ == '__main__':
