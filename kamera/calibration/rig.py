@@ -4,7 +4,9 @@ frame), the rig geometry, and the INS boresight with its per-frame residuals."""
 from __future__ import annotations
 
 import datetime
+import json
 import os
+import shutil
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -329,15 +331,64 @@ def write_rig_yaml(cal: RigCalibration, path: str) -> None:
         yaml.safe_dump(body, f, sort_keys=False)
 
 
+def camera_yaml_path(cal: RigCalibration, name: str, out_dir: str) -> str:
+    return os.path.join(out_dir, f"{cal.rig}_{name}.yaml")
+
+
 def write_outputs(cal: RigCalibration, out_dir: str) -> list[str]:
     """Write one yaml per camera plus the rig yaml; returns the paths written."""
     os.makedirs(out_dir, exist_ok=True)
     paths = []
     for name in sorted(cal.cameras):
-        path = os.path.join(out_dir, f"{cal.rig}_{name}.yaml")
+        path = camera_yaml_path(cal, name, out_dir)
         write_camera_yaml(cal, name, path)
         paths.append(path)
     rig_path = os.path.join(out_dir, f"{cal.rig}_rig.yaml")
     write_rig_yaml(cal, rig_path)
     paths.append(rig_path)
+    return paths
+
+
+# Camera channel -> the field-of-view name postflight uses in its sys_config.json keys.
+SYS_CONFIG_FOV = {"L": "left", "C": "center", "R": "right"}
+
+
+def write_sys_configs(
+    cal: RigCalibration, out_dir: str, config_dirs: list[str], install: bool
+) -> list[str]:
+    """A postflight ``sys_config.json`` per system configuration directory of the
+    flight, pointing ``<fov>_<modality>_yaml_path`` at the calibrated camera models.
+
+    Postflight (flight summary, footprint KMLs, geotiffs) finds its camera models
+    through ``<config_dir>/sys_config.json``. Each file written here is the flight's
+    own one with only those keys replaced, saved as
+    ``out_dir/<config dir name>_sys_config.json``. With ``install`` it also replaces
+    the flight's file, keeping the original as ``sys_config.json.orig``. Returns the
+    paths written.
+    """
+    models = {}
+    for name in cal.cameras:
+        channel, modality = name.split("_")
+        if channel in SYS_CONFIG_FOV:
+            key = f"{SYS_CONFIG_FOV[channel]}_{modality}_yaml_path"
+            models[key] = os.path.abspath(camera_yaml_path(cal, name, out_dir))
+    paths = []
+    for config_dir in sorted(config_dirs):
+        flight_path = os.path.join(config_dir, "sys_config.json")
+        body = {}
+        if os.path.exists(flight_path):
+            with open(flight_path) as f:
+                body = json.load(f)
+        body.update(models)
+        name = os.path.basename(os.path.normpath(config_dir))
+        path = os.path.join(out_dir, f"{name}_sys_config.json")
+        with open(path, "w") as f:
+            json.dump(body, f, indent=4, sort_keys=True)
+        paths.append(path)
+        if install:
+            backup = flight_path + ".orig"
+            if os.path.exists(flight_path) and not os.path.exists(backup):
+                shutil.copy2(flight_path, backup)
+            shutil.copy2(path, flight_path)
+            paths.append(flight_path)
     return paths

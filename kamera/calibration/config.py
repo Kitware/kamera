@@ -50,6 +50,13 @@ class CalibrateConfig(scfg.DataConfig):
         help="Ground range the homographies are exact at; 0 = median scene range of "
         "the calibration model. Set to the survey AGL",
     )
+    install_sys_config = scfg.Value(
+        False,
+        isflag=True,
+        help="Point the flight's sys_config.json at the calibrated camera models, so "
+        "postflight (flight summary, footprint KMLs) uses them; the original is kept "
+        "as sys_config.json.orig. A copy is always written beside the models",
+    )
     gif_frames = scfg.Value(5, help="Registration GIFs written per camera pair")
     force = scfg.Value(
         False, isflag=True, help="Rerun stages whose outputs already exist"
