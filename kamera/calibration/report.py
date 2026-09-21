@@ -96,6 +96,7 @@ def camera_page(pdf: PdfPages, cal: RigCalibration) -> None:
         "p1",
         "p2",
         "frames",
+        "obs",
         "rms px",
         "ifov deg",
     ]
@@ -112,6 +113,7 @@ def camera_page(pdf: PdfPages, cal: RigCalibration) -> None:
                 f"{c.K[1, 2]:.1f}",
                 *[f"{v:.5f}" for v in c.dist],
                 c.frames,
+                c.observations,
                 f"{c.reproj_rms_px:.2f}",
                 f"{np.degrees(1 / c.K[0, 0]):.5f}",
             ]

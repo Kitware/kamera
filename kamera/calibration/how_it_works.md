@@ -129,6 +129,14 @@ ignores those. For the IR cameras this comparison goes across the two models; it
 because both models are in INS coordinates, and it is accurate to about 0.3 degrees,
 which is plenty for a starting point.
 
+The tool prints, per camera, how many of the shared frames fell in the cluster and how
+tightly they agree, and warns when the scatter is over half a degree or under half the
+frames made the cluster. Pass 2 only refines a seed it can triangulate from: the
+triangulator drops tracks over 4 px of reprojection error, about 0.13 degrees for IR,
+and a seed a degree off loses the crossover tracks that pin the offset, so the offset
+stalls near the seed rather than blowing up. A warning here means the IR result needs
+checking, not that the run failed.
+
 ## Step 7: pass 2, the rig bundle adjustment (`sfm.py`, `rigged_model`, `refine_rig`)
 
 Now tell COLMAP about the rig:
@@ -161,7 +169,10 @@ From the final model:
 
 - **Intrinsics** per camera: focal lengths, principal point, distortion, straight from
   COLMAP's OPENCV camera. The per-camera reprojection error is computed over every
-  observation of that camera.
+  observation of that camera, and the observation count is reported next to it. That
+  count is the check on a stalled IR seed: the reprojection error only covers tracks
+  that survived triangulation, so it stays small even when most IR tracks were dropped,
+  while the observation count collapses.
 - **Rig geometry**: `cam_from_rig` for each camera, which maps rig coordinates (the
   `C_rgb` camera frame) into that camera. From it, the rotation relative to the
   reference (the L and R channels come out at about 30 degrees, UV within half a degree
