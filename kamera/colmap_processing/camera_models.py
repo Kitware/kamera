@@ -332,7 +332,7 @@ class Camera(object):
             string.append(
                 "".join(["fov: ", "({:.6},{:.6},{:.6})".format(*self.fov(np.inf))])
             )
-        except:
+        except Exception:
             pass
 
         return "".join(string)
@@ -663,28 +663,6 @@ class Camera(object):
 
         return fov_h, fov_v, fov_d
 
-    def unproject_to_depth(self, points, t=None):
-        """See Camera.unproject_to_depth documentation."""
-        points = self._unproject_to_depth(points, self.depth_map, t=t)
-        return points
-
-    def save_depth_viz(self, fname):
-        depth_image = self.depth_map.copy()
-        v = depth_image[np.isfinite(depth_image)]
-        if len(v) > 0:
-            vmin = np.percentile(v, 1)
-            vmax = np.percentile(v, 99)
-            depth_image -= vmin
-            depth_image[depth_image < 0] = 0
-            v = vmax - vmin
-            if v > 0:
-                depth_image /= v / 255
-
-        depth_image = np.round(depth_image).astype(np.uint8)
-
-        depth_image = cv2.applyColorMap(depth_image, cv2.COLORMAP_JET)
-        cv2.imwrite(fname, depth_image[:, :, ::-1])
-
 
 class StandardCamera(Camera):
     """Standard camera model.
@@ -876,29 +854,6 @@ class StandardCamera(Camera):
                     ]
                 )
             )
-
-    def save_to_krtd(self, filename):
-        """Write a single camera in ASCII KRTD format to the file object.
-
-        Args:
-            camera (list[np.ndarray]): A length-4 of type (K, R, t, d)
-            fout (str | os.PathLike): _description_
-        """
-        K = self.K
-        R = Rotation.from_quat(self.cam_quat).as_matrix()
-        t = self.cam_pos
-        d = self.dist
-        t = np.reshape(np.array(t), 3)
-        with open(filename, "w") as fout:
-            fout.write("%.12g %.12g %.12g\n" % tuple(K.tolist()[0]))
-            fout.write("%.12g %.12g %.12g\n" % tuple(K.tolist()[1]))
-            fout.write("%.12g %.12g %.12g\n\n" % tuple(K.tolist()[2]))
-            fout.write("%.12g %.12g %.12g\n" % tuple(R.tolist()[0]))
-            fout.write("%.12g %.12g %.12g\n" % tuple(R.tolist()[1]))
-            fout.write("%.12g %.12g %.12g\n\n" % tuple(R.tolist()[2]))
-            fout.write("%.12g %.12g %.12g\n\n" % tuple(t.tolist()))
-            for v in d:
-                fout.write("%.12g " % v)
 
     @property
     def K(self):
@@ -1630,6 +1585,28 @@ class DepthCamera(StandardCamera):
             ray_pos[:, i] += ray_dir[:, i] * depth_map[iy, ix]
 
         return ray_pos
+
+    def unproject_to_depth(self, points, t=None):
+        """See Camera.unproject_to_depth documentation."""
+        points = self._unproject_to_depth(points, self.depth_map, t=t)
+        return points
+
+    def save_depth_viz(self, fname):
+        depth_image = self.depth_map.copy()
+        v = depth_image[np.isfinite(depth_image)]
+        if len(v) > 0:
+            vmin = np.percentile(v, 1)
+            vmax = np.percentile(v, 99)
+            depth_image -= vmin
+            depth_image[depth_image < 0] = 0
+            v = vmax - vmin
+            if v > 0:
+                depth_image /= v / 255
+
+        depth_image = np.round(depth_image).astype(np.uint8)
+
+        depth_image = cv2.applyColorMap(depth_image, cv2.COLORMAP_JET)
+        cv2.imwrite(fname, depth_image[:, :, ::-1])
 
 
 class GeoStaticCamera(DepthCamera):
