@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 
 import cv2
@@ -30,18 +31,23 @@ SEED_MIN_CLUSTER_FRACTION = 0.5
 def write_gifs(frames, names, image_dir, left, right, h, gif_dir, count) -> dict:
     """Flip GIFs of the left image warped onto the right, for evenly spaced frames.
 
-    Returns the report images (warped, right, overlay) from the middle frame.
+    Returns the report images (warped, right, overlay) from the middle frame, or an
+    empty dict when no frame has both images or ``count`` is 0.
     """
     os.makedirs(gif_dir, exist_ok=True)
-    by_time = {t: n for n, (c, t) in names.items() if c == left}
+    # Both sides come from the normalized tree: the raw UV frames are nearly black.
+    by_time = {(c, t): n for n, (c, t) in names.items() if c in (left, right)}
     usable = [f for f in frames if left in f.images and right in f.images]
     out = {}
     chosen = usable[:: max(1, len(usable) // max(count, 1))][:count]
     for k, frame in enumerate(chosen):
-        left_img = cv2.imread(
-            os.path.join(image_dir, by_time[frame.time]), cv2.IMREAD_COLOR
+        left_img, right_img = (
+            cv2.imread(
+                os.path.join(image_dir, by_time[(camera, frame.time)]),
+                cv2.IMREAD_COLOR,
+            )
+            for camera in (left, right)
         )
-        right_img = cv2.imread(frame.images[right], cv2.IMREAD_COLOR)
         warped, ref = registration.warp_pair(left_img, right_img, h)
         registration.write_gif(
             os.path.join(gif_dir, f"{left}_to_{right}_{k}.gif"), warped, ref
@@ -69,6 +75,23 @@ def main(argv=None) -> None:
     def done(path: str) -> bool:
         return os.path.exists(path) and not cfg.force
 
+    def staging(path: str) -> str:
+        """A clean scratch path for a stage. Stages build there and ``publish`` moves
+        the result into place, so ``path`` only ever exists once its stage finished
+        and an interrupted run redoes the stage instead of skipping it."""
+        tmp = path + ".partial"
+        for stale in (tmp, tmp + "-wal", tmp + "-shm", tmp + "-journal"):
+            if os.path.isdir(stale):
+                shutil.rmtree(stale)
+            elif os.path.exists(stale):
+                os.remove(stale)
+        return tmp
+
+    def publish(tmp: str, path: str) -> None:
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        os.replace(tmp, path)
+
     print("[blue]Discovering frames[/blue]")
     frames, ins, rig_name = discover_flight(cfg.flight_dir)
     rig_name = cfg.rig_name or rig_name.replace("images_", "") or "rig"
@@ -89,27 +112,25 @@ def main(argv=None) -> None:
 
     if not done(db_path):
         print("[blue]Extracting features and writing INS priors[/blue]")
-        if os.path.exists(db_path):
-            os.remove(db_path)
+        tmp = staging(db_path)
         sfm.extract_features(
-            db_path,
+            tmp,
             image_dir,
             names,
             cfg.focal_px,
             cfg.max_image_size,
             cfg.num_features,
         )
-        sfm.write_pose_priors(db_path, names, ins, cfg.prior_std_m)
-    db = pc.Database.open(db_path)
-    matched = db.num_verified_image_pairs() > 0
-    db.close()
-    if not matched or cfg.force:
+        sfm.write_pose_priors(tmp, names, ins, cfg.prior_std_m)
         print("[blue]Matching[/blue]")
-        sfm.match_features(db_path, cfg.match_distance_m, cfg.match_neighbors)
+        sfm.match_features(tmp, cfg.match_distance_m, cfg.match_neighbors)
+        publish(tmp, db_path)
 
     if not done(pass1_dir):
         print("[blue]Pass 1: mapping with independent cameras[/blue]")
-        sfm.run_mapping(db_path, image_dir, pass1_dir)
+        tmp = staging(pass1_dir)
+        sfm.run_mapping(db_path, image_dir, tmp)
+        publish(tmp, pass1_dir)
     pass1 = sfm.load_models(pass1_dir)
     for k, r in pass1.items():
         print(
@@ -139,7 +160,9 @@ def main(argv=None) -> None:
                 )
         rig_in = os.path.join(work, "rig_init")
         sfm.rigged_model(db_path, pass1, names, cfg.reference_camera, rig_in)
-        sfm.refine_rig(db_path, names, rig_in, rig_dir)
+        tmp = staging(rig_dir)
+        sfm.refine_rig(db_path, names, rig_in, tmp)
+        publish(tmp, rig_dir)
     model = pc.Reconstruction(rig_dir)
     print(
         f"  rig model: {model.num_reg_frames()} frames, "
