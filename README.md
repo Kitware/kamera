@@ -25,33 +25,27 @@ KAMERA, or the **K**nowledge-guided Image **A**cquisition **M**anag**ER** and **
 ### Post-processing (native, Windows or Linux)
 
 GDAL and pycolmap come from conda-forge (Python 3.13); [uv](https://docs.astral.sh/uv/)
-installs the rest into `.venv`. Requires
-[conda](https://conda-forge.org/download/).
-
-Linux/macOS:
+installs the rest into `.venv` from the lockfile. Requires conda:
+[Miniforge](https://conda-forge.org/download/) is recommended since it defaults to the
+conda-forge channel these packages come from, but
+[Miniconda](https://www.anaconda.com/download/success) or a full Anaconda install also
+work because `environment.yml` pins the channel. The same steps work on Linux, macOS
+and Windows (PowerShell or Miniforge/Anaconda Prompt):
 
 ```bash
 git clone https://github.com/Kitware/kamera.git
 cd kamera
-conda env create -f environment.yml
+python bootstrap.py
 conda activate kamera
-make install
-source .venv/bin/activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 ```
 
-Windows (PowerShell or Anaconda Prompt):
-
-```powershell
-git clone https://github.com/Kitware/kamera.git
-cd kamera
-conda env create -f environment.yml
-conda activate kamera
-pip install -e .
-```
-
-Afterwards, `conda activate kamera` is all you need. Conda installs the CUDA
-build of pycolmap automatically with NVIDIA driver 575+ (CUDA 12.9),
-otherwise the CPU build; GPU only matters for full camera model calibration.
+`bootstrap.py` creates the `kamera` conda env from `environment.yml` (or updates it
+if it exists) and builds `.venv` on top of it; `make install` does the same on Linux.
+Pass `--name` to build a second env beside an existing one. Afterwards, activating
+the conda env and then `.venv` is all you need. Conda installs the CUDA build of
+pycolmap automatically with NVIDIA driver 575+ (CUDA 12.9), otherwise the CPU build;
+GPU only matters for full camera model calibration.
 
 ### Rig calibration
 
