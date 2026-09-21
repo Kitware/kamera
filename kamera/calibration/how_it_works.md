@@ -117,6 +117,12 @@ overlap is under 50%, so those legs only register through crossovers with higher
 passes. And the global bundle adjustment is set to run every 30% of growth instead of
 10%, which halved the run time on the full flight (about 2.5 hours for 8,800 images).
 
+Lens distortion is held at zero throughout pass 1, with only the focal length free.
+Two or three views of flat ground cannot pin distortion down, and on a 250-frame subset
+refining it from the initial pair drove the L_ir camera to a focal length 30% off and
+a k2 of -3, so no L_ir model ever grew past three images while C_ir and R_ir happened
+to survive. Pass 2 refines the full intrinsics once every camera is posed on the rig.
+
 ## Step 6: work out the rig from pass 1 (`sfm.py`, `derive_rig`, `robust_mean`)
 
 For every camera and every frame where both that camera and the reference camera
