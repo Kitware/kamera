@@ -1,13 +1,11 @@
 ROS_DISTRO ?= noetic
-PYTHON_VERSION ?= 3.13
+CONDA_ENV ?= kamera
 
 .PHONY: install build core viame gui postflight follower leader all clean
 
-# Build .venv on top of an activated conda env from environment.yml
+# Conda env from environment.yml plus .venv on top of it (see bootstrap.py)
 install:
-	@echo "🚀 Creating virtual environment using uv"
-	@uv venv --clear --system-site-packages --python=$(PYTHON_VERSION)
-	@uv sync --frozen --no-cache
+	@python bootstrap.py --name $(CONDA_ENV)
 
 build:
 	docker compose build
