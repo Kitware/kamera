@@ -204,7 +204,7 @@ keys first so old readers still work and the provenance after.
 
 ## Step 9: homographies for DIVE (`registration.py`, `cli.py`)
 
-For each channel and each pair `ir->uv`, `ir->rgb`, `uv->rgb`: take a grid of pixels in
+For each channel and each pair `ir->rgb`, `uv->rgb`: take a grid of pixels in
 the first camera, cast them out to a nominal ground range through the calibrated
 model, project them into the second camera, and fit one 3x3 homography to the result.
 The fit residual says how much a single matrix loses to lens distortion. The range

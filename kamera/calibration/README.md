@@ -35,7 +35,7 @@ For a plain-language walkthrough of every stage, see [how_it_works.md](how_it_wo
    intrinsics free as well.
 6. **calibrate** — INS boresight (`ins_from_rig`) and lever arm as a robust average over
    frames, per-camera models, and `rig.yaml`.
-7. **registration** — per channel `ir->uv`, `ir->rgb`, `uv->rgb` homographies as DIVE
+7. **registration** — per channel `ir->rgb` and `uv->rgb` homographies as DIVE
    camera-registration JSON (format v2), plus flip GIFs.
 8. **report** — PDF with intrinsics, rig angles, boresight residuals, overlays and the error budget.
 
