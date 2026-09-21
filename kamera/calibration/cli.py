@@ -187,6 +187,14 @@ def main(argv=None) -> None:
         )
     for p in rig.write_outputs(cal, model_dir):
         print(f"  wrote {p}")
+    # <sys_cfg>/<view>_view/<image>: postflight reads <sys_cfg>/sys_config.json.
+    config_dirs = {
+        os.path.dirname(os.path.dirname(p)) for f in frames for p in f.images.values()
+    }
+    for p in rig.write_sys_configs(
+        cal, model_dir, sorted(config_dirs), cfg.install_sys_config
+    ):
+        print(f"  wrote {p}")
 
     print("[blue]Fitting homographies and writing DIVE registration files[/blue]")
     reg_dir = os.path.join(model_dir, "dive_registration")
