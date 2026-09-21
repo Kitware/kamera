@@ -39,7 +39,7 @@ For a plain-language walkthrough of every stage, see [how_it_works.md](how_it_wo
    camera-registration JSON (format v2), plus flip GIFs.
 8. **report** — PDF with intrinsics, rig angles, boresight residuals, overlays and the error budget.
 
-## Outputs (`<flight>/calibration/models/`)
+## Outputs (`<flight>/calibration/camera_models/`)
 
 - `<rig>_<camera>.yaml` — `standard` camera model readable by
   `kamera.colmap_processing.camera_models.load_from_file`, with the rig and calibration
