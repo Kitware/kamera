@@ -153,18 +153,11 @@ defaults to the calibration flight's median scene range and should be set to the
 survey altitude. The files use DIVE's registration format version 2, one matrix-only
 pair each.
 
-The GIFs warp the first camera's picture onto the second with that homography for
-five frames spread across the flight and flip between the two, so a misregistration is
-visible at a glance.
+The GIFs show the registration the way DIVE does: for five frames spread across the flight, each one flips between the RGB frame and the same frame with the first camera warped onto it over its footprint, so a misregistration is visible at a glance.
 
 ## Step 10: Report (`report.py`)
 
-A PDF with a flight summary page (dates, frames on disk, selected and registered,
-images per camera, the flight track), the camera intrinsics table, the rig geometry
-with a sketch of the optical axes in aircraft body axes, and one page per homography
-pair showing the RGB frame with the warped camera blended over its footprint, as DIVE
-displays a registration. The boresight numbers and their per-frame scatter are in the
-rig yaml.
+A PDF with a flight summary page (dates, frames on disk, selected and registered, images per camera, the flight track), the camera intrinsics table, the rig geometry with a sketch of the optical axes in aircraft body axes, and one page per homography pair showing the RGB frame with the warped camera blended over its footprint, as DIVE displays a registration. The boresight numbers and their per-frame scatter are in the rig yaml, and the README describes what limits their accuracy.
 
 ## Running it again
 
