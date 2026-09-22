@@ -5,7 +5,6 @@ import sys
 import json
 import time
 import glob
-import warnings
 import threading
 from shutil import copyfile
 import exifread
@@ -22,21 +21,12 @@ import cv2
 import pygeodesy
 from osgeo import osr, gdal
 import simplekml
-from shapely.geometry import Polygon, mapping
+from shapely.geometry import Polygon
 import shapefile
 
 # Custom package imports.
-import sys
 
 sys.path.insert(0, "C:/Users/path_to/postflight_scripts/sensor_models/src")
-from kamera.sensor_models import (
-    quaternion_multiply,
-    quaternion_from_matrix,
-    quaternion_from_euler,
-    quaternion_slerp,
-    quaternion_inverse,
-    quaternion_matrix,
-)
 from kamera.colmap_processing.camera_models import load_from_file
 from kamera.sensor_models.nav_conversions import enu_to_llh, llh_to_enu
 from kamera.sensor_models.nav_state import NavStateINSJson
@@ -415,17 +405,17 @@ def decompose_affine(A):
 
 
 def get_image_chip(image, left, right, top, bottom):
-    l = np.maximum(left, 0)
-    r = np.maximum(l, right)
-    r = np.minimum(r, image.shape[1])
-    t = np.maximum(top, 0)
-    b = np.maximum(t, bottom)
-    b = np.minimum(b, image.shape[0])
+    x0 = np.maximum(left, 0)
+    x1 = np.maximum(x0, right)
+    x1 = np.minimum(x1, image.shape[1])
+    y0 = np.maximum(top, 0)
+    y1 = np.maximum(y0, bottom)
+    y1 = np.minimum(y1, image.shape[0])
 
     if image.ndim == 3:
-        return image[t:b, l:r, :]
+        return image[y0:y1, x0:x1, :]
     else:
-        return image[t:b, l:r]
+        return image[y0:y1, x0:x1]
 
 
 def points_along_image_border(width, height, num_points=4):
@@ -523,7 +513,7 @@ def parse_image_directory(image_dir, modality=None):
             with open(json_fname) as json_file:
                 try:
                     d = json.load(json_file)
-                except json.decoder.JSONDecodeError as e:
+                except json.decoder.JSONDecodeError:
                     print("Failed to decode file %s." % json_file)
                     continue
 
@@ -772,7 +762,7 @@ def measure_image_to_image_homographies(
 
             try:
                 translation, R, scale, S = decompose_affine(h)
-            except:
+            except Exception:
                 return True
 
             # translation = h[:2, 2]
@@ -877,10 +867,6 @@ def measure_image_to_image_homographies(
                 continue
 
             mask = mask.ravel().astype(bool)
-
-            # Verify whether homography is acceptable. If not, do RANSAC with
-            # only acceptable test cases.
-            det = np.linalg.det(h)
 
             pts0 = pts0[mask]
             pts1 = pts1[mask]
@@ -1323,11 +1309,8 @@ def create_geotiffs_glob(
 
     # This will do some duplication of NavState parsing but I do not have time to fix
     ret = parse_image_directory(image_dir, modality=modality)
-    img_fname_to_time = ret[0]
     img_time_to_fname = ret[1]
     platform_pose_provider = ret[2]
-    effort_type = ret[3]
-    trigger_type = ret[4]
 
     camera_model = load_from_file(camera_model_fname, platform_pose_provider)
 
@@ -1515,7 +1498,7 @@ def get_review_fate(
     t = basename_to_time[base_name]
     try:
         nth = nav_state_provider.time_to_save_every_x_image[t]
-    except KeyError as e:
+    except KeyError:
         print(f"Could not find 'save_every_x_image' for time {t}.")
         nth = None
 
@@ -1577,9 +1560,7 @@ def get_basename_to_time(flight_dir) -> dict:
     return basename_to_time
 
 
-def create_flight_summary(
-    flight_dir, save_shapefile_per_image=False, output_dir=None
-):
+def create_flight_summary(flight_dir, save_shapefile_per_image=False, output_dir=None):
     """Create flight summary for a flight directory.
 
     A flight directory contains a folder structure where different
@@ -1630,7 +1611,7 @@ def create_flight_summary(
     for f in det_txts:
         print(f)
         with open(f, "r") as of:
-            sets_detector_processed += [get_base(l) for l in of.readlines()]
+            sets_detector_processed += [get_base(line) for line in of.readlines()]
     sets_detector_processed = set(sets_detector_processed)
     print("Number of sets of images detected on: %s" % len(sets_detector_processed))
 
@@ -1641,8 +1622,8 @@ def create_flight_summary(
     for f in det_csvs:
         with open(f, "r") as of:
             lines = of.readlines()
-            lines = [l for l in lines if l[0] != "#"]
-            files = [get_base(l.split(",")[1]) for l in lines]
+            lines = [line for line in lines if line[0] != "#"]
+            files = [get_base(line.split(",")[1]) for line in lines]
             sets_with_detections += files
     sets_with_detections = set(sets_with_detections)
     print("Number of sets with detections: %s" % len(sets_with_detections))
@@ -1654,10 +1635,7 @@ def create_flight_summary(
         raise SystemExit("No meta jsons were found, please check your filepaths.")
     nav_state_provider = NavStateINSJson(json_glob)
 
-    fn_glob = os.path.join(flight_dir, "*/*/*meta.json")
     count = 0
-    est_metas = glob.glob(fn_glob)
-    total = len(est_metas) * 3
 
     for sys_config in os.listdir(flight_dir):
         sys_config_dir = "%s/%s" % (flight_dir, sys_config)
@@ -2070,12 +2048,10 @@ def visualize_registration_homographies(flight_dir, sys_str="rgb"):
 
     """
     img_to_lonlat_homog_dir = (
-        "%s/processed_results/" "homographies_img_to_lonlat" % flight_dir
+        "%s/processed_results/homographies_img_to_lonlat" % flight_dir
     )
 
-    img_to_img_homog_dir = (
-        "%s/processed_results/" "homographies_img_to_img" % flight_dir
-    )
+    img_to_img_homog_dir = "%s/processed_results/homographies_img_to_img" % flight_dir
 
     dir_out = "%s/processed_results/ins_registration_viz" % flight_dir
 
@@ -2173,7 +2149,6 @@ def visualize_registration_homographies(flight_dir, sys_str="rgb"):
 
     img_pair_fnames = sorted(list(img_to_img_homog.keys()))
     for img_pair_fname in img_pair_fnames:
-
         fname1, fname2 = img_pair_fname.split("_to_")
         h12 = img_to_img_homog[img_pair_fname]
         img1 = get_image(fname1)
@@ -2281,12 +2256,12 @@ def detection_summary(
 
     if img_to_lonlat_homog_dir is None:
         img_to_lonlat_homog_dir = (
-            "%s/processed_results/" "homographies_img_to_lonlat" % flight_dir
+            "%s/processed_results/homographies_img_to_lonlat" % flight_dir
         )
 
     if img_to_img_homog_dir is None:
         img_to_img_homog_dir = (
-            "%s/processed_results/" "homographies_img_to_img" % flight_dir
+            "%s/processed_results/homographies_img_to_img" % flight_dir
         )
 
     if not os.path.isdir(img_to_lonlat_homog_dir):
@@ -2478,7 +2453,7 @@ def __process_detection_csv(
                     return img
 
     # Track redundant detections.
-    print2("Comparing detections between frames to identify redundant " "detections...")
+    print2("Comparing detections between frames to identify redundant detections...")
     num_suppressed = 0
     img_fnames = sorted(img_fnames)
 

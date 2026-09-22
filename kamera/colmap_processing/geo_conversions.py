@@ -5,6 +5,7 @@ from math import cos, sin, sqrt
 
 try:
     from sklearn.preprocessing import PolynomialFeatures
+
     sklearn_imported = True
 except ImportError:
     sklearn_imported = False
@@ -15,16 +16,16 @@ from kamera.colmap_processing.rotations import quaternion_multiply
 
 # WGS84 constants
 _a = 6378137
-_f = 1/(298257223563/1000000000)
-_e2 = _f*(2-_f)
-_e2m = np.square(1-_f)
+_f = 1 / (298257223563 / 1000000000)
+_e2 = _f * (2 - _f)
+_e2m = np.square(1 - _f)
 _e2a = abs(_e2)
 _e4a = np.square(_e2)
 epsilon = np.finfo(float).eps
 _maxrad = 2 * _a / epsilon
 
-deg2rad = np.pi/180
-rad2deg = 180/np.pi
+deg2rad = np.pi / 180
+rad2deg = 180 / np.pi
 
 
 class FastENUConverter(object):
@@ -66,8 +67,17 @@ class FastENUConverter(object):
 
 
     """
-    def __init__(self, lat_range, lon_range, height_range, lat0, lon0, h0,
-                 accuracy=[1e-2, 1e-2, 1e-2]):
+
+    def __init__(
+        self,
+        lat_range,
+        lon_range,
+        height_range,
+        lat0,
+        lon0,
+        h0,
+        accuracy=[1e-2, 1e-2, 1e-2],
+    ):
         """
         :param lat_range: Range of latitudes (degrees) to support.
         :type lat_range: array-like shape (2,)
@@ -92,7 +102,7 @@ class FastENUConverter(object):
         for h in hs:
             LATS, LONS = np.meshgrid(lats, lons)
             L = len(LATS.ravel())
-            llhi = np.vstack([LATS.ravel(), LONS.ravel(), np.ones(L)*h]).T
+            llhi = np.vstack([LATS.ravel(), LONS.ravel(), np.ones(L) * h]).T
             llh = np.vstack([llh, llhi])
 
         enu = [llh_to_enu(_[0], _[1], _[2], lat0, lon0, h0) for _ in llh]
@@ -105,9 +115,10 @@ class FastENUConverter(object):
             degree += 1
 
             if degree == 10:
-                raise Exception('Failed to fit to required accuracy=%0.3f. '
-                                'Try reducing required accuracy.' %
-                                accuracy)
+                raise Exception(
+                    "Failed to fit to required accuracy=%0.3f. "
+                    "Try reducing required accuracy." % accuracy
+                )
 
             self._llh_feature_poly = PolynomialFeatures(degree=degree)
             features = self._llh_feature_poly.fit_transform(llh)
@@ -132,9 +143,10 @@ class FastENUConverter(object):
             degree += 1
 
             if degree == 10:
-                raise Exception('Failed to fit to required accuracy=%0.3f. '
-                                'Try reducing required accuracy.' %
-                                accuracy)
+                raise Exception(
+                    "Failed to fit to required accuracy=%0.3f. "
+                    "Try reducing required accuracy." % accuracy
+                )
 
             self._enu_feature_poly = PolynomialFeatures(degree=degree)
             features = self._enu_feature_poly.fit_transform(enu)
@@ -146,15 +158,14 @@ class FastENUConverter(object):
             self._enu_coeff = np.array(coeff).T
 
             fit = np.dot(features, self._enu_coeff)
-            enu_fit = [llh_to_enu(_[0], _[1], _[2], lat0, lon0, h0)
-                       for _ in fit]
+            enu_fit = [llh_to_enu(_[0], _[1], _[2], lat0, lon0, h0) for _ in fit]
             if np.any(np.abs(enu_fit - enu) > accuracy):
                 continue
 
             break
 
     def llh_to_enu(self, lat, lon, h):
-        if hasattr(lat, '__len__'):
+        if hasattr(lat, "__len__"):
             llh = np.vstack([lat, lon, h]).T
             features = self._llh_feature_poly.transform(llh)
             enu = np.dot(features, self._llh_coeff)
@@ -166,7 +177,7 @@ class FastENUConverter(object):
             return float(enu[0, 0]), float(enu[0, 1]), float(enu[0, 2])
 
     def enu_to_llh(self, east, north, up):
-        if hasattr(east, '__len__'):
+        if hasattr(east, "__len__"):
             enu = np.vstack([east, north, up]).T
             features = self._enu_feature_poly.transform(enu)
             enu = np.dot(features, self._enu_coeff)
@@ -227,32 +238,40 @@ def llh_to_enu(lat, lon, h, lat0, lon0, h0, in_degrees=True, pure_python=True):
 
     """
     if not in_degrees:
-        lat = lat*180/np.pi
-        lon = lon*180/np.pi
-        lat0 = lat0*180/np.pi
-        lon0 = lon0*180/np.pi
+        lat = lat * 180 / np.pi
+        lon = lon * 180 / np.pi
+        lat0 = lat0 * 180 / np.pi
+        lon0 = lon0 * 180 / np.pi
 
     if pure_python:
         sphi, cphi = sincosd(lat0)
         slam, clam = sincosd(lon0)
         _r = geocentric_rotation(sphi, cphi, slam, clam)
-        xc,yc,zc = llh_to_ecef(lat, lon, h, in_degrees=True)
-        _x0,_y0,_z0 = llh_to_ecef(lat0, lon0, h0, in_degrees=True)
-        xc -= _x0; yc -= _y0; zc -= _z0;
-        x = _r[0] * xc + _r[3] * yc + _r[6] * zc;
-        y = _r[1] * xc + _r[4] * yc + _r[7] * zc;
-        z = _r[2] * xc + _r[5] * yc + _r[8] * zc;
-        return [x,y,z]
+        xc, yc, zc = llh_to_ecef(lat, lon, h, in_degrees=True)
+        _x0, _y0, _z0 = llh_to_ecef(lat0, lon0, h0, in_degrees=True)
+        xc -= _x0
+        yc -= _y0
+        zc -= _z0
+        x = _r[0] * xc + _r[3] * yc + _r[6] * zc
+        y = _r[1] * xc + _r[4] * yc + _r[7] * zc
+        z = _r[2] * xc + _r[5] * yc + _r[8] * zc
+        return [x, y, z]
     else:
-        output = subprocess.check_output(['CartConvert','-l',
-                                          str(lat0),str(lon0),
-                                          str(h0),'--input-string',
-                                          ' '.join([str(lat),str(lon),str(h)])])
-        return [float(s) for s in output.split('\n')[0].split(' ')]
+        output = subprocess.check_output(
+            [
+                "CartConvert",
+                "-l",
+                str(lat0),
+                str(lon0),
+                str(h0),
+                "--input-string",
+                " ".join([str(lat), str(lon), str(h)]),
+            ]
+        )
+        return [float(s) for s in output.split("\n")[0].split(" ")]
 
 
-def enu_to_llh(east, north, up, lat0, lon0, h0, in_degrees=True,
-               pure_python=True):
+def enu_to_llh(east, north, up, lat0, lon0, h0, in_degrees=True, pure_python=True):
     """Convert latitude, longitude, and height to east, north, up.
 
     East, north, and up are coordinates within a local level Cartesian
@@ -302,36 +321,46 @@ def enu_to_llh(east, north, up, lat0, lon0, h0, in_degrees=True,
 
     """
     if not in_degrees:
-        lat0 = lat0*180/np.pi
-        lon0 = lon0*180/np.pi
+        lat0 = lat0 * 180 / np.pi
+        lon0 = lon0 * 180 / np.pi
 
     if pure_python:
         x, y, z = east, north, up
         sphi, cphi = sincosd(lat0)
         slam, clam = sincosd(lon0)
         _r = geocentric_rotation(sphi, cphi, slam, clam)
-        _x0,_y0,_z0 = llh_to_ecef(lat0, lon0, h0, in_degrees=True)
+        _x0, _y0, _z0 = llh_to_ecef(lat0, lon0, h0, in_degrees=True)
 
-        xc = _x0 + _r[0] * x + _r[1] * y + _r[2] * z,
-        yc = _y0 + _r[3] * x + _r[4] * y + _r[5] * z,
-        zc = _z0 + _r[6] * x + _r[7] * y + _r[8] * z;
+        xc = (_x0 + _r[0] * x + _r[1] * y + _r[2] * z,)
+        yc = (_y0 + _r[3] * x + _r[4] * y + _r[5] * z,)
+        zc = _z0 + _r[6] * x + _r[7] * y + _r[8] * z
         lat, lon, h = ecef_to_llh(xc, yc, zc, in_degrees)
     else:
-        output = subprocess.check_output(['CartConvert','-r','-l',str(lat0),
-                                          str(lon0),str(h0),'--input-string',
-                                          ' '.join([str(east),str(north),
-                                                    str(up)])])
+        output = subprocess.check_output(
+            [
+                "CartConvert",
+                "-r",
+                "-l",
+                str(lat0),
+                str(lon0),
+                str(h0),
+                "--input-string",
+                " ".join([str(east), str(north), str(up)]),
+            ]
+        )
 
-        lat, lon, h = [float(s) for s in output.split('\n')[0].split(' ')]
+        lat, lon, h = [float(s) for s in output.split("\n")[0].split(" ")]
 
     if not in_degrees:
-        lat = lat*180/np.pi
-        lon = lon*180/np.pi
+        lat = lat * 180 / np.pi
+        lon = lon * 180 / np.pi
 
-    return [lat,lon,h]
+    return [lat, lon, h]
 
 
-_cached1 = _a*(1-_e2)
+_cached1 = _a * (1 - _e2)
+
+
 def dlat_dlon_per_meter(lat, in_degrees=True):
     """Return latitude and longitude degrees change per meter east and north.
 
@@ -352,18 +381,18 @@ def dlat_dlon_per_meter(lat, in_degrees=True):
 
     """
     if in_degrees:
-        lat_ = lat*deg2rad
+        lat_ = lat * deg2rad
 
-    east = _cached1*(1 - _e2*sin(lat_)**2)**(-3/2)
+    east = _cached1 * (1 - _e2 * sin(lat_) ** 2) ** (-3 / 2)
 
     # Parameter (or reduced) latitude.
-    beta = np.arctan((1-_f)*np.tan(lat_))
+    beta = np.arctan((1 - _f) * np.tan(lat_))
 
-    north = _a*np.cos(beta)
+    north = _a * np.cos(beta)
 
     if in_degrees:
-        east = east*deg2rad
-        north = north*deg2rad
+        east = east * deg2rad
+        north = north * deg2rad
 
     return east, north
 
@@ -379,7 +408,7 @@ def ned_quat_to_enu_quat(quat):
     :rtype: 4-array
 
     """
-    return quaternion_multiply([np.sqrt(2)/2,np.sqrt(2)/2,0,0], quat)
+    return quaternion_multiply([np.sqrt(2) / 2, np.sqrt(2) / 2, 0, 0], quat)
 
 
 def enu_quat_to_ned_quat(quat):
@@ -393,7 +422,7 @@ def enu_quat_to_ned_quat(quat):
     :rtype: 4-array
 
     """
-    return quaternion_multiply([np.sqrt(2)/2,np.sqrt(2)/2,0,0], quat)
+    return quaternion_multiply([np.sqrt(2) / 2, np.sqrt(2) / 2, 0, 0], quat)
 
 
 def ecef_to_llh(X, Y, Z, in_degrees=True):
@@ -422,7 +451,7 @@ def ecef_to_llh(X, Y, Z, in_degrees=True):
     z = 2167698
 
     """
-    R = np.hypot(X,Y)
+    R = np.hypot(X, Y)
     if R == 0:
         slam = 0
         clam = 1
@@ -430,25 +459,25 @@ def ecef_to_llh(X, Y, Z, in_degrees=True):
         slam = Y / R
         clam = X / R
 
-    h = np.hypot(R,Z)      # Distance to center of earth
-    if (h > _maxrad):
+    h = np.hypot(R, Z)  # Distance to center of earth
+    if h > _maxrad:
         # We really far away (> 12 million light years) treat the earth as a
         # point and h, above, is an acceptable approximation to the height.
         # This avoids overflow, e.g., in the computation of disc below.  It's
         # possible that h has overflowed to inf but that's OK.
         #
         # Treat the case X, Y finite, but R overflows to +inf by scaling by 2.
-        R = np.hypot(X/2, Y/2)
+        R = np.hypot(X / 2, Y / 2)
 
         if R == 0:
             slam = 0
             clam = 1
         else:
-            slam = (Y/2) / R
-            clam = (X/2) / R
+            slam = (Y / 2) / R
+            clam = (X / 2) / R
 
-        H = np.hypot(Z/2,R)
-        sphi = (Z/2) / H
+        H = np.hypot(Z / 2, R)
+        sphi = (Z / 2) / H
         cphi = R / H
     elif _e4a == 0:
         # Treat the spherical case.  Dealing with underflow in the general case
@@ -470,17 +499,17 @@ def ecef_to_llh(X, Y, Z, in_degrees=True):
         q = _e2m * np.square(Z / _a)
         r = (p + q - _e4a) / 6
         if _f < 0:
-            p,q = q,p
+            p, q = q, p
 
         if not (_e4a * q == 0 and r <= 0):
             # Avoid possible division by zero when r = 0 by multiplying
             # equations for s and t by r^3 and r, resp.
-            S = _e4a * p * q / 4 # S = r^3 * s
+            S = _e4a * p * q / 4  # S = r^3 * s
             r2 = np.square(r)
             r3 = r * r2
             disc = S * (2 * r3 + S)
             u = r
-            if (disc >= 0):
+            if disc >= 0:
                 T3 = S + r3
                 # Pick the sign on the sqrt to maximize abs(T3).  This
                 # minimizes loss of precision due to cancellation.  The result
@@ -492,7 +521,7 @@ def ecef_to_llh(X, Y, Z, in_degrees=True):
                     T3 += np.sqrt(disc)
 
                 # N.B. cbrt always returns the real root.  cbrt(-8) = -2.
-                T = np.cbrt(T3) # T = r * t
+                T = np.cbrt(T3)  # T = r * t
                 # T can be zero but then r2 / T -> 0.
                 if T != 0:
                     u += T + (r2 / T)
@@ -505,7 +534,7 @@ def ecef_to_llh(X, Y, Z, in_degrees=True):
                 # r < 0.
                 u += 2 * r * np.cos(ang / 3)
 
-            v = np.sqrt(np.square(u) + _e4a * q) # guaranteed positive
+            v = np.sqrt(np.square(u) + _e4a * q)  # guaranteed positive
             # Avoid loss of accuracy when u < 0.  Underflow doesn't occur in
             # e4 * q / (v - u) because u ~ e^4 when q is small and u < 0.
             if u < 0:  # u+v guaranteed positive
@@ -526,12 +555,12 @@ def ecef_to_llh(X, Y, Z, in_degrees=True):
                 k2 = k
 
             d = k1 * R / k2
-            H = np.hypot(Z/k1, R/k2)
-            sphi = (Z/k1) / H
-            cphi = (R/k2) / H
-            h = (1 - _e2m/k1) * np.hypot(d, Z)
+            H = np.hypot(Z / k1, R / k2)
+            sphi = (Z / k1) / H
+            cphi = (R / k2) / H
+            h = (1 - _e2m / k1) * np.hypot(d, Z)
 
-        else:    # e4 * q == 0 && r <= 0
+        else:  # e4 * q == 0 && r <= 0
             # This leads to k = 0 (oblate, equatorial plane) and k + e^2 = 0
             # (prolate, rotation axis) and the generation of 0/0 in the general
             # formulas for phi and h.  using the general formula and division by 0
@@ -543,7 +572,7 @@ def ecef_to_llh(X, Y, Z, in_degrees=True):
             else:
                 zz = np.sqrt(p / _e2m)
 
-            if _f <  0:
+            if _f < 0:
                 xx = np.sqrt(_e4a - p)
             else:
                 xx = np.sqrt(p)
@@ -552,15 +581,15 @@ def ecef_to_llh(X, Y, Z, in_degrees=True):
             sphi = zz / H
             cphi = xx / H
             if Z < 0:
-                sphi = -sphi # for tiny negative Z (not for prolate)
+                sphi = -sphi  # for tiny negative Z (not for prolate)
 
             if _f >= 0:
-                h = - _a * (_e2m) * H / _e2a
+                h = -_a * (_e2m) * H / _e2a
             else:
-                h = - _a * (1) * H / _e2a
+                h = -_a * (1) * H / _e2a
 
-    lat = float(np.arctan2(sphi, cphi)*180/np.pi)
-    lon = float(np.arctan2(slam, clam)*180/np.pi)
+    lat = float(np.arctan2(sphi, cphi) * 180 / np.pi)
+    lon = float(np.arctan2(slam, clam) * 180 / np.pi)
     h = float(h)
     return lat, lon, h
 
@@ -586,18 +615,18 @@ def llh_to_ecef(lat, lon, h, in_degrees=True):
 
     """
     if not in_degrees:
-        lat = lat*180/np.pi
-        lon = lon*180/np.pi
+        lat = lat * 180 / np.pi
+        lon = lon * 180 / np.pi
 
-    sphi,cphi = sincosd(lat)
-    slam,clam = sincosd(lon)
+    sphi, cphi = sincosd(lat)
+    slam, clam = sincosd(lon)
 
-    n = _a/np.sqrt(1-_e2*np.square(sphi))
+    n = _a / np.sqrt(1 - _e2 * np.square(sphi))
     Z = (_e2m * n + h) * sphi
     X = (n + h) * cphi
     Y = X * slam
     X *= clam
-    return [float(X),float(Y),float(Z)]
+    return [float(X), float(Y), float(Z)]
 
 
 def geocentric_rotation(sphi, cphi, slam, clam):
@@ -612,11 +641,17 @@ def geocentric_rotation(sphi, cphi, slam, clam):
     """
     M = np.zeros(9)
     # Local X axis (east) in geocentric coords
-    M[0] = -slam;        M[3] =  clam;        M[6] = 0;
+    M[0] = -slam
+    M[3] = clam
+    M[6] = 0
     # Local Y axis (north) in geocentric coords
-    M[1] = -clam * sphi; M[4] = -slam * sphi; M[7] = cphi;
+    M[1] = -clam * sphi
+    M[4] = -slam * sphi
+    M[7] = cphi
     # Local Z axis (up) in geocentric coords
-    M[2] =  clam * cphi; M[5] =  slam * cphi; M[8] = sphi;
+    M[2] = clam * cphi
+    M[5] = slam * cphi
+    M[8] = sphi
     return M
 
 
@@ -648,13 +683,17 @@ def sincosd(x):
         s = x
 
     if np.uint8(q) & np.uint8(3) == np.uint(0):
-        sinx =  s; cosx =  c
+        sinx = s
+        cosx = c
     elif np.uint8(q) & np.uint8(3) == np.uint(1):
-        sinx =  c; cosx = -s
+        sinx = c
+        cosx = -s
     elif np.uint8(q) & np.uint8(3) == np.uint(2):
-        sinx = -s; cosx = -c
+        sinx = -s
+        cosx = -c
     else:
-      sinx = -c; cosx =  s
+        sinx = -c
+        cosx = s
 
     # Set sign of 0 results.  -0 only produced for sin(-0)
     if x:
@@ -679,17 +718,21 @@ def rmat_enu_ecef(lat, lon, in_degrees=True):
 
     """
     if in_degrees:
-        lat = lat/180*np.pi
-        lon = lon/180*np.pi
+        lat = lat / 180 * np.pi
+        lon = lon / 180 * np.pi
 
     clat = cos(lat)
     slat = sin(lat)
     clon = cos(lon)
     slon = sin(lon)
 
-    return np.array([[-slon, -slat*clon, clat*clon],
-                     [clon, -slat*slon, clat*slon],
-                     [0, clat, slat]])
+    return np.array(
+        [
+            [-slon, -slat * clon, clat * clon],
+            [clon, -slat * slon, clat * slon],
+            [0, clat, slat],
+        ]
+    )
 
 
 def rmat_ecef_enu(lat, lon, in_degrees=True):
@@ -707,17 +750,21 @@ def rmat_ecef_enu(lat, lon, in_degrees=True):
 
     """
     if in_degrees:
-        lat = lat/180*np.pi
-        lon = lon/180*np.pi
+        lat = lat / 180 * np.pi
+        lon = lon / 180 * np.pi
 
     clat = cos(lat)
     slat = sin(lat)
     clon = cos(lon)
     slon = sin(lon)
 
-    return np.array([[-slon, clon, 0],
-                     [-clon*slat, -slon*slat, clat],
-                     [clon*clat, slon*clat, slat]])
+    return np.array(
+        [
+            [-slon, clon, 0],
+            [-clon * slat, -slon * slat, clat],
+            [clon * clat, slon * clat, slat],
+        ]
+    )
 
 
 def quat_std_to_ypr_std(quat, qx_std, qy_std, qz_std, qw_std=None):
@@ -770,53 +817,59 @@ def quat_std_to_ypr_std(quat, qx_std, qy_std, qz_std, qw_std=None):
     qx2 = qx**2
     qy2 = qy**2
     qz2 = qz**2
-    qwqy = qw*qy
-    qxqz = qx*qz
-    qyqz = qy*qz
-    qwqx = qw*qx
-    qwqz = qw*qz
-    qxqy = qx*qy
-    C1 = qwqz+qxqy
-    C2 = qz2+qy2
-    C4 = qyqz+qwqx
-    C5 = qy2+qx2
-    C6 = 1-2*(C2)
-    C7 = C6**2+4*C1**2
-    C8 = (1-2*C5)**2
-    C9 = 1-2*C5
-    C10 = 4*C4**2+C8
-    C11 = C9/C10
-    C12 = C4*8
+    qwqy = qw * qy
+    qxqz = qx * qz
+    qyqz = qy * qz
+    qwqx = qw * qx
+    qwqz = qw * qz
+    qxqy = qx * qy
+    C1 = qwqz + qxqy
+    C2 = qz2 + qy2
+    C4 = qyqz + qwqx
+    C5 = qy2 + qx2
+    C6 = 1 - 2 * (C2)
+    C7 = C6**2 + 4 * C1**2
+    C8 = (1 - 2 * C5) ** 2
+    C9 = 1 - 2 * C5
+    C10 = 4 * C4**2 + C8
+    C11 = C9 / C10
+    C12 = C4 * 8
 
     # Heading
-    dheading_dx = (2*qy*C6)/C7
-    dheading_dy = (2*qx*C6)/C7+(8*qy*C1)/C7
-    dheading_dz = (2*qw*C6)/C7+(8*qz*C1)/C7
-    dheading_dw = (2*qz*C6)/C7
+    dheading_dx = (2 * qy * C6) / C7
+    dheading_dy = (2 * qx * C6) / C7 + (8 * qy * C1) / C7
+    dheading_dz = (2 * qw * C6) / C7 + (8 * qz * C1) / C7
+    dheading_dw = (2 * qz * C6) / C7
 
     # Pitch
-    C3 = sqrt(1-4*(qwqy-qxqz)**2)
-    dpitch_dx = -2*qz/C3
-    dpitch_dy = 2*qw/C3
-    dpitch_dz = -2*qx/C3
-    dpitch_dw = 2*qy/C3
+    C3 = sqrt(1 - 4 * (qwqy - qxqz) ** 2)
+    dpitch_dx = -2 * qz / C3
+    dpitch_dy = 2 * qw / C3
+    dpitch_dz = -2 * qx / C3
+    dpitch_dw = 2 * qy / C3
 
     # Change in roll as function of qx
-    droll_dx = qx*C12/C10+2*qw*C11
-    droll_dy = qy*C12/C10+2*qz*C11
-    droll_dz = 2*qy*C11
-    droll_dw = 2*qx*C11
+    droll_dx = qx * C12 / C10 + 2 * qw * C11
+    droll_dy = qy * C12 / C10 + 2 * qz * C11
+    droll_dz = 2 * qy * C11
+    droll_dw = 2 * qx * C11
 
-    heading_std = abs(dheading_dx - dheading_dy/3 - dheading_dz/3 - dheading_dw/3)*qx_std
-    heading_std += abs(dheading_dy - dheading_dx/3 - dheading_dz/3 - dheading_dw/3)*qy_std
-    heading_std += abs(dheading_dz - dheading_dx/3 - dheading_dy/3 - dheading_dw/3)*qz_std
+    heading_std = (
+        abs(dheading_dx - dheading_dy / 3 - dheading_dz / 3 - dheading_dw / 3) * qx_std
+    )
+    heading_std += (
+        abs(dheading_dy - dheading_dx / 3 - dheading_dz / 3 - dheading_dw / 3) * qy_std
+    )
+    heading_std += (
+        abs(dheading_dz - dheading_dx / 3 - dheading_dy / 3 - dheading_dw / 3) * qz_std
+    )
 
-    pitch_std = abs(dpitch_dx - dpitch_dy/3 - dpitch_dz/3 - dpitch_dw/3)*qx_std
-    pitch_std += abs(dpitch_dy - dpitch_dx/3 - dpitch_dz/3 - dpitch_dw/3)*qy_std
-    pitch_std += abs(dpitch_dz - dpitch_dx/3 - dpitch_dy/3 - dpitch_dw/3)*qz_std
+    pitch_std = abs(dpitch_dx - dpitch_dy / 3 - dpitch_dz / 3 - dpitch_dw / 3) * qx_std
+    pitch_std += abs(dpitch_dy - dpitch_dx / 3 - dpitch_dz / 3 - dpitch_dw / 3) * qy_std
+    pitch_std += abs(dpitch_dz - dpitch_dx / 3 - dpitch_dy / 3 - dpitch_dw / 3) * qz_std
 
-    roll_std = abs(droll_dx - droll_dy/3 - droll_dz/3 - droll_dw/3)*qx_std
-    roll_std += abs(droll_dy - droll_dx/3 - droll_dz/3 - droll_dw/3)*qy_std
-    roll_std += abs(droll_dz - droll_dx/3 - droll_dy/3 - droll_dw/3)*qz_std
+    roll_std = abs(droll_dx - droll_dy / 3 - droll_dz / 3 - droll_dw / 3) * qx_std
+    roll_std += abs(droll_dy - droll_dx / 3 - droll_dz / 3 - droll_dw / 3) * qy_std
+    roll_std += abs(droll_dz - droll_dx / 3 - droll_dy / 3 - droll_dw / 3) * qz_std
 
     return heading_std, pitch_std, roll_std
