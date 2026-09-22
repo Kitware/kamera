@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import sys
+from collections import Counter
 
 import cv2
 import numpy as np
@@ -15,7 +16,7 @@ from rich import print
 from kamera.calibration import registration, rig, sfm
 from kamera.calibration.config import CalibrateConfig
 from kamera.calibration.flight import build_image_tree, discover_flight
-from kamera.calibration.report import write_report
+from kamera.calibration.report import FlightSummary, write_report
 from kamera.colmap_processing.camera_models import StandardCamera
 
 # Homography pairs per channel, left -> right (DIVE registers the left onto the right).
@@ -32,8 +33,8 @@ SEED_MIN_CLUSTER_FRACTION = 0.5
 def write_gifs(frames, names, image_dir, left, right, h, gif_dir, count) -> dict:
     """Flip GIFs of the left image warped onto the right, for evenly spaced frames.
 
-    Returns the report images (warped, right, overlay) from the middle frame, or an
-    empty dict when no frame has both images or ``count`` is 0.
+    Returns the report overlay from the middle frame, or an empty dict when no frame
+    has both images or ``count`` is 0.
     """
     os.makedirs(gif_dir, exist_ok=True)
     # Both sides come from the normalized tree: the raw UV frames are nearly black.
@@ -49,16 +50,16 @@ def write_gifs(frames, names, image_dir, left, right, h, gif_dir, count) -> dict
             )
             for camera in (left, right)
         )
-        warped, ref = registration.warp_pair(left_img, right_img, h)
+        warped, ref, mask = registration.warp_pair(left_img, right_img, h)
+        # Flip between the right image and the same with the warped left pasted over
+        # its footprint, the way DIVE shows a registration.
         registration.write_gif(
-            os.path.join(gif_dir, f"{left}_to_{right}_{k}.gif"), warped, ref
+            os.path.join(gif_dir, f"{left}_to_{right}_{k}.gif"),
+            ref,
+            registration.composite(warped, ref, mask),
         )
         if k == len(chosen) // 2:
-            out = {
-                "warped_img": warped,
-                "right_img": ref,
-                "overlay_img": registration.blend_overlay(warped, ref),
-            }
+            out = {"overlay_img": registration.blend_overlay(warped, ref, mask)}
     return out
 
 
@@ -96,6 +97,7 @@ def main(argv=None) -> None:
     print("[blue]Discovering frames[/blue]")
     frames, ins, rig_name = discover_flight(cfg.flight_dir)
     rig_name = cfg.rig_name or rig_name.replace("images_", "") or "rig"
+    discovered = frames
     all_cameras = {camera for frame in frames for camera in frame.images}
     full = [f for f in frames if len(f.images) == len(all_cameras)]
     stop = (
@@ -244,8 +246,22 @@ def main(argv=None) -> None:
                 {"left": left, "right": right, "h": h, "stats": stats, **images}
             )
 
+    last = cfg.frame_start + (len(frames) - 1) * cfg.frame_stride
+    summary = FlightSummary(
+        discovered=len(discovered),
+        complete=len(full),
+        selected=frames,
+        selection=(
+            "all complete frames"
+            if len(frames) == len(full)
+            else f"frames {cfg.frame_start} to {last} of {len(full)}, "
+            f"stride {cfg.frame_stride}"
+        ),
+        images_on_disk=Counter(c for f in discovered for c in f.images),
+        ins=ins,
+    )
     report_path = os.path.join(camera_model_dir, f"{rig_name}_calibration_report.pdf")
-    write_report(report_path, cal, pairs)
+    write_report(report_path, cal, pairs, summary)
     print(f"[green]Report written to {report_path}[/green]")
 
 
