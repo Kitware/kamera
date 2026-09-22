@@ -104,17 +104,35 @@ def source_stamp(flight_dir: str, extra: dict | None = None) -> dict:
 
 
 def warp_pair(
-    left_img: np.ndarray, right_img: np.ndarray, h: np.ndarray, width: int = 1280
-) -> tuple[np.ndarray, np.ndarray]:
+    left_img: np.ndarray, right_img: np.ndarray, h: np.ndarray, width: int = 1600
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Warp the left image into the right image's pixels.
 
-    Both are returned resized to ``width`` wide, RGB.
+    Returns the warped left, the right, and the warped footprint mask, all resized to
+    ``width`` wide, the images RGB.
     """
     scale = width / right_img.shape[1]
     size = (width, round(right_img.shape[0] * scale))
     s = np.diag([scale, scale, 1.0])
     warped = cv2.warpPerspective(left_img, s @ h, size, flags=cv2.INTER_LINEAR)
-    return _rgb(warped), _rgb(cv2.resize(right_img, size, interpolation=cv2.INTER_AREA))
+    mask = (
+        cv2.warpPerspective(
+            np.full(left_img.shape[:2], 255, np.uint8),
+            s @ h,
+            size,
+            flags=cv2.INTER_NEAREST,
+        )
+        > 0
+    )
+    right = _rgb(cv2.resize(right_img, size, interpolation=cv2.INTER_AREA))
+    return _rgb(warped), right, mask
+
+
+def composite(warped: np.ndarray, right: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """The right image with the warped left pasted over its footprint, as DIVE shows it."""
+    out = right.copy()
+    out[mask] = warped[mask]
+    return out
 
 
 def _rgb(im: np.ndarray) -> np.ndarray:
@@ -131,7 +149,15 @@ def write_gif(path: str, a: np.ndarray, b: np.ndarray, duration_ms: int = 400) -
     )
 
 
-def blend_overlay(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Magenta/green false-colour blend: misregistration shows as coloured fringes."""
-    ga, gb = cv2.cvtColor(a, cv2.COLOR_RGB2GRAY), cv2.cvtColor(b, cv2.COLOR_RGB2GRAY)
-    return np.dstack([ga, gb, ga])
+def blend_overlay(
+    warped: np.ndarray, right: np.ndarray, mask: np.ndarray
+) -> np.ndarray:
+    """The right image in colour with a magenta/green blend over the warped footprint.
+
+    Misregistration shows as coloured fringes inside the footprint.
+    """
+    gw = cv2.cvtColor(warped, cv2.COLOR_RGB2GRAY)
+    gr = cv2.cvtColor(right, cv2.COLOR_RGB2GRAY)
+    out = right.copy()
+    out[mask] = np.dstack([gw, gr, gw])[mask]
+    return out

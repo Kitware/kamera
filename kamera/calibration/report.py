@@ -1,8 +1,10 @@
-"""PDF report: cameras, rig geometry, boresight residuals, overlays, error budget."""
+"""PDF report: flight summary, cameras, rig geometry, registration overlays."""
 
 from __future__ import annotations
 
+import datetime
 import textwrap
+from dataclasses import dataclass
 
 import matplotlib
 import numpy as np
@@ -11,64 +13,54 @@ from matplotlib.backends.backend_pdf import PdfPages
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from kamera.calibration.flight import Frame, InsTrajectory
 from kamera.calibration.rig import RigCalibration
 
 PAGE = (11, 8.5)
 
-ERROR_NOTES = """\
-Error budget and what limits it
-
-INS attitude at the trigger. Each meta.json carries one 100 Hz INS sample taken before
-the event, so the attitude used here is up to 10 ms stale (median gap reported above).
-At the turn rates of a figure-eight (about 5 deg/s) that is up to 0.05 deg, or roughly
-25 RGB pixels, and it enters every frame's boresight estimate as noise. A hardware
-event-stamped INS sample or a full-rate log removes it; InsTrajectory accepts either
-without code changes.
-
-SfM drift. Bundle adjustment with INS position priors pins scale, heading and position
-to the INS, but the relative orientation drift of the model over the flight is what
-dominates the per-frame boresight scatter. The rig constraint removes the intra-frame
-freedom entirely, so the relative camera geometry (and therefore the homographies) is
-far better determined than the absolute boresight.
-
-Exposure timing. A camera whose exposure midpoint differs from the reference camera's
-sees the ground further along track by ground speed x time difference, and a bundle
-adjustment on a translating rig cannot tell that from a camera mounted that far forward.
-The rig table's "exposure vs ref" column reads each camera's forward offset back into a
-time difference at the flight's ground speed (negative = earlier than the reference).
-Only the relative timing is observable: the position priors absorb any delay shared by
-the whole rig. The camera yaml positions carry these offsets, which is correct at
-similar ground speeds.
-
-Lever arms. Beyond that timing signal, at 400 to 900 m a 30 cm baseline subtends less
-than one IR pixel, so the rig translations are weakly determined and the reported
-standard deviations should be read as such. The INS lever arm is the median offset of
-the rig origin from the INS position over all frames.
-
-Homographies. A homography maps one camera onto another exactly only for a plane at one
-range, and the timing baseline above makes the range matter. Each pair is fit for the
-range in its title (the survey AGL if given, else the calibration flight's median scene
-range); the fit residual (rms and p95, in right-image pixels) then measures the lens
-distortion a single matrix cannot carry, and the warped overlays show it visually.
-"""
+FRAME_NOTES = """A frame is one trigger event. Every camera fires on it and writes one image, so the
+images of a trigger share a single rig position and orientation, and that shared pose
+is what the rig bundle adjustment enforces. Only triggers where every camera wrote an
+image are used. A frame is registered when structure from motion placed it; the
+boresight uses the registered frames whose INS-to-rig rotation is not an outlier."""
 
 
-def _text_page(pdf: PdfPages, title: str, body: str) -> None:
-    fig = plt.figure(figsize=PAGE)
-    fig.text(0.06, 0.94, title, fontsize=16, weight="bold", va="top")
-    fig.text(
-        0.06, 0.88, body, fontsize=9.5, va="top", family="monospace", linespacing=1.4
-    )
-    pdf.savefig(fig)
-    plt.close(fig)
+@dataclass
+class FlightSummary:
+    """What the flight folder held and which of it went into the calibration."""
+
+    discovered: int  # triggers found in the flight folder
+    complete: int  # triggers with an image from every camera
+    selected: list[Frame]  # complete frames handed to structure from motion
+    selection: str  # how they were picked, in words
+    images_on_disk: dict[str, int]  # per camera, over every discovered trigger
+    ins: InsTrajectory
+
+
+def _utc(t: float) -> datetime.datetime:
+    return datetime.datetime.fromtimestamp(t, datetime.timezone.utc)
 
 
 def _table_page(
-    pdf: PdfPages, title: str, header: list[str], rows: list[list], widths=None
+    pdf: PdfPages,
+    title: str,
+    header: list[str],
+    rows: list[list],
+    widths=None,
+    note: str = "",
 ) -> None:
     fig, ax = plt.subplots(figsize=PAGE)
     ax.axis("off")
     ax.set_title(title, fontsize=15, weight="bold", loc="left", pad=20)
+    if note:
+        fig.text(
+            0.06,
+            0.86 - 0.033 * (len(rows) + 1) - 0.04,
+            "\n".join(textwrap.wrap(note, 120)),
+            fontsize=8,
+            va="top",
+            linespacing=1.4,
+        )
     table = ax.table(
         cellText=rows,
         colLabels=header,
@@ -83,10 +75,166 @@ def _table_page(
     plt.close(fig)
 
 
+def summary_page(pdf: PdfPages, cal: RigCalibration, fs: FlightSummary) -> None:
+    """Page 1: the flight, the frames, and how many of them each camera contributed."""
+    sel = fs.selected
+    t0, t1 = sel[0].time, sel[-1].time
+    ins_t0, ins_t1 = fs.ins.times[0], fs.ins.times[-1]
+    pos = np.array([fs.ins.pose(f.time)[0] for f in sel])
+    track_km = np.linalg.norm(np.diff(pos, axis=0), axis=1).sum() / 1000
+    window = (fs.ins.times >= t0) & (fs.ins.times <= t1)
+    alt = fs.ins.llh[window if window.any() else slice(None), 2]
+    interval = np.median(np.diff([f.time for f in sel]))
+    registered = np.isin(
+        np.round([f.time for f in sel], 3), np.round(cal.frame_times, 3)
+    )
+    facts = [
+        ("flight", cal.flight),
+        ("rig", f"{cal.rig}: {len(cal.cameras)} cameras, reference {cal.reference}"),
+        (
+            "date (UTC)",
+            f"{_utc(ins_t0):%Y-%m-%d}, {_utc(ins_t0):%H:%M} to {_utc(ins_t1):%H:%M} "
+            f"({(ins_t1 - ins_t0) / 60:.0f} min of INS samples)",
+        ),
+        (
+            "frames on disk",
+            f"{fs.discovered} triggers, {fs.complete} with every camera",
+        ),
+        (
+            "frames selected",
+            f"{len(sel)} ({fs.selection}), {_utc(t0):%H:%M} to {_utc(t1):%H:%M}, "
+            f"{(t1 - t0) / 60:.0f} min",
+        ),
+        (
+            "frames registered",
+            f"{registered.sum()} placed by SfM, {int(cal.inlier.sum())} used for "
+            "the boresight",
+        ),
+        ("trigger interval", f"median {interval:.2f} s"),
+        (
+            "ground speed",
+            f"median {cal.ground_speed_mps:.0f} m/s, {track_km:.1f} km flown over "
+            "the selected frames",
+        ),
+        (
+            "altitude",
+            f"INS {alt.min():.0f} to {alt.max():.0f} m above the ellipsoid, "
+            f"median scene range {cal.scene_range_m:.0f} m",
+        ),
+    ]
+    fig = plt.figure(figsize=PAGE)
+    fig.text(
+        0.05, 0.94, f"KAMERA rig calibration: {cal.rig}", fontsize=16, weight="bold"
+    )
+    width = max(len(k) for k, _ in facts)
+    fig.text(
+        0.05,
+        0.88,
+        "\n".join(f"{k:<{width}}  {v}" for k, v in facts),
+        fontsize=8.5,
+        va="top",
+        family="monospace",
+        linespacing=1.5,
+    )
+    fig.text(0.05, 0.66, "What a frame is", fontsize=11, weight="bold", va="top")
+    fig.text(
+        0.05,
+        0.625,
+        "\n".join(textwrap.wrap(" ".join(FRAME_NOTES.split()), 78)),
+        fontsize=8.5,
+        va="top",
+        linespacing=1.4,
+    )
+    ax = fig.add_axes((0.05, 0.08, 0.5, 0.38))
+    ax.axis("off")
+    ax.set_title("images per camera", fontsize=11, weight="bold", loc="left")
+    rows = [
+        [
+            name,
+            f"{c.width}x{c.height}",
+            fs.images_on_disk.get(name, 0),
+            len(sel),
+            c.frames,
+            c.observations,
+        ]
+        for name, c in sorted(cal.cameras.items())
+    ]
+    table = ax.table(
+        cellText=rows,
+        colLabels=[
+            "camera",
+            "size",
+            "on disk",
+            "selected",
+            "registered",
+            "observations",
+        ],
+        loc="upper center",
+        cellLoc="center",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
+    table.scale(1, 1.4)
+
+    ax = fig.add_axes((0.63, 0.42, 0.33, 0.46))
+    enu = fs.ins.enu / 1000
+    ax.plot(enu[:, 0], enu[:, 1], "-", color="0.8", lw=0.8, label="whole flight")
+    minutes = (np.array([f.time for f in sel]) - t0) / 60
+    sc = ax.scatter(
+        pos[:, 0] / 1000, pos[:, 1] / 1000, c=minutes, s=6, cmap="viridis", zorder=3
+    )
+    if not registered.all():
+        ax.plot(
+            pos[~registered, 0] / 1000,
+            pos[~registered, 1] / 1000,
+            ".",
+            color="red",
+            ms=3,
+            zorder=4,
+            label="selected, not registered",
+        )
+    # Zoom to the registered frames: the ferry legs run off the plot.
+    area = pos[registered] if registered.any() else pos
+    lo, hi = area[:, :2].min(0) / 1000, area[:, :2].max(0) / 1000
+    margin = 0.1 * max(hi - lo) + 0.1
+    ax.set(
+        xlim=(lo[0] - margin, hi[0] + margin),
+        ylim=(lo[1] - margin, hi[1] + margin),
+        xlabel="east (km)",
+        ylabel="north (km)",
+        title="flight track",
+    )
+    ax.set_aspect("equal")
+    ax.legend(fontsize=7, loc="best")
+    fig.colorbar(sc, ax=ax, fraction=0.04, pad=0.02).set_label(
+        "minutes since first selected frame", fontsize=7
+    )
+
+    ax = fig.add_axes((0.63, 0.08, 0.33, 0.22))
+    ax.plot((fs.ins.times - ins_t0) / 60, fs.ins.llh[:, 2], color="0.4", lw=0.8)
+    ax.axvspan((t0 - ins_t0) / 60, (t1 - ins_t0) / 60, color="C0", alpha=0.2)
+    ax.set(
+        xlabel="minutes since first INS sample",
+        ylabel="altitude (m)",
+        title="INS altitude, selected window shaded",
+    )
+    pdf.savefig(fig)
+    plt.close(fig)
+
+
+MODALITY_ORDER = {"rgb": 0, "uv": 1, "ir": 2}
+CHANNEL_ORDER = {"L": 0, "C": 1, "R": 2}
+
+
+def camera_order(name: str) -> tuple[int, int]:
+    """Sort key: modality first so focal lengths sit side by side, then L, C, R."""
+    channel, modality = name.split("_")
+    return MODALITY_ORDER.get(modality, 9), CHANNEL_ORDER.get(channel, 9)
+
+
 def camera_page(pdf: PdfPages, cal: RigCalibration) -> None:
     header = [
         "camera",
-        "size",
         "fx",
         "fy",
         "cx",
@@ -95,134 +243,173 @@ def camera_page(pdf: PdfPages, cal: RigCalibration) -> None:
         "k2",
         "p1",
         "p2",
-        "frames",
+        "fov deg (h x v)",
+        "gsd cm",
         "obs",
         "rms px",
-        "ifov deg",
     ]
     rows = []
-    for name in sorted(cal.cameras):
+    for name in sorted(cal.cameras, key=camera_order):
         c = cal.cameras[name]
+        fov_h = 2 * np.degrees(np.arctan(c.width / 2 / c.K[0, 0]))
+        fov_v = 2 * np.degrees(np.arctan(c.height / 2 / c.K[1, 1]))
         rows.append(
             [
                 name,
-                f"{c.width}x{c.height}",
                 f"{c.K[0, 0]:.1f}",
                 f"{c.K[1, 1]:.1f}",
                 f"{c.K[0, 2]:.1f}",
                 f"{c.K[1, 2]:.1f}",
-                *[f"{v:.5f}" for v in c.dist],
-                c.frames,
+                f"{c.dist[0]:.3f}",
+                f"{c.dist[1]:.3f}",
+                f"{c.dist[2]:.4f}",
+                f"{c.dist[3]:.4f}",
+                f"{fov_h:.1f} x {fov_v:.1f}",
+                f"{100 * cal.scene_range_m / c.K[0, 0]:.1f}",
                 c.observations,
                 f"{c.reproj_rms_px:.2f}",
-                f"{np.degrees(1 / c.K[0, 0]):.5f}",
             ]
         )
-    _table_page(pdf, f"{cal.rig}: camera intrinsics ({cal.flight})", header, rows)
+    _table_page(
+        pdf,
+        f"{cal.rig}: camera intrinsics ({cal.flight})",
+        header,
+        rows,
+        widths=[
+            0.07,
+            0.07,
+            0.07,
+            0.07,
+            0.07,
+            0.065,
+            0.065,
+            0.065,
+            0.065,
+            0.11,
+            0.06,
+            0.07,
+            0.06,
+        ],
+        note=(
+            "OpenCV model: fx, fy, cx, cy in pixels; k1, k2 radial and p1, p2 "
+            "tangential distortion. fov is the full field of view from the focal "
+            "length and image size. gsd is the ground footprint of one pixel at the "
+            f"flight's median scene range of {cal.scene_range_m:.0f} m. obs is the "
+            "number of features with a 3D point; rms is their reprojection error."
+        ),
+    )
+
+
+def swathe_order(name: str) -> tuple[int, int]:
+    """Sort key: L, C, R first so each swathe's three cameras sit together."""
+    channel, modality = name.split("_")
+    return CHANNEL_ORDER.get(channel, 9), MODALITY_ORDER.get(modality, 9)
 
 
 def rig_page(pdf: PdfPages, cal: RigCalibration) -> None:
     fig = plt.figure(figsize=PAGE)
-    fig.suptitle(
+    fig.text(
+        0.06,
+        0.94,
         f"Rig geometry relative to {cal.reference}",
         fontsize=15,
         weight="bold",
-        x=0.06,
-        ha="left",
     )
-    ax = fig.add_subplot(1, 2, 1)
+    ax = fig.add_axes((0.06, 0.5, 0.88, 0.4))
     ax.axis("off")
     rows = []
-    for name in sorted(cal.cameras):
+    for name in sorted(cal.cameras, key=swathe_order):
         rel = cal.rotation_from_reference(name)
         rv, c = rel.as_rotvec(degrees=True), cal.cameras[name].center_in_rig
         rows.append(
             [
                 name,
                 f"{np.degrees(rel.magnitude()):.3f}",
-                f"{rv[0]:+.3f} {rv[1]:+.3f} {rv[2]:+.3f}",
-                f"{c[0]:+.2f} {c[1]:+.2f} {c[2]:+.2f}",
+                *[f"{v:+.3f}" for v in rv],
+                *[f"{v:+.2f}" for v in c],
                 f"{cal.implied_delay_ms(name):+.0f}",
             ]
         )
     header = [
         "camera",
-        "angle deg",
-        "rotvec deg (ref axes)",
-        "centre m (rig)",
-        "exposure vs ref ms",
+        "angle (deg)",
+        "rot x (deg)",
+        "rot y (deg)",
+        "rot z (deg)",
+        "lever arm x (m)",
+        "lever arm y (m)",
+        "lever arm z (m)",
+        "exposure offset (ms)",
     ]
-    t = ax.table(
+    table = ax.table(
         cellText=rows,
         colLabels=header,
-        loc="center",
+        loc="upper center",
         cellLoc="center",
-        colWidths=[0.14, 0.14, 0.36, 0.3, 0.14],
+        colWidths=[0.08, 0.09, 0.09, 0.09, 0.09, 0.11, 0.11, 0.11, 0.14],
     )
-    t.auto_set_font_size(False)
-    t.set_fontsize(7.5)
-    t.scale(1, 1.6)
-    ax3 = fig.add_subplot(1, 2, 2, projection="3d")
-    for i, name in enumerate(sorted(cal.cameras)):
-        z = cal.cameras[name].rig_from_cam.apply([0, 0, 1])
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
+    table.scale(1, 1.4)
+    fig.text(
+        0.06,
+        0.6,
+        "\n".join(
+            textwrap.wrap(
+                "Rotation of each camera relative to the reference, as a rotation "
+                "vector in the reference camera's axes (x right, y down the image, "
+                "z along the optical axis); angle is its magnitude. Lever arm is the "
+                "camera centre in that frame. Exposure offset reads the along-track "
+                "part of the lever arm as a timing difference at the flight's ground "
+                "speed, positive when the camera exposes after the reference; a "
+                "bundle adjustment on a moving rig cannot separate the two. Lever arms "
+                "are weakly determined at these ranges and should be read as such.",
+                125,
+            )
+        ),
+        fontsize=8,
+        va="top",
+        linespacing=1.4,
+    )
+
+    ax3 = fig.add_axes((0.2, 0.0, 0.6, 0.46), projection="3d")
+    # Draw the rig as mounted, in INS body axes (forward, right, down) via the
+    # boresight: the cameras hang from the mount plate and look down, so the down
+    # axis is inverted to point down the page.
+    grid = np.array([[-1, -1], [1, -1], [1, 1], [-1, 1]], float)
+    ax3.plot_trisurf(grid[:, 0], grid[:, 1], np.zeros(4), color="0.85", alpha=0.5)
+    colours = {"rgb": "C0", "uv": "C2", "ir": "C3"}
+    for name in sorted(cal.cameras, key=swathe_order):
+        z = cal.ins_from_rig.apply(cal.cameras[name].rig_from_cam.apply([0, 0, 1]))
         ax3.quiver(
-            0, 0, 0, *z, length=1.0, label=name, arrow_length_ratio=0.08, color=f"C{i}"
+            0,
+            0,
+            0,
+            *z,
+            length=1.0,
+            label=name,
+            arrow_length_ratio=0.06,
+            color=colours.get(name.split("_")[1], "k"),
         )
     ax3.set(
         xlim=(-1, 1),
         ylim=(-1, 1),
-        zlim=(0, 1),
-        xlabel="rig x",
-        ylabel="rig y",
-        zlabel="rig z (optical)",
+        zlim=(1, 0),
+        xticks=[],
+        yticks=[],
+        zticks=[],
     )
-    ax3.set_title("optical axes in the rig frame", fontsize=10)
-    ax3.legend(fontsize=6, loc="upper left")
-    pdf.savefig(fig)
-    plt.close(fig)
-
-
-def boresight_page(pdf: PdfPages, cal: RigCalibration) -> None:
-    keep = cal.inlier
-    t = cal.frame_times - cal.frame_times[0]
-    res, pos = cal.rotation_residual_deg, cal.position_residual_m
-    mag = np.linalg.norm(res[keep], axis=1)
-    fig, axes = plt.subplots(2, 2, figsize=PAGE)
-    e = cal.ins_from_rig.as_euler("ZYX", degrees=True)
-    lever = cal.lever_arm_m
-    fig.suptitle(
-        f"INS boresight: ins_from_rig euler ZYX = "
-        f"({e[0]:.4f}, {e[1]:.4f}, {e[2]:.4f}) deg, "
-        f"lever arm = ({lever[0]:.2f}, {lever[1]:.2f}, {lever[2]:.2f}) m; "
-        f"{keep.sum()} frames, {(~keep).sum()} rejected",
+    ax3.set_xlabel("forward", fontsize=8)
+    ax3.set_ylabel("right (starboard)", fontsize=8)
+    ax3.set_zlabel("down", fontsize=8)
+    ax3.tick_params(labelsize=7)
+    ax3.view_init(elev=22, azim=20)
+    ax3.set_title(
+        "optical axes in aircraft body axes, seen from behind the aircraft",
         fontsize=10,
-        weight="bold",
+        y=0.98,
     )
-    for i, lbl in enumerate("xyz"):
-        axes[0, 0].plot(t[keep], res[keep, i], ".", ms=2, label=f"rot {lbl}")
-        axes[1, 0].plot(t[keep], pos[keep, i], ".", ms=2, label=f"pos {lbl}")
-    axes[0, 0].set(
-        title="per-frame boresight residual (deg, rig axes)",
-        xlabel="s since first frame",
-    )
-    axes[1, 0].set(
-        title="rig origin vs INS minus lever arm (m, body axes)",
-        xlabel="s since first frame",
-    )
-    axes[0, 0].legend(fontsize=7)
-    axes[1, 0].legend(fontsize=7)
-    axes[0, 1].hist(mag, bins=50, color="gray")
-    axes[0, 1].set(
-        title=f"residual magnitude: median {np.median(mag):.3f}, "
-        f"p90 {np.percentile(mag, 90):.3f} deg",
-        xlabel="deg",
-    )
-    axes[1, 1].hist(cal.ins_gap_s * 1000, bins=40, color="gray")
-    axes[1, 1].set(
-        title=f"INS sample staleness: median {np.median(cal.ins_gap_s) * 1000:.1f} ms",
-        xlabel="ms",
-    )
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    ax3.legend(fontsize=7, loc="center left", bbox_to_anchor=(1.12, 0.5))
     pdf.savefig(fig)
     plt.close(fig)
 
@@ -230,54 +417,41 @@ def boresight_page(pdf: PdfPages, cal: RigCalibration) -> None:
 def homography_page(pdf: PdfPages, pair: dict) -> None:
     s = pair["stats"]
     fig = plt.figure(figsize=PAGE)
-    fig.suptitle(
+    fig.text(
+        0.03,
+        0.955,
         f"{pair['left']} -> {pair['right']} at {s['rangeM']:.0f} m: "
         f"fit rms {s['rmsPx']:.2f} px, p95 {s['p95Px']:.2f} px, "
-        f"max {s['maxPx']:.2f} px, "
-        f"coverage {100 * s['coverage']:.0f}%",
+        f"max {s['maxPx']:.2f} px, coverage {100 * s['coverage']:.0f}%",
         fontsize=11,
         weight="bold",
     )
-    panels = [
-        ("warped_img", f"{pair['left']} warped into {pair['right']}"),
-        ("right_img", pair["right"]),
-        ("overlay_img", "overlay (magenta/green)"),
-    ]
-    for i, (key, title) in enumerate(panels):
-        ax = fig.add_subplot(1, 3, i + 1)
-        # No GIF frame had both images (or --gif_frames 0): keep the page for its fit.
-        if key in pair:
-            ax.imshow(pair[key])
-        ax.set_title(title, fontsize=9)
-        ax.axis("off")
+    ax = fig.add_axes((0.03, 0.07, 0.94, 0.86))
+    # No GIF frame had both images (or --gif_frames 0): keep the page for its fit.
+    if "overlay_img" in pair:
+        ax.imshow(pair["overlay_img"])
+        ax.set_title(
+            f"{pair['right']} in colour; inside the {pair['left']} footprint, "
+            f"{pair['left']} warped in magenta over {pair['right']} in green",
+            fontsize=8,
+        )
+    ax.axis("off")
     h_text = np.array2string(
         np.asarray(pair["h"]), precision=5, suppress_small=True, max_line_width=200
     ).replace("\n", " ")
     fig.text(
-        0.06, 0.04, "H (left -> right) = " + h_text, fontsize=7, family="monospace"
+        0.03, 0.03, "H (left -> right) = " + h_text, fontsize=7, family="monospace"
     )
-    pdf.savefig(fig)
+    pdf.savefig(fig, dpi=150)
     plt.close(fig)
 
 
 def write_report(
-    path: str, cal: RigCalibration, pairs: list[dict], notes: str = ""
+    path: str, cal: RigCalibration, pairs: list[dict], flight: FlightSummary
 ) -> None:
     with PdfPages(path) as pdf:
-        _text_page(
-            pdf,
-            f"KAMERA rig calibration: {cal.rig}",
-            textwrap.dedent(f"""\
-            flight:            {cal.flight}
-            reference camera:  {cal.reference}
-            cameras:           {", ".join(sorted(cal.cameras))}
-            frames used:       {int(cal.inlier.sum())}
-            """)
-            + notes,
-        )
+        summary_page(pdf, cal, flight)
         camera_page(pdf, cal)
         rig_page(pdf, cal)
-        boresight_page(pdf, cal)
         for pair in pairs:
             homography_page(pdf, pair)
-        _text_page(pdf, "Error sources", ERROR_NOTES)

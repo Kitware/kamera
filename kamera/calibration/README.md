@@ -37,7 +37,7 @@ For a plain-language walkthrough of every stage, see [how_it_works.md](how_it_wo
    frames, per-camera models, and `rig.yaml`.
 7. **registration** — per channel `ir->rgb` and `uv->rgb` homographies as DIVE
    camera-registration JSON (format v2), plus flip GIFs.
-8. **report** — PDF with intrinsics, rig angles, boresight residuals, overlays and the error budget.
+8. **report** — PDF with the flight summary, intrinsics, rig geometry and registration overlays.
 
 ## Outputs (`<flight>/calibration/camera_models/`)
 
