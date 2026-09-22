@@ -8,7 +8,7 @@ from kamera.postflight import utilities
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Convert all images from a " "flight into shapefiles."
+        description="Convert all images from a flight into shapefiles."
     )
     parser.add_argument(
         "-flight_dir",
@@ -35,10 +35,12 @@ def main():
     # output_dir = '/example_output_dir'
 
     if not flight_dir:
-      raise SystemError("No flight dir specified! Please pass one as an argument or hardcode one in the file.")
+        raise SystemError(
+            "No flight dir specified! Please pass one as an argument or hardcode one in the file."
+        )
 
     utilities.create_flight_summary(flight_dir, output_dir=output_dir)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
