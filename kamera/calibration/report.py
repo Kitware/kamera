@@ -414,19 +414,32 @@ def rig_page(pdf: PdfPages, cal: RigCalibration) -> None:
     plt.close(fig)
 
 
-def homography_page(pdf: PdfPages, pair: dict) -> None:
-    s = pair["stats"]
+def homography_page(pdf: PdfPages, cal: RigCalibration, pair: dict) -> None:
+    s, left, right = pair["stats"], pair["left"], pair["right"]
+    # The fit residual is in right-camera pixels; restate it in the left camera's own
+    # pixels and on the ground, since one IR pixel is many RGB pixels.
+    scale = cal.cameras[right].K[0, 0] / cal.cameras[left].K[0, 0]
+    gsd_cm = 100 * s["rangeM"] / cal.cameras[right].K[0, 0]
     fig = plt.figure(figsize=PAGE)
     fig.text(
         0.03,
-        0.955,
-        f"{pair['left']} -> {pair['right']} at {s['rangeM']:.0f} m: "
+        0.965,
+        f"{left} -> {right} at {s['rangeM']:.0f} m: "
         f"fit rms {s['rmsPx']:.2f} px, p95 {s['p95Px']:.2f} px, "
-        f"max {s['maxPx']:.2f} px, coverage {100 * s['coverage']:.0f}%",
+        f"max {s['maxPx']:.2f} px in {right} pixels, coverage {100 * s['coverage']:.0f}%",
         fontsize=11,
         weight="bold",
     )
-    ax = fig.add_axes((0.03, 0.07, 0.94, 0.86))
+    fig.text(
+        0.03,
+        0.94,
+        f"in {left} pixels: rms {s['rmsPx'] / scale:.2f}, "
+        f"p95 {s['p95Px'] / scale:.2f}, max {s['maxPx'] / scale:.2f} "
+        f"(one {left} pixel = {scale:.1f} {right} pixels); "
+        f"rms {s['rmsPx'] * gsd_cm:.0f} cm on the ground",
+        fontsize=9,
+    )
+    ax = fig.add_axes((0.03, 0.06, 0.94, 0.835))
     # No GIF frame had both images (or --gif_frames 0): keep the page for its fit.
     if "overlay_img" in pair:
         ax.imshow(pair["overlay_img"])
@@ -454,4 +467,4 @@ def write_report(
         camera_page(pdf, cal)
         rig_page(pdf, cal)
         for pair in pairs:
-            homography_page(pdf, pair)
+            homography_page(pdf, cal, pair)
