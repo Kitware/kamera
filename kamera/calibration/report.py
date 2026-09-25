@@ -360,7 +360,7 @@ def rig_page(pdf: PdfPages, cal: RigCalibration) -> None:
                 "Rotation of each camera relative to the reference, as a rotation "
                 "vector in the reference camera's axes (x right, y down the image, "
                 "z along the optical axis); angle is its magnitude. Lever arm is the "
-                "camera centre in that frame. Exposure offset reads the along-track "
+                "camera center in that frame. Exposure offset reads the along-track "
                 "part of the lever arm as a timing difference at the flight's ground "
                 "speed, positive when the camera exposes after the reference; a "
                 "bundle adjustment on a moving rig cannot separate the two. Lever arms "

@@ -66,7 +66,7 @@ class RigCalibration:
         return (self.ins_from_rig * self.cameras[name].rig_from_cam).as_quat()
 
     def center_in_ins_body(self, name: str) -> np.ndarray:
-        """Camera centre in INS body axes (forward, right, down) from the rig origin."""
+        """Camera center in INS body axes (forward, right, down) from the rig origin."""
         return self.ins_from_rig.apply(self.cameras[name].center_in_rig)
 
     def camera_position(self, name: str) -> np.ndarray:
@@ -258,7 +258,7 @@ def write_camera_yaml(cal: RigCalibration, name: str, path: str) -> None:
     }
     header = (
         "# KAMERA camera model. camera_quaternion (x, y, z, w) rotates camera\n"
-        "# vectors into the INS body frame; camera_position is the camera centre in\n"
+        "# vectors into the INS body frame; camera_position is the camera center in\n"
         "# that frame (metres). distortion_coefficients follow OpenCV (k1, k2, p1,\n"
         "# p2). The extra keys record the rig calibration this came from.\n"
     )
@@ -278,8 +278,8 @@ def write_rig_yaml(cal: RigCalibration, path: str) -> None:
             },
             "rotation_from_reference_deg": _floats(rel.as_rotvec(degrees=True)),
             "angle_from_reference_deg": float(np.degrees(rel.magnitude())),
-            "centre_in_rig_m": _floats(cam.center_in_rig),
-            "centre_in_ins_body_m": _floats(cal.center_in_ins_body(name)),
+            "center_in_rig_m": _floats(cam.center_in_rig),
+            "center_in_ins_body_m": _floats(cal.center_in_ins_body(name)),
             "exposure_offset_from_reference_ms": cal.implied_delay_ms(name),
             "frames": cam.frames,
             "observations": cam.observations,
