@@ -20,10 +20,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `bootstrap.py` builds the conda env and `.venv` in one step on Linux, macOS and
   Windows; `make install` calls it. `.venv` is recreated instead of failing when it exists.
 - ruff (line length 88) is the project formatter and linter, installed with the `dev` group.
+- The per-system runtime folders `tmux/nayak` and `tmux/taiga` are one `runtime/`
+  folder: the env script, the supervisor program definitions and the launchers are
+  shared, and `SYSTEM_NAME` only selects the config under `src/cfg/<system>/`.
+- One supervisor group, `kamera`, replaces the system-named groups. Operators use
+  `supervisorctl restart kamera:*` on either system.
+- `src/cfg`: files identical across systems (`supervisord.conf`,
+  `default_camera_configurations.json`) live at the top level; `sysctl.conf` is a
+  file, not a folder; the tmux and vim dotfiles moved to `provision/`; the spare
+  center box is `center0spare`. `kameramaster` resolves to each system's own center.
+- The Ansible playbooks live directly under `provision/ansible/playbooks/` and the
+  helpers are `kamera_provision`, `kamera_configure`, `kamera_build` and `kamera_all`.
+- fstab entries in the configure playbook are keyed on the mount point, so a changed
+  option or disk id replaces the line instead of appending another.
 
 ### Removed
 
 - Old per-camera calibration scripts under `kamera/postflight/scripts`.
+- The uas platform: its runtime layout, per-host config and playbooks had not changed
+  since the first commit and no longer ran. Everything is readable at the `uas-last`
+  tag, and `docs/uas_time_sync.md` explains its PPS and PTP clock chain.
+- The old `nuvo` and `cas` host names from the hosts files and scripts, and the unused
+  `spoof_ins.json` and `spoof_events.sh`.
 
 ## [0.5.0] - 2026-07-21
 

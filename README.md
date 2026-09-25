@@ -20,6 +20,17 @@ KAMERA, or the **K**nowledge-guided Image **A**cquisition **M**anag**ER** and **
 - **Mapping**: All imagery and detections are mapped for accurate survey area calculation and post flight data evaluation.
 - **Open-Source**: All software has been open-sourced under the Apache License (Version 2.0) and pulls together numerous different off-the-shelf camera drivers and hardware specifications.
 
+## Layout
+
+- `src/` is the onboard software: ROS packages for the cameras, INS, DAQ and processing, under `src/core`, `src/cams` and `src/process`.
+- `src/cfg/` is the per-system configuration. `nayak/` and `taiga/` each hold a `config.yaml`, the default system state, and one folder per host with its network and clock settings. Files shared by every system sit at the top level. The file `~/kw/SYSTEM_NAME` on a host picks which folder applies.
+- `runtime/` is how a host runs the system: the env script, the supervisor program definitions for the leader and the followers, and the scripts supervisor calls (tmux startup). It is the same on every system.
+- `compose/` runs and `docker/` defines the images built for the containers those programs start.
+- `provision/` sets up a host from a fresh install with Ansible, plus the desktop shortcuts and dotfiles it installs.
+- `scripts/` holds operator tools such as `kamera_run.sh` and `kamera_halt.sh`.
+- `kamera/` is the Python package for post-processing, including the rig calibration.
+- `docs/` holds notes that do not belong next to code.
+
 ## Installation
 
 ### Post-processing (native, Windows or Linux)
