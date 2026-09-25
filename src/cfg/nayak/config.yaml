@@ -42,6 +42,10 @@ arch:
       fov: right
       idx: 2
       enabled: true
+    center0spare:
+      fov: center
+      idx: 0
+      enabled: false
 postproc_commands:
         - "flight_summary"
         - "homography"
