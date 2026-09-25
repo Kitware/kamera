@@ -29,7 +29,7 @@ if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/enable ) == "true" ]]; then
   fi
 fi
 
-CAM_FOV=${CAM_FOV:-$(cq ".hosts.${NODE_HOSTNAME}.fov")}
+CAM_FOV=${CAM_FOV:-$(cq ".arch.hosts[\"${NODE_HOSTNAME}\"].fov")}
 
 for VNAME in CFG_ALIAS_SET CAM_FOV CAM_MODE
 do
