@@ -39,8 +39,8 @@ The right long-term fix is in hardware (see "What we should do later").
    like.
 
 3. **The 3D model said the same thing.** Bundle adjustment had placed all three IR
-   camera centres about 1.0 m behind the RGB camera along the flight line, and the UV
-   centres about 0.6 m behind, on a rig whose real spacing is a few tens of
+   camera centers about 1.0 m behind the RGB camera along the flight line, and the UV
+   centers about 0.6 m behind, on a rig whose real spacing is a few tens of
    centimetres. A rig flying in a straight line cannot tell "this camera exposed 15 ms
    earlier" from "this camera is mounted 1 m further back", so the adjustment turned
    the timing into a fake lever arm. We confirmed the direction with nothing but the
