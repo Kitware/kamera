@@ -2,7 +2,8 @@
 #include <cstdio>
 #include <chrono>
 #include <mutex>
-#include <ros/ros.h>
+#include <thread>
+#include <rclcpp/rclcpp.hpp>
 // Local installs
 #include <GenApi/GenApi.h>
 #include <gevapi.h>
@@ -16,9 +17,9 @@ using std::string;
 using std::map;
 
 
-void cb_fail_shutdown(ros::TimerEvent e) {
+void cb_fail_shutdown() {
     ROS_WARN("Shutting down due to unhealthy");
-    ros::requestShutdown();
+    rclcpp::shutdown();
 }
 
 /// === === ===  new improved interface to GenApi - now with RAII!
@@ -142,19 +143,22 @@ bool GenApiConnector::tryNuc() {
 Watchdog::Watchdog() : failCallback_{cb_fail_shutdown} {}
 Watchdog::Watchdog(double lookback_period, double health_threshold)
 :
-    lookback_period_{lookback_period},
+    lookback_period_{rclcpp::Duration::from_seconds(lookback_period)},
     health_threshold{health_threshold},
     failCallback_{cb_fail_shutdown} {}
 
+rclcpp::Time Watchdog::now() {
+    return clock_.now();
+}
 
-void Watchdog::push_back(ros::Time const &t, double val) {
+void Watchdog::push_back(rclcpp::Time const &t, double val) {
     std::lock_guard<std::mutex> guard(mutex_);
-    if (!t.isValid()) {
+    if (t.nanoseconds() == 0) {
         ROS_ERROR("zero/invalid time encountered in Watchdog::push_back()");
         return;
     }
 
-    array.emplace_back(std::pair<ros::Time, double>(t, val));
+    array.emplace_back(std::pair<rclcpp::Time, double>(t, val));
     }
 
 int Watchdog::size() {
@@ -165,14 +169,14 @@ int Watchdog::size() {
 void Watchdog::show() {
     std::lock_guard<std::mutex> guard(mutex_);
     for (const auto pair : array) {
-        std::cout << pair.first << ": " << pair.second << std::endl;
+        std::cout << pair.first.seconds() << ": " << pair.second << std::endl;
     }
     std::cout << "\n---" << std::endl;
 }
 
 void Watchdog::purge() {
     std::lock_guard<std::mutex> guard(mutex_);
-    auto now = ros::Time::now();
+    auto now = clock_.now();
     std::size_t index = 0;
     for (const auto pair : array) {
         auto age = now - pair.first ;
@@ -186,12 +190,12 @@ void Watchdog::purge() {
 
 void Watchdog::pet() {
     ROS_INFO("Pet the watchdog");
-    this->push_back(ros::Time::now(), 1.0);
+    this->push_back(now(), 1.0);
 }
 
 void Watchdog::kick() {
     ROS_WARN("kicked the watchdog");
-    this->push_back(ros::Time::now(), -1.0);
+    this->push_back(now(), -1.0);
 }
 
 void Watchdog::check() {
@@ -212,14 +216,13 @@ double Watchdog::computeHealth() {
     return accu / total;
 }
 
-void Watchdog::setFailCallback(ros::TimerCallback callback) {
+void Watchdog::setFailCallback(std::function<void()> callback) {
     failCallback_ = callback;
 }
 
 void Watchdog::callFail() {
     ROS_ERROR("failed health check");
-    ros::TimerEvent e;
-    failCallback_(e);
+    failCallback_();
 }
 
 
@@ -290,19 +293,25 @@ void Trigger::bind_node_action(GenApi::CNodeMapRef *cam_node_map_ptr, const char
     trigger_cmd_node_ptr = cam_node_map_ptr->_GetNode(trigger_node_name);
 }
 
-/** Hold up processing until trigger received */
+/** Hold up processing until trigger received.
+ * Callbacks are serviced by an executor in another thread in ROS2, so
+ * this just waits for the flag. */
 void Trigger::spin_until_trigger() {
     if (!setToFire) return;
-    while (!ready.load()) {
-        ros::spinOnce();
+    while (!ready.load() && rclcpp::ok()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     ready = false;
 }
 // ----------------------------------------------------------------------------
 
-string parse_validate_arg(ros::NodeHandle const &nh, string param, map<string, int> validmap, bool &failed) {
+string parse_validate_arg(rclcpp::Node &nh, string param, map<string, int> validmap, bool &failed) {
     string tmp_str;
-    if( ! nh.getParam( param, tmp_str ) ) {
+    if (!nh.has_parameter(param)) {
+        nh.declare_parameter(param, std::string(""));
+    }
+    nh.get_parameter(param, tmp_str);
+    if (tmp_str.empty()) {
         failed = true;
         ROS_ERROR( "No param %s of type 'string' provided.", param.c_str() );
     }
@@ -333,34 +342,38 @@ bool is_number(string entry) {
 }
 
 // I have no idea why it's failing with with default parameters so for now just regular overloading
-int parse_pos_int(ros::NodeHandle const &nh, string param, bool &failed) {
+int parse_pos_int(rclcpp::Node &nh, string param, bool &failed) {
     return parse_pos_int(nh, param, failed, 1);
 }
 
-int parse_pos_int(ros::NodeHandle const &nh, string param, bool &failed, int minval) {
-    int tmp_int;
-    if( ! nh.getParam( param, tmp_int ) ) {
+int parse_pos_int(rclcpp::Node &nh, string param, bool &failed, int minval) {
+    int tmp_int = minval - 1;
+    if (!nh.has_parameter(param)) {
+        nh.declare_parameter(param, tmp_int);
+    }
+    if( ! nh.get_parameter( param, tmp_int ) ) {
         failed = true;
         ROS_ERROR( "No param %s of type 'int' provided.", param.c_str() );
     } else if (tmp_int < minval) {
         failed = true;
         ROS_ERROR("%s=%d. It must be greater than or equal to %d.", param.c_str(), tmp_int, minval );
-    } else {
-        return tmp_int;
     }
+    return tmp_int;
 }
 
-float parse_pos_float(ros::NodeHandle const &nh, string param, bool &failed) {
-    float tmp;
-    if( ! nh.getParam( param, tmp ) ) {
+float parse_pos_float(rclcpp::Node &nh, string param, bool &failed) {
+    double tmp = 0.0;
+    if (!nh.has_parameter(param)) {
+        nh.declare_parameter(param, tmp);
+    }
+    if( ! nh.get_parameter( param, tmp ) ) {
         failed = true;
         ROS_ERROR( "No param %s provided.", param.c_str() );
     } else if (tmp <= 0) {
         failed = true;
         ROS_ERROR("%s must be a positive value.", param.c_str() );
-    } else {
-        return tmp;
     }
+    return (float) tmp;
 }
 
 
@@ -520,7 +533,7 @@ int safe_exit(int exit_code, GEV_CAMERA_HANDLE cam_handle = NULL) {
         //_CloseSocketAPI();
     }
 
-    ros::shutdown();
+    rclcpp::shutdown();
 
     return exit_code;
 }

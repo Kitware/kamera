@@ -1,12 +1,15 @@
 # This image contains the base of the ROS/CUDA for the system, plus
 # a bunch of utility packages
-FROM nvidia/cuda:12.6.2-devel-ubuntu20.04 AS base_cuda_ubuntu
+# CUDA 13.0 = newest major with native support on the fleet's r580 drivers
+# (13.1+ would rely on minor-version compatibility on r580 hosts; every node
+# needs driver >= 580 before this image deploys).
+FROM nvidia/cuda:13.0.3-devel-ubuntu24.04 AS base_cuda_ubuntu
 
 WORKDIR /root
 # setup environment
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8
-ENV ROS_DISTRO noetic
+ENV ROS_DISTRO jazzy
 ENV DEBIAN_FRONTEND noninteractive
 
 # setup timezone
@@ -20,22 +23,24 @@ RUN echo 'Etc/UTC' > /etc/timezone && \
 RUN apt-get update && apt-get install -q -y --no-install-recommends \
     dirmngr \
     gnupg2 \
+    curl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# setup sources.list
-RUN echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros1-latest.list
-
-# setup keys
-RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
+# setup ROS2 apt source (Jazzy runs on Ubuntu 24.04 / noble)
+RUN curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+        -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu noble main" \
+        > /etc/apt/sources.list.d/ros2-latest.list
 
 # install ros packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ros-noetic-ros-core=1.5.0-1* \
-    ros-noetic-ros-base=1.5.0-1* \
-    ros-noetic-perception=1.5.0-1* \
-    python3-catkin-tools \
+    ros-jazzy-ros-core \
+    ros-jazzy-ros-base \
+    ros-jazzy-perception \
+    python3-colcon-common-extensions \
     python3-pip \
-    ros-noetic-rqt-image-view \
+    ros-jazzy-rqt-image-view \
     && rm -rf /var/lib/apt/lists/*
 
 # ROS BUILD FINISHED
@@ -56,9 +61,6 @@ RUN     apt-get update -q && apt-get install --no-install-recommends -y \
             sqlite3 \
             python3-pip \
             python3-rosdep \
-            python3-rosinstall \
-            python3-vcstools \
-            python3-catkin-tools \
             unzip \
     &&  apt-get update -q && apt-get install --no-install-recommends -y \
             autoconf \
@@ -76,8 +78,7 @@ RUN     apt-get update -q && apt-get install --no-install-recommends -y \
 
 
 ## ipython isn't strictly required (like most things in is kitchen sink image) but it's extremely useful for debugging
-RUN     pip install --upgrade --no-cache-dir pip \
-    &&  pip install --no-cache-dir \
+RUN     pip install --break-system-packages --no-cache-dir \
             ipython \
             ipdb \
             pyserial \

@@ -21,7 +21,8 @@ unset _redis_elapsed
 echo "Redis successfully connected at ${REDIS_HOST}, starting."
 
 export NODE_HOSTNAME=$(hostname)
-export ROS_MASTER_URI="http://${REDIS_HOST}:11311"
+# ROS2: peer discovery via DDS; all hosts must share a domain id
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"
 export KAMERA_DIR="/home/user/kw/kamera"
 export DATA_MOUNT_POINT=$(redis-cli --raw -h ${REDIS_HOST} get /sys/arch/base)
 export CAM_FOV=$(redis-cli --raw -h ${REDIS_HOST} get /sys/${NODE_HOSTNAME}/cam_fov)

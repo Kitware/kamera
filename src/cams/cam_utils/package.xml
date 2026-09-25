@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>cam_utils</name>
+  <version>1.0.0</version>
+  <description>
+    Shared camera-driver utilities: event/image matching cache and small
+    parsing helpers (formerly compiled straight out of the phase_one tree).
+  </description>
+
+  <maintainer email="adam.romlein@kitware.com">Adam Romlein</maintainer>
+  <license>Apache 2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>custom_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

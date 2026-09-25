@@ -2,9 +2,6 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division, print_function
-import sys
-
-import rospy
 
 from roskv.impl.redis_envoy import RedisEnvoy
 

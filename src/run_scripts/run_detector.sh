@@ -18,8 +18,7 @@ IMAGE_LIST_DIR=$DETECTION_CSV_DIR
 mkdir -p ${DETECTION_CSV_DIR}
 mkdir -p ${IMAGE_LIST_DIR}
 
-roslaunch sprokit_adapters sprokit_detector_fusion_adapter.launch \
-                    kwiver:=${WS_DEVEL} \
+ros2 launch sprokit_adapters sprokit_detector_fusion_adapter.launch.xml \
                     detector_node:=detector \
                     detection_pipefile:="${PIPEFILE}" \
                     embed_det_chips:=true \

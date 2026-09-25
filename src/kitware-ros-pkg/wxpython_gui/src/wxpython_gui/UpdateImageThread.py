@@ -2,7 +2,7 @@
 from __future__ import division, print_function
 import datetime
 import threading
-import rospy
+from wxpython_gui import rosnode as ros
 from io import BytesIO
 import cv2
 import sys
@@ -97,21 +97,21 @@ class UpdateImageThread(threading.Thread):
 
         """
         if not self.sub:
-            self._image_service = rospy.ServiceProxy(
+            self._image_service = ros.ServiceProxy(
                 self._ros_srv_topic, RequestImageView, persistent=True
             )
-            self._compress_image_service = rospy.ServiceProxy(
+            self._compress_image_service = ros.ServiceProxy(
                 "%s/compressed" % self._ros_srv_topic,
                 RequestCompressedImageView,
                 persistent=False,
             )
         else:
             sub_topic = os.path.join("/", self._node_host, self._chan, "image_raw")
-            self._sub_to_images = rospy.Subscriber(
+            self._sub_to_images = ros.Subscriber(
                 sub_topic, Image, self.process_pub_image
             )
         im_rate = 5
-        rate = rospy.Rate(im_rate)
+        rate = ros.Rate(im_rate)
         while True:
             if self._stop:
                 return None  # Check for a request to stop.
@@ -123,7 +123,7 @@ class UpdateImageThread(threading.Thread):
                 rate.sleep()
                 # if ret is None or ret is False:
                 #    h = std_msgs.msg.Header()
-                #    h.stamp = rospy.Time.now()
+                #    h.stamp = now
                 #    self.update_status_msg(h)
                 #    format_status()
                 #    print("Stopping requests.")
@@ -134,7 +134,7 @@ class UpdateImageThread(threading.Thread):
                 pass  # wx noise
             except Exception as e:
                 rate.sleep()
-                self._image_service = rospy.ServiceProxy(
+                self._image_service = ros.ServiceProxy(
                     self._ros_srv_topic, RequestImageView, persistent=True
                 )
                 exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -152,7 +152,7 @@ class UpdateImageThread(threading.Thread):
         try:
             pass
 
-        except rospy.service.ServiceException:
+        except ros.ServiceException:
             pass
 
     def get_homography(self, preview=False):
@@ -214,7 +214,7 @@ class UpdateImageThread(threading.Thread):
         try:
             homography, output_height, output_width = self.get_homography()
 
-            # py3 rospy is strict: int fields reject floats (incl. numpy).
+            # rosidl is strict: int fields reject floats (incl. numpy).
             output_height = int(output_height)
             output_width = int(output_width)
             contrast_strength = int(SYS_CFG["ir_contrast_strength"])
@@ -278,22 +278,22 @@ class UpdateImageThread(threading.Thread):
             # print("Time to update frame was %0.3fs" % (toc - tic))
             return True
 
-        except rospy.service.ServiceException as e:
+        except ros.ServiceException as e:
             # Too noisy
-            # rospy.logwarn('Service failed: {}'.format(e))
-            self._image_service = rospy.ServiceProxy(
+            # ros.logwarn('Service failed: {}'.format(e))
+            self._image_service = ros.ServiceProxy(
                 self._ros_srv_topic, RequestImageView, persistent=True
             )
             return
 
         except RuntimeError as e:
-            rospy.logwarn(e)
+            ros.logwarn(e)
             return
 
     def update_status_msg(self, img_header):
         # type: (std_msgs.msg.Header) -> str
         """Update the status bar for an image view"""
-        t = img_header.stamp.to_sec()
+        t = ros.stamp_to_sec(img_header.stamp)
         t = datetime.datetime.utcfromtimestamp(t)
         # string = format_status(timeval=t, num_dropped=0)
         # Don't let a missing redis key block imagery dispatch.
@@ -304,7 +304,7 @@ class UpdateImageThread(threading.Thread):
                 timeval=t,
             )
         except Exception as e:
-            rospy.logwarn_throttle(10, "Could not format status: {}".format(e))
+            ros.logwarn_throttle(10, "Could not format status: {}".format(e))
             return None
         wx.CallAfter(self._parent.update_status_msg, string)
         return string

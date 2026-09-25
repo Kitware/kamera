@@ -2,13 +2,14 @@
 from __future__ import print_function
 import time
 
-import rospy
+import rclpy
+from rclpy.node import Node
 from sensor_msgs.msg import Image
 
 
 def cb(msg):
     now = time.time()
-    msg_time = msg.header.stamp.secs + (msg.header.stamp.nsecs / 1000000000.0)
+    msg_time = msg.header.stamp.sec + (msg.header.stamp.nanosec / 1000000000.0)
     print("===")
     print("now        : %f" % now)
     print("msg time   : %f" % msg_time)
@@ -16,8 +17,12 @@ def cb(msg):
     print("now delta  : %f" % (now - msg_time))
 
 
-rospy.init_node("latency_reader", anonymous=True)
-rospy.Subscriber("/test/camera/cueing/0/image_raw", Image,
-                 cb, queue_size=1)
+def main(args=None):
+    rclpy.init(args=args)
+    node = Node("latency_reader")
+    node.create_subscription(Image, "/test/camera/cueing/0/image_raw", cb, 1)
+    rclpy.spin(node)
 
-rospy.spin()
+
+if __name__ == "__main__":
+    main()

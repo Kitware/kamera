@@ -6,7 +6,6 @@ import json
 from collections import OrderedDict
 from collections.abc import Iterable
 
-import rospy
 
 
 def make_path(path, from_file=False, verbose=False):

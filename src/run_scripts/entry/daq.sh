@@ -13,7 +13,7 @@ fi
 
 if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/rebuild ) == "true" ]]; then
   echo "/debug/rebuild set, triggering rebuild on startup"
-  catkin build mcc_daq
+  colcon build --packages-select mcc_daq
   if [[ $? -ne 0 ]]; then
     echo "Rebuild failed. Your code is in an unstable state"
     exit 1
@@ -22,9 +22,10 @@ if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/rebuild ) == "true" ]]; then
   fi
 fi
 
+RESPAWN=$([[ "${NORESPAWN}" == "true" ]] && echo false || echo true)
 if [[ "$MCC_DAQ" == *"tty"* ]] ; then
     export DAQ_TTY="$MCC_DAQ"
-    exec roslaunch --wait ser_daq ser_daq.launch norespawn:="${NORESPAWN}"
+    exec ros2 launch ser_daq ser_daq.launch.xml
 else
-    exec roslaunch --wait mcc_daq daq.launch norespawn:="${NORESPAWN}"
+    exec ros2 launch mcc_daq daq.launch.xml respawn:=${RESPAWN}
 fi

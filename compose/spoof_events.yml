@@ -9,7 +9,7 @@ services:
     devices:
       - "${PULSE_TTY}:${PULSE_TTY}"
     environment:
-      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
       NODE_HOSTNAME: "${NODE_HOSTNAME}"
       DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
       SYSTEM_NAME: "${SYSTEM_NAME}"

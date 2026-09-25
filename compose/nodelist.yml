@@ -9,7 +9,7 @@ services:
     tty: true
     network_mode: host
     environment:
-      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
       DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"
     volumes:
       - "${PWD}/src:${DOCKER_KAMERA_DIR}/src:ro"

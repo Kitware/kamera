@@ -42,11 +42,10 @@ fi
 
 
 
-ROSWAIT="--wait"
 CAM_PIXEL_FORMAT=${CAM_PIXEL_FORMAT:-mono16}
 CAM_TRIGGER_SOURCE=${CAM_TRIGGER_SOURCE:-External}
 CAM_TIMEOUT=${CAM_TIMEOUT:-3333}
-DRIVER=$(cq ".devices.${DEV_ID}.model").launch
+DRIVER=$(cq ".devices.${DEV_ID}.model").launch.xml
 # extra arguments to pass to roslaunch in the form of `argname1:=val argname2:=val`
 CAM_EXTRA_ARGS=${CAM_EXTRA_ARGS:-}
 LOGFILE="/tmp/roslaunch_err_${CAM_FOV}_${CAM_MODE}.log"
@@ -61,7 +60,7 @@ EXTRA ARGS  : ${CAM_EXTRA_ARGS}
 "
 if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/rebuild ) == "true" ]]; then
   echo "/debug/rebuild set, triggering rebuild on startup"
-  catkin build kw_genicam_driver
+  colcon build --packages-select kw_genicam_driver
   if [[ $? -ne 0 ]]; then
     echo "Rebuild failed. Your code is in an unstable state"
     exit 1
@@ -70,22 +69,14 @@ if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/rebuild ) == "true" ]]; then
   fi
 fi
 
-exec roslaunch "${ROSWAIT}" kw_genicam_driver ${DRIVER} \
+RESPAWN=$([[ "${NORESPAWN}" == "true" ]] && echo false || echo true)
+exec ros2 launch kw_genicam_driver ${DRIVER} \
     system_name:=${NODE_HOSTNAME} \
-    norespawn:="${NORESPAWN}" \
+    respawn:=${RESPAWN} \
     cam_fov:=${CAM_FOV} \
     camera_ipv4:=${CAM_IP} \
     camera_manufacturer:=FLIR \
     firmware_mode:=${CAM_PIXEL_FORMAT} \
     nextImage_timeout:=${CAM_TIMEOUT} \
     info_verbosity:=$(/cfg/get ".verbosity") \
-    ${CAM_EXTRA_ARGS} 2> >(tee -a "${LOGFILE}" >&2) &
-
-STAT_ROS=$!
-wait $STAT_ROS
-echo "roslaunch probably died with a 0 error code"
-RES=$(grep -Po -e 'REQUIRED.+ has died' "${LOGFILE}")
-if [[ -n $RES ]]; then
-   echo $RES
-   exit 1
-fi
+    ${CAM_EXTRA_ARGS} 2> >(tee -a "${LOGFILE}" >&2)

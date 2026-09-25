@@ -6,7 +6,9 @@
 #include <sw/redis++/redis++.h>
 #include <roskv/envoy.h>
 #include <roskv/archiver.h>
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
+
+#define ROS_INFO(...) RCLCPP_INFO(rclcpp::get_logger("test_roskv"), __VA_ARGS__)
 
 // No Color
 #define NC "\033[0m"
@@ -169,21 +171,20 @@ bool test_envoy() {
 }
 
 int main(int argc,char** argv) {
-    ros::init(argc, argv, "test_roskv");
-    ros::start();
-    ros::NodeHandle nh;
-    auto end_ = nh.createTimer(ros::Duration(1.0),
-        [](const ros::TimerEvent &event) {
+    rclcpp::init(argc, argv);
+    auto nh = std::make_shared<rclcpp::Node>("test_roskv");
+    auto end_ = nh->create_wall_timer(std::chrono::seconds(1),
+        []() {
             ROS_GREEN("complete!");
-            ros::shutdown();
-        }, true, true);
+            rclcpp::shutdown();
+        });
     ROS_INFO("ros started");
     test_json();
     test_redis();
     test_roskv();
     test_with_env();
     test_envoy();
-    ros::spin();
+    rclcpp::spin(nh);
     std::cout << "clean exit" << std::endl;
     return 0;
 }

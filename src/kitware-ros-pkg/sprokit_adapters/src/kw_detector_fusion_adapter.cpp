@@ -1,16 +1,15 @@
 
-#include "ros/ros.h"
-#include "sensor_msgs/Image.h"
-#include "std_msgs/String.h"
-#include <image_transport/image_transport.h>
-#include <cv_bridge/cv_bridge.h>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/image.hpp>
+#include <std_msgs/msg/string.hpp>
+#include <cv_bridge/cv_bridge.hpp>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 
-#include <custom_msgs/ImageSpaceDetection.h>
-#include <custom_msgs/ImageSpaceDetectionList.h>
-#include <custom_msgs/SynchronizedImages.h>
+#include <custom_msgs/msg/image_space_detection.hpp>
+#include <custom_msgs/msg/image_space_detection_list.hpp>
+#include <custom_msgs/msg/synchronized_images.hpp>
 
 #include <sprokit/processes/adapters/embedded_pipeline.h>
 #include <arrows/ocv/image_container.h>
@@ -22,28 +21,26 @@
 
 #include <sys/stat.h>
 #include <fstream>
+#include <filesystem>
 #include <signal.h>
 #include <string>
 #include <ostream>
 #include <stdlib.h>
 #include <time.h>
 #include <stdio.h>
-#include <boost/filesystem.hpp>
+#include <thread>
+
+static rclcpp::Logger LOG = rclcpp::get_logger("sprokit_detector_fusion_adapter");
+
+#define ROS_INFO(...) RCLCPP_INFO(LOG, __VA_ARGS__)
+#define ROS_WARN(...) RCLCPP_WARN(LOG, __VA_ARGS__)
+#define ROS_ERROR(...) RCLCPP_ERROR(LOG, __VA_ARGS__)
+#define ROS_INFO_STREAM(args) RCLCPP_INFO_STREAM(LOG, args)
+#define ROS_ERROR_STREAM(args) RCLCPP_ERROR_STREAM(LOG, args)
 
 // GLOBAL pointer to embedded pipeline
 kwiver::embedded_pipeline* g_pep;
 
-
-// ===============================================================
-struct InputMetadata
-{
-  // input message header
-  std_msgs::Header m_header;
-
-  // Input image size
-  int m_height;
-  int m_width;
-};
 
 // check if file exists for sync node
 inline bool file_exists (const std::string& name) {
@@ -101,7 +98,7 @@ public:
   random_string( size_t length )
   {
     std::string rand_str( length, 0 );
-    for (int i = 0; i < length; ++i) {
+    for (size_t i = 0; i < length; ++i) {
         rand_str[i] = randchar();
     }
     return rand_str;
@@ -119,10 +116,10 @@ public:
 class AdapterCallback
 {
 public:
-  AdapterCallback( ros::NodeHandle &nh,
+  AdapterCallback( rclcpp::Node::SharedPtr nh,
                    kwiver::embedded_pipeline* pipeline_ptr,
                    std::string topic, int sync_q_size, int rgb_port_ind,
-		   int ir_port_ind, int uv_port_ind)
+                   int ir_port_ind, int uv_port_ind)
     : m_pep( pipeline_ptr ),
       m_topic( topic ),
       m_rgb_port_ind( rgb_port_ind ),
@@ -131,12 +128,15 @@ public:
   {
     // Set up callback for input topic depending on the image message type
     ROS_INFO_STREAM( "Subscribing to SynchronizedImages topic: " << topic );
-    m_synchronized_images_sub = nh.subscribe( topic, sync_q_size,
-                                              &AdapterCallback::synchronizedImagesCallback, this );
+    m_synchronized_images_sub = nh->create_subscription<custom_msgs::msg::SynchronizedImages>(
+        topic, sync_q_size,
+        [this](const custom_msgs::msg::SynchronizedImages::ConstSharedPtr msg) {
+            synchronizedImagesCallback(msg);
+        });
   }
 
   // ROS callback for SynchronizedImages
-  void synchronizedImagesCallback( const custom_msgs::SynchronizedImagesConstPtr& msg )
+  void synchronizedImagesCallback( const custom_msgs::msg::SynchronizedImages::ConstSharedPtr& msg )
   {
     // Create dataset for input
     auto ds = kwiver::adapter::adapter_data_set::create();
@@ -150,17 +150,17 @@ public:
         cv_image = cv_bridge::toCvCopy( msg->image_rgb, "rgb8" )->image;
       } else if ( msg->image_rgb.data.empty() ) {
           if ( file_exists(file_name) ) {
-	          cv_image = cv::imread(file_name, cv::IMREAD_COLOR);
-	          if ( cv_image.empty() ) {
-	              ROS_ERROR_STREAM("Could not read image from disk: " << file_name.c_str());
+              cv_image = cv::imread(file_name, cv::IMREAD_COLOR);
+              if ( cv_image.empty() ) {
+                  ROS_ERROR_STREAM("Could not read image from disk: " << file_name.c_str());
                   return;
-	          } else {
-	              ROS_INFO("Successfully read rgb image from disk.");
-	          }
-	      } else {
-	            ROS_ERROR_STREAM("RGB file name does not exist " << file_name.c_str());
+              } else {
+                  ROS_INFO("Successfully read rgb image from disk.");
+              }
+          } else {
+                ROS_ERROR_STREAM("RGB file name does not exist " << file_name.c_str());
             return ;
-	      }
+          }
       } else {
            ROS_ERROR("RGB image is null-ish ");
            return ;
@@ -201,17 +201,17 @@ public:
         cv_image2 = cv_bridge::toCvCopy( msg->image_ir, "mono16" )->image;
       } else if ( msg->image_ir.data.empty() ) {
           if ( file_exists(file_name) ) {
-	          cv_image2 = cv::imread(file_name, cv::IMREAD_ANYDEPTH);
-	          if ( cv_image2.empty() ) {
-	              ROS_ERROR_STREAM("Could not read image from disk: " << file_name.c_str());
+              cv_image2 = cv::imread(file_name, cv::IMREAD_ANYDEPTH);
+              if ( cv_image2.empty() ) {
+                  ROS_ERROR_STREAM("Could not read image from disk: " << file_name.c_str());
                   return;
-	          } else {
-	              ROS_INFO("Successfully read IR image from disk.");
-	          }
-	      } else {
-	            ROS_ERROR_STREAM("IR file name does not exist " << file_name.c_str());
+              } else {
+                  ROS_INFO("Successfully read IR image from disk.");
+              }
+          } else {
+                ROS_ERROR_STREAM("IR file name does not exist " << file_name.c_str());
             return ;
-	      }
+          }
       } else {
            ROS_ERROR("IR image is null-ish ");
            return ;
@@ -255,7 +255,7 @@ public:
 
 private:
   kwiver::embedded_pipeline* m_pep;
-  ros::Subscriber m_synchronized_images_sub;
+  rclcpp::Subscription<custom_msgs::msg::SynchronizedImages>::SharedPtr m_synchronized_images_sub;
   std::string m_frame_id;
   std::string m_topic;
   int m_rgb_port_ind;
@@ -268,8 +268,9 @@ private:
 void
 sigint_handler( int sig )
 {
+  (void) sig;
   g_pep->send_end_of_input();
-  ros::shutdown();
+  rclcpp::shutdown();
 }
 
 
@@ -294,13 +295,11 @@ main( int argc, char** argv )
 
   random_string_generator string_generator;
 
-  std::ofstream debug_out("/root/kamera_ws/image_id.txt");
-  ros::init( argc, argv, "sprokit_detector_fusion_adapter" );
-  ros::NodeHandle nh_pub;
-  ros::NodeHandle nh_priv("~");
+  rclcpp::init( argc, argv );
+  auto node = std::make_shared<rclcpp::Node>( "sprokit_detector_fusion_adapter" );
 
-  std::string redis_uri;
-  if ( ! nh_priv.getParam("redis_uri", redis_uri) ) {
+  std::string redis_uri = node->declare_parameter("redis_uri", std::string(""));
+  if ( redis_uri.empty() ) {
     ROS_ERROR( "'redis_uri' not found in parameters." );
     return -1;
   }
@@ -309,34 +308,35 @@ main( int argc, char** argv )
   std::shared_ptr<RedisEnvoy> envoy = std::make_shared<RedisEnvoy>(envoy_opts);
 
   // Find pipeline file name from parameters (see README)
-  // get hostname from param namespace
-  std::string ns = nh_priv.getNamespace();
+  // get hostname from node namespace
+  std::string ns = node->get_namespace();
+  if (ns == "/") {
+    ns = "";
+  }
   std::ostringstream oss;
   std::ostringstream healthss;
   healthss << ns << "/health";
   oss << "/sys" << ns << "/pipefile";
   std::string health_param = healthss.str();
   std::string redis_pipefile = oss.str();
-  // Try and get pipefile from redis, if fails, get from rosparam
+  // Try and get pipefile from redis, if fails, get from node param
   std::string pipe_file;
   try {
     ROS_INFO("Trying to get Redis pipefile from: %s.", redis_pipefile.c_str());
     pipe_file = envoy->get(redis_pipefile);
-  } catch( std::invalid_argument e ) {
-      ROS_WARN("No Redis failed for pipefile, falling back to rosparam.");
-      if ( ! nh_priv.getParam("pipe_file", pipe_file) ) {
+  } catch( std::invalid_argument &e ) {
+      ROS_WARN("No Redis failed for pipefile, falling back to node param.");
+      pipe_file = node->declare_parameter("pipe_file", std::string(""));
+      if ( pipe_file.empty() ) {
         ROS_ERROR( "'pipe_file' not found in parameter path <<." );
         return -1;
       } else {
-        ROS_INFO( "Setting Redis pipefile based off ros param." );
+        ROS_INFO( "Setting Redis pipefile based off node param." );
         envoy->put(redis_pipefile, pipe_file);
       }
     }
 
-  std::string pipeline_dir;
-  if ( ! nh_priv.param<std::string>("pipeline_dir", pipeline_dir, "")) {
-    ROS_WARN( "'pipeline_dir' file not found in parameters" );
-  }
+  std::string pipeline_dir = node->declare_parameter("pipeline_dir", std::string(""));
   // Open pipeline description
   std::ifstream pipe_str;
   pipe_str.open( pipe_file, std::ifstream::in );
@@ -353,64 +353,24 @@ main( int argc, char** argv )
 
   if (pipeline_dir.empty()) {
     ROS_WARN( "'pipeline_dir' file not found in parameters. Defaulting to '`dirname pipe_file`" );
-    boost::filesystem::path pipefile_path(pipe_file);
-    pipefile_path.remove_filename();
-    pipeline_dir = pipefile_path.string();
+    std::filesystem::path pipefile_path(pipe_file);
+    pipeline_dir = pipefile_path.parent_path().string();
   }
   ROS_INFO("pipeline_dir=%s", pipeline_dir.c_str());
 
-  int rgb_port_ind;
-  if ( ! nh_priv.getParam("rgb_port_ind", rgb_port_ind) )
-  {
-    // Entry not found, use default name
-    ROS_WARN( "'rgb_port_ind' not found, RGB image will not be sent to pipeline." );
-    rgb_port_ind = 0;
-  }
-
-  int ir_port_ind;
-  if ( ! nh_priv.getParam("ir_port_ind", ir_port_ind) )
-  {
-    // Entry not found, use default name
-    ROS_WARN( "'ir_port_ind' not found, RGB image will not be sent to pipeline." );
-    ir_port_ind = 0;
-  }
-
-  int uv_port_ind;
-  if ( ! nh_priv.getParam("uv_port_ind", uv_port_ind) )
-  {
-    // Entry not found, use default name
-    ROS_WARN( "'uv_port_ind' not found, RGB image will not be sent to pipeline." );
-    uv_port_ind = 0;
-  }
+  int rgb_port_ind = node->declare_parameter("rgb_port_ind", 0);
+  int ir_port_ind = node->declare_parameter("ir_port_ind", 0);
+  int uv_port_ind = node->declare_parameter("uv_port_ind", 0);
 
   // Get detector ID string, which identifies the detector used (see README).
-  std::string detector_id_string;
-  if( ! nh_priv.getParam( "detector_id_string", detector_id_string ) )
-  {
-    // Entry not found, use default name
-    ROS_WARN( "'detector_id_string' not defined, defaulting to 'unspecified'." );
-    detector_id_string = "unspecified";
-  }
-  else
-  {
-    ROS_INFO( "'detector_id_string' set to '%s'", detector_id_string.c_str() );
-  }
+  std::string detector_id_string = node->declare_parameter("detector_id_string", std::string("unspecified"));
+  ROS_INFO( "'detector_id_string' set to '%s'", detector_id_string.c_str() );
 
   // OpenCV Threading Value
-  int ocv_num_threads;
-  if( ! nh_priv.getParam( "ocv_num_threads", ocv_num_threads ) )
-  {
-    ROS_WARN( "'ocv_num_threads' not defined, defaulting to -1 (serial execution)." );
-    ocv_num_threads = -1;
-  }
+  int ocv_num_threads = node->declare_parameter("ocv_num_threads", -1);
 
   // ROS sync queue value
-  int sync_q_size;
-  if( ! nh_priv.getParam( "sync_q_size", sync_q_size ) )
-  {
-    ROS_WARN( "'sync_q_size' not defined, defaulting to 5,000." );
-    sync_q_size = 5000;
-  }
+  int sync_q_size = node->declare_parameter("sync_q_size", 5000);
 
   // 0 means "OpenCV will disable threading optimizations and run all its functions sequentially"
   // <0 means default allocation.
@@ -430,34 +390,27 @@ main( int argc, char** argv )
 
   // There are an, as of yet, unknown number of image topics that are to be
   // multiplexed through the detector pipeline. So, we incrementally seek
-  // parameter "synchronized_images_in_topic#" until we find it not populated or populated
-  // with "unused".
+  // parameter "synchronized_images_in#" until we find it not populated or
+  // populated with "unused".
   std::vector<AdapterCallback*> input_cbs;
 
   int i = 1;
   // The annotated image base will be concatenated with the integer image number.
   std::string topic_name;
 
-  // Incrementally seek parameter "synchronized_images_in_topic#" until we find
-  // it not populated or populated with "unused".
   while( true )
   {
     std::string topic_param;
     topic_param = std::string( "synchronized_images_in" ) + std::to_string( i );
-    if ( nh_priv.getParam( topic_param, topic_name ) )
+    topic_name = node->declare_parameter( topic_param, std::string("unused") );
+    if( topic_name != "unused" )
     {
-      if( topic_name == "unused" )
-      {
-        break;
-      }
-      // Set callbacks
-
       // Create instance of image callback for current image topic and add to
       // vector of callback instances.
       ROS_INFO( "Found SynchronizedImages topic %s", topic_name.c_str() );
-      input_cbs.push_back( new AdapterCallback( nh_pub, &pipeline, topic_name,
-			      			sync_q_size, rgb_port_ind,
-					       	ir_port_ind, uv_port_ind ) );
+      input_cbs.push_back( new AdapterCallback( node, &pipeline, topic_name,
+                                        sync_q_size, rgb_port_ind,
+                                        ir_port_ind, uv_port_ind ) );
     }
     else if( i == 1)
     {
@@ -471,18 +424,17 @@ main( int argc, char** argv )
     ++i;
   }
 
-  ros::Publisher detection_pub;
-  detection_pub = nh_priv.advertise< custom_msgs::ImageSpaceDetectionList > ( "detections_out", 20 );
+  auto detection_pub = node->create_publisher<custom_msgs::msg::ImageSpaceDetectionList>(
+      "~/detections_out", 20 );
 
-  // Start ROS spinner
-  ros::AsyncSpinner spinner( 1 );
-  spinner.start();
+  // Start ROS spinner in the background; the main thread services the pipeline
+  std::thread spin_thread([node]() { rclcpp::spin(node); });
 
   json::json health;
 
   int frame = 0;
 
-  while ( ros::ok() )
+  while ( rclcpp::ok() )
   {
     ROS_INFO( "OpenCV thread number: %d", cv::getNumThreads() );
     auto ods = pipeline.receive(); // blocks until data ready
@@ -495,7 +447,8 @@ main( int argc, char** argv )
       ROS_INFO( "End of data found by node. Waiting for scheduler to complete." );
       pipeline.wait(); // wait for pipeline scheduler to complete
       ROS_INFO( "Waiting for scheduler to ROS shutdown." );
-      ros::shutdown();
+      rclcpp::shutdown();
+      spin_thread.join();
       return 0;
     }
 
@@ -525,7 +478,7 @@ main( int argc, char** argv )
 
     ROS_INFO( "Received 'file_name' %s from pipeline", src_img_fname.c_str() );
 
-    custom_msgs::ImageSpaceDetectionList det_list;
+    custom_msgs::msg::ImageSpaceDetectionList det_list;
 
     // Get values from the metadata "header" item.
     det_list.header.frame_id = src_img_fname;
@@ -539,7 +492,7 @@ main( int argc, char** argv )
     // loop over det_v - adding to list
     for ( auto det : det_v )
     {
-      custom_msgs::ImageSpaceDetection one_det;
+      custom_msgs::msg::ImageSpaceDetection one_det;
       one_det.header = det_list.header;
       one_det.camera_of_origin = src_img_fname;
       one_det.uid = string_generator.random_string( 20 );
@@ -570,9 +523,9 @@ main( int argc, char** argv )
       }
     } // end loop
 
-    detection_pub.publish( det_list );
+    detection_pub->publish( det_list );
 
-    double time = ros::Time::now().toSec();
+    double time = node->now().seconds();
     auto int_dets = det_v.size();
 
     // Convert things to string for json
@@ -589,4 +542,6 @@ main( int argc, char** argv )
 
   } // end big while
 
+  spin_thread.join();
+  return 0;
 } // main

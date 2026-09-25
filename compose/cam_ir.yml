@@ -7,8 +7,8 @@ services:
     init: true
     tty: true
     environment:
-      ROS_MASTER_URI: "${ROS_MASTER_URI}"
-      ROS_DISTRO: "noetic"
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+      ROS_DISTRO: "jazzy"
       REDIS_HOST: "${REDIS_HOST}"
       NODE_HOSTNAME: "${NODE_HOSTNAME}"
       CAM_MODE: "ir"

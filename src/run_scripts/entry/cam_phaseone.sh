@@ -90,12 +90,9 @@ trap "errcho 'Caught SIGINT'; cleanup" SIGINT
 # Expected exit code from docker stop command.
 trap "errcho 'Caught SIGTERM'; cleanup" SIGTERM
 
-ROSWAIT="--wait"
-LOGFILE="/tmp/roslaunch_err_${CAM_FOV}_${CAM_MODE}.log"
-
 if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/rebuild ) == "true" ]]; then
   echo "/debug/rebuild set, triggering rebuild on startup"
-  catkin build phase_one
+  colcon build --packages-select phase_one
   if [[ $? -ne 0 ]]; then
     echo "Rebuild failed. Your code is in an unstable state"
     exit 1
@@ -108,22 +105,13 @@ echo "Building to_process.txt"
 rm -f /mnt/data/to_process.txt
 find /mnt/data/iiq_buffer -name "*.IIQ" > /mnt/data/to_process.txt
 
-export ROS_NAMESPACE="/${NODE_HOSTNAME}/${CAM_MODE}"
-exec roslaunch "${ROSWAIT}" phase_one phase_one_standalone.launch \
+RESPAWN=$([[ "${NORESPAWN}" == "true" ]] && echo false || echo true)
+exec ros2 launch phase_one phase_one_standalone.launch.xml \
     ip_address:=${CAM_IP} \
     system_name:=${NODE_HOSTNAME} \
     cam_mode:=${CAM_MODE} \
     hostname:=${NODE_HOSTNAME} \
     trigger_mode:=${TRIGGER_MODE} \
-    norespawn:=${NORESPAWN} \
+    respawn:=${RESPAWN} \
     num_threads:=28 \
     auto_trigger_rate:=1.0
-
-STAT_ROS=$!
-wait $STAT_ROS
-echo "roslaunch probably died with a 0 error code"
-RES=$(grep -Po -e 'REQUIRED.+ has died' "${LOGFILE}")
-if [[ -n $RES ]]; then
-   echo $RES
-   exit 1
-fi

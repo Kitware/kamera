@@ -1,24 +1,14 @@
 FROM kamera/base/core-ros:latest
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-        ros-noetic-compressed-image-transport \
-        ros-noetic-camera-info-manager \
-        ros-noetic-image-view \
-        ros-noetic-cv-bridge \
-        ros-noetic-nodelet \
-        ros-noetic-nodelet-topic-tools \
-        ros-noetic-vision-opencv \
-        ros-noetic-diagnostic-updater \
-        ros-noetic-self-test \
-        ros-noetic-polled-camera \
-        ros-noetic-message-generation \
-        ros-noetic-message-runtime \
-        libgtkmm-2.4-1v5 \
-        libglademm-2.4-1v5 \
-        libgtkglextmm-x11-1.2-dev \
-        libgtkglextmm-x11-1.2-0v5 \
-        libglade2-dev \
-        libglademm-2.4-dev \
+        ros-jazzy-compressed-image-transport \
+        ros-jazzy-image-transport \
+        ros-jazzy-camera-info-manager \
+        ros-jazzy-camera-calibration-parsers \
+        ros-jazzy-cv-bridge \
+        ros-jazzy-vision-opencv \
+        ros-jazzy-diagnostic-updater \
+        ros-jazzy-rosidl-default-generators \
     && rm -rf /var/lib/apt/lists/*
 
 ## build deps
@@ -40,7 +30,7 @@ RUN apt-get update -q && apt-get install --no-install-recommends -y \
             usbutils \
     && rm -rf /var/lib/apt/lists/*
 
-RUN     pip install --no-cache-dir \
+RUN     pip install --break-system-packages --no-cache-dir \
             pyserial \
             osrf-pycommon \
             shapely \
