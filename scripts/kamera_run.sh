@@ -57,7 +57,7 @@ fi
 ## === === === === === ===   Env setup  === === === === === === ===
 blueprintf "Configuring main KAMERA entrypoint."
 # Add detector ENV variables to Redis
-source ${KAM_REPO_DIR}/src/cfg/set_detector_read_state.sh
+source ${KAM_REPO_DIR}/scripts/set_detector_read_state.sh
 blueprintf "."
 
 MASTER_HOST=$(cq '.master_host')

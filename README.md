@@ -59,7 +59,7 @@ report. See [kamera/calibration/README.md](kamera/calibration/README.md).
 # post-processing / flight summary image
 make postflight
 # Builds the core docker images for use in the onboard sytems
-make nuvo
+make core
 # if using VIAME for the DL detectors
 make viame
 # if using the real-time GUI

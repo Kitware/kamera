@@ -1,5 +1,5 @@
 ---
-## Netplan for nuvo0
+## Netplan for center0spare
 network:
   version: 2
   ethernets:

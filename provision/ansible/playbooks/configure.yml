@@ -65,7 +65,7 @@
       - name: Copy over supervisor config for sudoless and RPC
         become: True
         copy:
-          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/supervisord.conf"
+          src: "{{ kamera_dir }}/src/cfg/supervisord.conf"
           remote_src: true
           dest: /etc/supervisor/supervisord.conf
           owner: root
@@ -120,7 +120,7 @@
       - name: Add sysctl rmem params.
         become: True
         copy:
-          src: "{{ kamera_dir }}/src/cfg/sysctl/sysctl.conf"
+          src: "{{ kamera_dir }}/src/cfg/sysctl.conf"
           remote_src: true
           dest: /etc/sysctl.conf
           owner: root
@@ -185,7 +185,7 @@
         become: True
         when: leader or follower or gui
         copy:
-          src: "{{ kamera_dir }}/src/cfg/tmux.conf"
+          src: "{{ kamera_dir }}/provision/tmux.conf"
           remote_src: true
           dest: /home/user/.tmux.conf
 
@@ -193,7 +193,7 @@
         become: True
         when: leader or follower or gui
         copy:
-          src: "{{ kamera_dir }}/src/cfg/vimrc"
+          src: "{{ kamera_dir }}/provision/vimrc"
           remote_src: true
           dest: /home/user/.vimrc
 

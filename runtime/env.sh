@@ -11,7 +11,7 @@ cq () {
 export REDIS_HOST=$(cq ".redis_host")
 
 # Uncomment this line if you wish to run the GUI in "offline" mode
-# (without nuvo0, 1, etc. hooked up)
+# (without center0, left1, etc. hooked up)
 # export REDIS_HOST="localhost"
 
 _redis_elapsed=0
