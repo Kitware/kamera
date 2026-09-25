@@ -19,13 +19,10 @@ from kamera.calibration.flight import build_image_tree, discover_flight
 from kamera.calibration.report import FlightSummary, write_report
 from kamera.colmap_processing.camera_models import StandardCamera
 
-# Homography pairs per channel, left -> right (DIVE registers the left onto the right).
-# Only the pairs DIVE uses; ir->uv follows from the other two and only adds noise.
+# Homography pairs per channel, left -> right; only the pairs DIVE uses.
 PAIRS = [("ir", "rgb"), ("uv", "rgb")]
 
-# A rig seed is trusted only when the per-frame estimates behind it agree. The rig
-# bundle adjustment drops tracks over 4 px of reprojection error (about 0.13 deg for
-# the IR cameras), so a seed a degree off stalls near the seed instead of converging.
+# A seed a degree off loses its tracks to the 4 px filter and stalls there.
 SEED_MAX_SCATTER_DEG = 0.5
 SEED_MIN_CLUSTER_FRACTION = 0.5
 
@@ -51,8 +48,7 @@ def write_gifs(frames, names, image_dir, left, right, h, gif_dir, count) -> dict
             for camera in (left, right)
         )
         warped, ref, mask = registration.warp_pair(left_img, right_img, h)
-        # Flip between the right image and the same with the warped left pasted over
-        # its footprint, the way DIVE shows a registration.
+        # Flip between the right image and the warped left pasted over it, as DIVE does.
         registration.write_gif(
             os.path.join(gif_dir, f"{left}_to_{right}_{k}.gif"),
             ref,

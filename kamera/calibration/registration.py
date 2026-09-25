@@ -129,7 +129,7 @@ def warp_pair(
 
 
 def composite(warped: np.ndarray, right: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    """The right image with the warped left pasted over its footprint, as DIVE shows it."""
+    """The right image with the warped left pasted over its footprint (DIVE's view)."""
     out = right.copy()
     out[mask] = warped[mask]
     return out

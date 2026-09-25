@@ -28,8 +28,7 @@ class CameraCalibration:
     cam_from_rig: pc.Rigid3d
     colmap_params: dict
     frames: int
-    # 2D features with a 3D point. Collapses for a camera whose rig seed was too far
-    # off for its tracks to survive triangulation, while reproj_rms_px stays small.
+    # Features with a 3D point; collapses when a bad seed lost the camera's tracks.
     observations: int
     reproj_rms_px: float
 
@@ -167,8 +166,7 @@ def calibrate_rig(
             )
         cameras[name].frames += 1
 
-    # Per frame: the boresight (INS body <- rig) and the rig origin relative to the INS
-    # position, in body axes.
+    # Per frame: boresight (INS body <- rig) and rig origin vs the INS, in body axes.
     times, ins_from_rig, lever, gaps = [], [], [], []
     for frame in model.frames.values():
         if not frame.has_pose():

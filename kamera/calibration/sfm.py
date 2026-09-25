@@ -119,20 +119,16 @@ def mapping_options(refine_rig: bool) -> pc.IncrementalPipelineOptions:
         use_prior_position=True,
         ba_refine_sensor_from_rig=refine_rig,
         extract_colors=False,
-        # Distortion cannot be recovered from two or three views of flat ground: on
-        # the May 2025 flight, refining it from the initial pair drove L_ir to a 30%
-        # focal error and k2 of -3, so no L_ir model ever grew past three images.
-        # It stays at the per-modality seed; pass 2 refines the full intrinsics once
-        # the whole rig is posed.
+        # Flat ground cannot pin distortion from a few views; pass 2 refines it instead.
         ba_refine_extra_params=False,
     )
-    # Nadir aerial pairs subtend small angles; the default 16 deg init threshold
-    # rejects them.
+    # Nadir pairs subtend small angles; the default 16 deg init threshold rejects them.
     opts.mapper.init_min_tri_angle = 4.0
-    # Global BA every 30% of growth instead of 10%: it dominates runtime on thousands
-    # of frames.
+    # Global BA every 30% of growth instead of 10%; it dominates runtime.
     opts.ba_global_frames_ratio = opts.ba_global_points_ratio = 1.3
     opts.ba_global_max_refinements = 2
+    # |k| over this drops the camera as bogus; IR k2 hits -1.3. Only this level works.
+    opts.max_extra_param = 10.0
     return opts
 
 
@@ -186,8 +182,7 @@ def refine_rig(
     """
     shutil.rmtree(out_dir, ignore_errors=True)
     os.makedirs(out_dir)
-    # The triangulator always colours points from disk; 8x8 stand-ins spare it the
-    # 100 MP frames.
+    # The triangulator colours points from disk; 8x8 stand-ins spare it the 100 MP RGB.
     image_dir = os.path.join(os.path.dirname(out_dir), "placeholders")
     for name in names:
         os.makedirs(os.path.dirname(os.path.join(image_dir, name)), exist_ok=True)
@@ -198,8 +193,7 @@ def refine_rig(
     opts = mapping_options(refine_rig=True)
     model = pc.Reconstruction(init_dir)
     for refine_intrinsics in (False, True):
-        # Intrinsics are only ever refined in the rig bundle adjustment below, never by
-        # the triangulator.
+        # Intrinsics are refined only in the rig bundle adjustment, never here.
         model = pc.triangulate_points(
             model,
             db_path,
@@ -309,6 +303,9 @@ def model_cameras(
         for im in r.images.values():
             if im.has_pose:
                 cams.setdefault(names[im.name][0], r.cameras[im.camera_id])
+    # Reconstruction cameras drop the flag; without it the rig config clears the priors.
+    for cam in cams.values():
+        cam.has_prior_focal_length = True
     return cams
 
 

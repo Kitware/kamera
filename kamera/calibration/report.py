@@ -18,7 +18,8 @@ from kamera.calibration.rig import RigCalibration
 
 PAGE = (11, 8.5)
 
-FRAME_NOTES = """A frame is one trigger event. Every camera fires on it and writes one image, so the
+FRAME_NOTES = """\
+A frame is one trigger event. Every camera fires on it and writes one image, so the
 images of a trigger share a single rig position and orientation, and that shared pose
 is what the rig bundle adjustment enforces. Only triggers where every camera wrote an
 image are used. A frame is registered when structure from motion placed it; the
@@ -373,9 +374,7 @@ def rig_page(pdf: PdfPages, cal: RigCalibration) -> None:
     )
 
     ax3 = fig.add_axes((0.2, 0.0, 0.6, 0.46), projection="3d")
-    # Draw the rig as mounted, in INS body axes (forward, right, down) via the
-    # boresight: the cameras hang from the mount plate and look down, so the down
-    # axis is inverted to point down the page.
+    # Body axes via the boresight; down is inverted so the cameras hang from the plate.
     grid = np.array([[-1, -1], [1, -1], [1, 1], [-1, 1]], float)
     ax3.plot_trisurf(grid[:, 0], grid[:, 1], np.zeros(4), color="0.85", alpha=0.5)
     colours = {"rgb": "C0", "uv": "C2", "ir": "C3"}
@@ -416,8 +415,7 @@ def rig_page(pdf: PdfPages, cal: RigCalibration) -> None:
 
 def homography_page(pdf: PdfPages, cal: RigCalibration, pair: dict) -> None:
     s, left, right = pair["stats"], pair["left"], pair["right"]
-    # The fit residual is in right-camera pixels; restate it in the left camera's own
-    # pixels and on the ground, since one IR pixel is many RGB pixels.
+    # Restate the right-pixel residual in left pixels and on the ground.
     scale = cal.cameras[right].K[0, 0] / cal.cameras[left].K[0, 0]
     gsd_cm = 100 * s["rangeM"] / cal.cameras[right].K[0, 0]
     fig = plt.figure(figsize=PAGE)
@@ -426,7 +424,8 @@ def homography_page(pdf: PdfPages, cal: RigCalibration, pair: dict) -> None:
         0.965,
         f"{left} -> {right} at {s['rangeM']:.0f} m: "
         f"fit rms {s['rmsPx']:.2f} px, p95 {s['p95Px']:.2f} px, "
-        f"max {s['maxPx']:.2f} px in {right} pixels, coverage {100 * s['coverage']:.0f}%",
+        f"max {s['maxPx']:.2f} px in {right} pixels, "
+        f"coverage {100 * s['coverage']:.0f}%",
         fontsize=11,
         weight="bold",
     )
