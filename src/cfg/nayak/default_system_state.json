@@ -3,8 +3,8 @@
         "allow_ir_nuc": 1,
         "archive_all_ir_images": 0,
         "base": "/mnt/data",
-        "effort": "default_effort",
-        "flight": "02",
+        "effort": "ON",
+        "flight": "00",
         "is_archiving": 0,
         "jpg": {
             "quality": 95
@@ -12,11 +12,11 @@
         "load_shapefile": 0,
         "max_fps": 2.5,
         "min_fps": 0.1,
-        "overlap_percent": 25.0,
-        "project": "glacial_2024",
-        "rgb_vfov": 14,
+        "overlap_percent": 50.0,
+        "project": "default_effort_2019",
+        "rgb_vfov": 17.27,
         "sys_cfg": "default_camera_configuration",
-        "trigger_freq": 1.0,
+        "trigger_freq": 1,
         "turn_off_nuc_in_shapefile": 1,
         "use_archive_region": 0,
         "use_nvjpeg": 1,
@@ -25,7 +25,7 @@
     "base": "/mnt/data",
     "collection_mode": "fixed rate",
     "detector": {
-        "read_from_nas": false
+        "read_from_nas": true
     },
     "effort_metadata_dict": {
         "default_effort": {
@@ -37,10 +37,10 @@
             "wait_time_sec": 60
         }
     },
-    "flight_number_str": "02",
-    "ir_contrast_strength": 1000.0,
+    "flight_number_str": "00",
+    "ir_contrast_strength": 200,
     "latch_frame_rate_msg": false,
-    "observer": "AR",
+    "observer": "",
     "requested_geni_params": {
         "center0nayak": {
             "ir": {
@@ -122,14 +122,14 @@
             }
         }
     },
-    "rgb_vfov": 17.266922854601024,
-    "shapefile_fname": "/home/user/kamera_ws/src/kitware-ros-pkg/wxpython_gui/shapefiles/KotzTestAndUAS.shp",
+    "rgb_vfov": 17.27,
+    "shapefile_fname": "",
     "show_center": true,
     "show_ir": true,
     "show_left": true,
     "show_rgb": true,
     "show_right": true,
-    "show_saturated_pixels": true,
+    "show_saturated_pixels": false,
     "show_uv": false,
-    "syscfg_dir": "/mnt/data/glacial_2024/fl02/default_camera_configuration/"
+    "syscfg_dir": "/mnt/data/default_project/fl00/default_camera_configuration/"
 }

@@ -147,7 +147,7 @@ camera_config_filename = os.path.join(
     USER_CFG["gui_cfg_dir"], "camera_configurations.json"
 )
 default_camera_config_file = os.path.join(
-    REAL_KAM_REPO_DIR, "src/cfg", system_name, "default_camera_configurations.json"
+    REAL_KAM_REPO_DIR, "src/cfg", "default_camera_configurations.json"
 )
 if not os.path.isfile(camera_config_filename):
     try:

@@ -18,15 +18,10 @@ ff02::3 ip6-allhosts
 192.168.88.100 center0nayak
 192.168.88.101 left1nayak
 192.168.88.102 right2nayak
-192.168.88.103 center1nayak
-
-# Fallback static connections
-192.168.88.210 nuvo0bak
-192.168.88.211 nuvo1bak
-192.168.88.212 nuvo2bak
+192.168.88.103 center0spare
 
 192.168.198.13 kamera_nas
 
-# Set ros master url here - typically nuvo0
-192.168.88.10 kameramaster
+# ROS master alias, pinged by master.sh
+192.168.88.100 kameramaster
 192.168.88.99 ins

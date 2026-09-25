@@ -14,7 +14,7 @@
         "min_fps": 0.1,
         "overlap_percent": 50.0,
         "project": "default_effort_2019",
-        "rgb_vfov": 14,
+        "rgb_vfov": 17.27,
         "sys_cfg": "default_camera_configuration",
         "trigger_freq": 1,
         "turn_off_nuc_in_shapefile": 1,
@@ -122,7 +122,7 @@
             }
         }
     },
-    "rgb_vfov": 14.0,
+    "rgb_vfov": 17.27,
     "shapefile_fname": "",
     "show_center": true,
     "show_ir": true,
