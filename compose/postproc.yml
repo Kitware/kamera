@@ -17,4 +17,4 @@ services:
         - "/mnt:/mnt"
         - "$PWD/../kamera/postflight:/src/postflight"
         - "$PWD/../src/run_scripts/entry:/entry"
-        - "$PWD/../tmux/cas/env.sh:/entry/env.sh"
+        - "$PWD/../tmux/crewed/env.sh:/entry/env.sh"

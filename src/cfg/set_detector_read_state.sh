@@ -1,8 +1,7 @@
 # Source top-level env file
 
-SYSTEM_NAME=$(cat /home/user/kw/SYSTEM_NAME)
 KAM_REPO_DIR=$(/home/user/.config/kamera/repo_dir.bash)
-source "${KAM_REPO_DIR}/tmux/${SYSTEM_NAME}/env.sh"
+source "${KAM_REPO_DIR}/tmux/crewed/env.sh"
 
 # Pull from .env, and set globally in Redis
 echo "Setting global redis params."
