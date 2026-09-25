@@ -47,7 +47,7 @@ L, C and R files of one trigger become one **frame**. Name each image
 every json into one time-ordered trajectory. Frames missing any of the nine images are
 dropped, so every frame used has all nine.
 
-The INS trajectory (`InsTrajectory`) converts latitude/longitude/altitude to metres in a local east-north-up (ENU) frame centerd on the flight, and heading/pitch/roll into a rotation, using the same convention as the rest of KAMERA (`sensor_models.nav_state`). Asked for the pose at any time, it interpolates between the two nearest samples.
+The INS trajectory (`InsTrajectory`) converts latitude/longitude/altitude to metres in a local east-north-up (ENU) frame centered on the flight, and heading/pitch/roll into a rotation, using the same convention as the rest of KAMERA (`sensor_models.nav_state`). Asked for the pose at any time, it interpolates between the two nearest samples.
 
 ## Step 2: Organize Imagery (`flight.py`, `build_image_tree`)
 
