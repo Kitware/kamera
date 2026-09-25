@@ -62,6 +62,18 @@
           state: link
           force: True
 
+      # The [program:*] definitions are shared across crewed systems
+      # (tmux/crewed); this links in the per-system [group:<system>] that names
+      # what operators address as `supervisorctl restart <system>:*`.
+      - name: Link per-system supervisor group
+        become: True
+        file:
+          src: "{{ kamera_dir }}/src/cfg/{{ config_dir }}/supervisor_group_{{ 'leader' if leader else 'follower' }}.conf"
+          dest: /etc/supervisor/conf.d/{{ config_dir }}-group.conf
+          state: link
+          force: True
+          owner: root
+
       - name: Copy over supervisor config for sudoless and RPC
         become: True
         copy:
