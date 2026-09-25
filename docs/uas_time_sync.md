@@ -25,4 +25,4 @@ The part most worth remembering is how the three uas boxes and their cameras wer
 
 ## If it comes back
 
-A future uas would be built on the current runtime layout under `tmux/`, not on the old one. The clock chain above is independent of that layout. It needs `gpsd`, `chrony` and `linuxptp` installed, a network card with a hardware clock on each host, and a GPS receiver with a PPS output on the leader. The old provisioning under `provision/ansible/playbooks/uas` at the tag shows how those were installed.
+A future uas would be built on the current runtime layout under `runtime/`, not on the old one. The clock chain above is independent of that layout. It needs `gpsd`, `chrony` and `linuxptp` installed, a network card with a hardware clock on each host, and a GPS receiver with a PPS output on the leader. The old provisioning under `provision/ansible/playbooks/uas` at the tag shows how those were installed.
