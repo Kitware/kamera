@@ -4,7 +4,7 @@
 export COMPOSE_IGNORE_ORPHANS=True # make compose quieter
 KAM_REPO_DIR=$(/home/user/.config/kamera/repo_dir.bash)
 echo $KAM_REPO_DIR
-source "${KAM_REPO_DIR}/tmux/crewed/env.sh"
+source "${KAM_REPO_DIR}/tmux/env.sh"
 
 errcho() {
     (>&2 echo -e "\e[31m$1\e[0m")
