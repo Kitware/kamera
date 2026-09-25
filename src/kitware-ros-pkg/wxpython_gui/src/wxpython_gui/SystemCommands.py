@@ -1,4 +1,4 @@
-from wxpython_gui.cfg import kv, DOCK_KAM_REPO_DIR, REAL_KAM_REPO_DIR, system_name
+from wxpython_gui.cfg import kv, DOCK_KAM_REPO_DIR, REAL_KAM_REPO_DIR
 from roskv.util import filter_hosts_by_system
 import time
 import xmlrpc.client as xmlrpclib
@@ -13,7 +13,7 @@ class SystemCommandsCall(object):
         if isinstance(hosts, dict):
             hosts = list(hosts.keys())
         self.hosts = filter_hosts_by_system(hosts)
-        self.process_group = system_name
+        self.process_group = "kamera"
         self.supers = {
             host: xmlrpclib.Server("http://%s:9001/RPC2" % host) for host in self.hosts
         }

@@ -44,15 +44,11 @@ class PowerManager(object):
         self.status = "requested {}".format(desired)
         self.updated_at = time.time()
 
-        system_name = os.environ.get("SYSTEM_NAME", "").strip()
-        if system_name:
-            try:
-                self._supervisor.supervisor.stopProcessGroup(system_name, True)
-                logger.info("Stopped supervisor group {}", system_name)
-            except Exception as exc:
-                logger.warning(
-                    "stopProcessGroup {} failed: {}", system_name, exc
-                )
+        try:
+            self._supervisor.supervisor.stopProcessGroup("kamera", True)
+            logger.info("Stopped supervisor group kamera")
+        except Exception as exc:
+            logger.warning("stopProcessGroup kamera failed: {}", exc)
 
         try:
             self._supervisor.supervisor.startProcess(supervisor_process, False)

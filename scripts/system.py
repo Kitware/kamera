@@ -6,7 +6,7 @@ with open("/home/user/kw/SYSTEM_NAME") as f:
     SYSTEM_NAME = f.read().strip()
 
 hosts = [ f"center0{SYSTEM_NAME}", f"left1{SYSTEM_NAME}", f"right2{SYSTEM_NAME}"]
-group = SYSTEM_NAME
+group = "kamera"
 pod = [
     "image_manager",
     f"{group}:fps_monitor",

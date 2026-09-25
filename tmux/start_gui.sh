@@ -12,6 +12,6 @@ if [ ${REDIS_HOST} = "localhost" ]; then
 fi
 
 echo "Start gui."
-cd $DIR/../..
+cd $DIR/..
 
 docker compose -f $KAMERA_DIR/compose/gui.yml up
