@@ -44,6 +44,8 @@
 #include <nlohmann/json.hpp>
 #include <sw/redis++/redis++.h>
 using namespace sw;
+// Boost >= 1.73 no longer puts bind placeholders in the global namespace.
+using namespace boost::placeholders;
 
 #define CHECK_ERR(fnc, amsg)                               \
 do {                                                       \

@@ -4,6 +4,11 @@ project(mcc_daq)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# The vendored MCC USB driver C sources rely on pre-gcc-10 tentative
+# definitions (common symbols) across translation units; keep the old
+# behavior for C only.
+add_compile_options($<$<COMPILE_LANGUAGE:C>:-fcommon>)
+
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)

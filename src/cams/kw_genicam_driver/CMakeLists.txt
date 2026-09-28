@@ -50,12 +50,15 @@ set( GENICAM_LIBRARIES
 include_directories(${GENICAM_INCLUDE_DIRS})
 link_directories(${GENICAM_LIBRARY_DIRS})
 
+# libGevApi.so (prebuilt, old glibc) needs the pthread_yield compat shim on
+# glibc >= 2.34; compile it into every target that links GENICAM_LIBRARIES.
 add_executable( a6750_driver_node
         src/decode_error.cpp
         src/driver_a6750.cpp
         src/utils.cpp
         src/spec_a6750.cpp
-        src/genicam_ctl.cpp)
+        src/genicam_ctl.cpp
+        src/pthread_yield_shim.c)
 ament_target_dependencies(a6750_driver_node
         rclcpp std_msgs sensor_msgs custom_msgs image_transport cv_bridge cam_utils roskv)
 target_link_libraries( a6750_driver_node
@@ -65,6 +68,7 @@ target_link_libraries( a6750_driver_node
 
 add_executable( gige_scan
         src/gige_scan.cpp
+        src/pthread_yield_shim.c
         )
 target_link_libraries( gige_scan
         ${GENICAM_LIBRARIES}

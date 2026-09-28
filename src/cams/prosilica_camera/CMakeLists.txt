@@ -28,7 +28,7 @@ include_directories(include ${Boost_INCLUDE_DIR})
 
 add_library(prosilica src/libprosilica/prosilica.cpp)
 ament_target_dependencies(prosilica rclcpp sensor_msgs prosilica_gige_sdk)
-target_link_libraries(prosilica nlohmann_json::nlohmann_json)
+target_link_libraries(prosilica nlohmann_json::nlohmann_json ${Boost_LIBRARIES})
 
 add_executable(prosilica_node
         src/nodes/prosilica_node.cpp
