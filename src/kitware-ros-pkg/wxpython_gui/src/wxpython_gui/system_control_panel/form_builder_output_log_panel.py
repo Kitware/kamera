@@ -29,7 +29,7 @@ class MainFrame ( wx.Frame ):
 		bSizer44 = wx.BoxSizer( wx.VERTICAL )
 		
 		self.message_panel = wx.Panel( self.m_panel33, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
-		bSizer44.Add( self.message_panel, 1, wx.ALL|wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL, 5 )
+		bSizer44.Add( self.message_panel, 1, wx.ALL|wx.EXPAND, 5 )
 		
 		bSizer62 = wx.BoxSizer( wx.HORIZONTAL )
 		

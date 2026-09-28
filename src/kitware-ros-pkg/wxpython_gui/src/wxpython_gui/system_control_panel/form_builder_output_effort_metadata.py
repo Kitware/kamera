@@ -37,7 +37,7 @@ class MainFrame ( wx.Frame ):
 		bSizer10 = wx.BoxSizer( wx.HORIZONTAL )
 
 		self.on_populate_from_last_entry_button = wx.Button( self.m_panel33, wx.ID_ANY, u"Autofill from Previous", wx.DefaultPosition, wx.DefaultSize, 0 )
-		bSizer10.Add( self.on_populate_from_last_entry_button, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
+		bSizer10.Add( self.on_populate_from_last_entry_button, 0, wx.ALL, 5 )
 
 
 		bSizer44.Add( bSizer10, 0, wx.ALIGN_CENTER_HORIZONTAL, 5 )

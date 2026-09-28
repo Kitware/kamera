@@ -57,7 +57,7 @@ class MainFrame ( wx.Frame ):
 		bSizer11.Add( self.m_staticText1421, 0, wx.ALIGN_CENTER_HORIZONTAL|wx.ALL, 5 )
 
 		self.histogram_panel = wx.Panel( self.m_panel11, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
-		bSizer11.Add( self.histogram_panel, 1, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.ALL, 5 )
+		bSizer11.Add( self.histogram_panel, 1, wx.EXPAND|wx.ALL, 5 )
 
 
 		self.m_panel11.SetSizer( bSizer11 )
@@ -71,14 +71,14 @@ class MainFrame ( wx.Frame ):
 		bSizer12 = wx.BoxSizer( wx.HORIZONTAL )
 
 		self.m_button2 = wx.Button( self.m_panel23, wx.ID_ANY, u"Toggle", wx.DefaultPosition, wx.DefaultSize, 0 )
-		bSizer12.Add( self.m_button2, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL|wx.ALIGN_CENTER_VERTICAL, 5 )
+		bSizer12.Add( self.m_button2, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 		self.m_staticText7 = wx.StaticText( self.m_panel23, wx.ID_ANY, u"Show saturated pixels in red", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText7.Wrap( -1 )
 		bSizer12.Add( self.m_staticText7, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 
 
-		bSizer111.Add( bSizer12, 0, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL, 5 )
+		bSizer111.Add( bSizer12, 0, wx.EXPAND, 5 )
 
 		bSizer13 = wx.BoxSizer( wx.VERTICAL )
 
