@@ -5,7 +5,6 @@ Library handling projection operations of a standard camera model.
 Note: the raster coordiante system has its origin at the center of the top left
 pixel.
 """
-from __future__ import division, print_function, absolute_import
 import numpy as np
 from osgeo import osr, gdal
 

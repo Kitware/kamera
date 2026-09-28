@@ -5,7 +5,6 @@ ROS2 port: reads bags via the `rosbags` library (pip install rosbags), which
 understands both ROS1 .bag files (the legacy data this tool exists for) and
 ROS2 bag directories, without needing a ROS environment at all.
 """
-from __future__ import print_function
 
 import argparse
 import logging

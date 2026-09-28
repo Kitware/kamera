@@ -2,7 +2,6 @@
 """
 Script to convert Bayered images to deBayered RGB images.
 """
-from __future__ import division, print_function
 import argparse
 
 # KAMERA imports.

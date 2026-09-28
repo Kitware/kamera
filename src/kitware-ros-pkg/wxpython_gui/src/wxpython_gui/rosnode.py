@@ -6,7 +6,6 @@ event handlers and worker threads. This module owns a single rclpy node
 serviced by a background executor thread, and exposes the small imperative
 surface the GUI needs (subscriptions, synchronous service calls, logging).
 """
-from __future__ import division, print_function
 
 import threading
 import time as _time

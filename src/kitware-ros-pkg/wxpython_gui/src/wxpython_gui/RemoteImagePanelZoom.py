@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import division, print_function
 import wx
 import numpy as np
 from wxpython_gui.RemoteImagePanel import RemoteImagePanel

@@ -2,7 +2,6 @@
 """
 Library handling projection operations of a standard camera model.
 """
-from __future__ import division, print_function
 import os
 import glob
 

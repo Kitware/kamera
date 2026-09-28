@@ -1,5 +1,4 @@
 #! /usr/bin/python
-from __future__ import division, print_function
 
 # ROS imports
 import rclpy

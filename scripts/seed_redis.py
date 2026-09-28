@@ -18,7 +18,6 @@ Example:
     seed_redis.py --redis-host center0taiga \\
         --prefix /debug --config src/cfg/debug_defaults.json
 """
-from __future__ import print_function
 import argparse
 import json
 import os
