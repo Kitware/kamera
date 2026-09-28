@@ -3,7 +3,7 @@
         "allow_ir_nuc": 1,
         "archive_all_ir_images": 0,
         "base": "/mnt/data",
-        "effort": "ON",
+        "effort": "default_effort",
         "flight": "00",
         "is_archiving": 0,
         "jpg": {
