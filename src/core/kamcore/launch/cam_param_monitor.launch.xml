@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <node name="cam_param_monitor" pkg="kamcore" exec="cam_param_monitor" respawn="true" output="screen"/>
+</launch>

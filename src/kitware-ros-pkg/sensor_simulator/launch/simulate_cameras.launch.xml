@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Simulate cameras for one system -->
+<launch>
+  <arg name="sys_namespace" default="/subsys0"/>
+  <arg name="frame_rate" default="4.0"/>
+
+  <node name="simulate_cameras" pkg="sensor_simulator" exec="simulate_cameras"
+        namespace="$(var sys_namespace)" respawn="true" output="screen">
+    <param name="frame_rate" value="$(var frame_rate)"/>
+  </node>
+</launch>

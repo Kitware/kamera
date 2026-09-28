@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Diagnostics 
+# Diagnostics
 
-echo "[ ] [ ] [ ] ROSNODE CHECK [ ] [ ] [ ] "
+echo "[ ] [ ] [ ] ROS2 NODE CHECK [ ] [ ] [ ] "
 
 source /entry/project_env.sh
 
@@ -12,5 +12,4 @@ trap "errcho 'Caught SIGINT'; cleanup" SIGINT
 # Expected exit code from docker stop command.
 trap "errcho 'Caught SIGTERM'; cleanup" SIGTERM
 
-exec rosnode list
-
+exec ros2 node list

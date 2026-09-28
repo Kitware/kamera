@@ -87,12 +87,11 @@ trap "errcho 'Caught SIGINT'; cleanup" SIGINT
 # Expected exit code from docker stop command.
 trap "errcho 'Caught SIGTERM'; cleanup" SIGTERM
 
-ROSWAIT="--wait"
 LOGFILE="/tmp/roslaunch_err_${CAM_FOV}_${CAM_MODE}.log"
 
 if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/rebuild ) == "true" ]]; then
   echo "/debug/rebuild set, triggering rebuild on startup"
-  catkin build prosilica_camera
+  colcon build --packages-select prosilica_camera
   if [[ $? -ne 0 ]]; then
     echo "Rebuild failed. Your code is in an unstable state"
     exit 1
@@ -101,21 +100,13 @@ if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/rebuild ) == "true" ]]; then
   fi
 fi
 
-exec roslaunch "${ROSWAIT}" prosilica_camera prosilica.launch \
+RESPAWN=$([[ "${NORESPAWN}" == "true" ]] && echo false || echo true)
+exec ros2 launch prosilica_camera prosilica.launch.xml \
     ip:=${CAM_IP} \
     system_name:=${NODE_HOSTNAME} \
     cameratype:=${CAM_MODE} \
     cam_fov:=${CAM_FOV} \
     trigger_mode:=${TRIGGER_MODE} \
-    norespawn:=${NORESPAWN} \
+    respawn:=${RESPAWN} \
     GainMode:=$(cq ".launch.cam.${CAM_MODE}.GainMode") \
-    GainValue:=$(cq ".launch.cam.${CAM_MODE}.GainValue") 2> >(tee -a "${LOGFILE}" >&2) &
-
-STAT_ROS=$!
-wait $STAT_ROS
-echo "roslaunch probably died with a 0 error code"
-RES=$(grep -Po -e 'REQUIRED.+ has died' "${LOGFILE}")
-if [[ -n $RES ]]; then
-   echo $RES
-   exit 1
-fi
+    GainValue:=$(cq ".launch.cam.${CAM_MODE}.GainValue") 2> >(tee -a "${LOGFILE}" >&2)

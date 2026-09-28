@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <arg name="node_name" default="gis"/>
+  <arg name="port" default="5017"/>
+  <arg name="ip" default="192.168.88.99"/>
+  <arg name="replay" default=""/>
+  <arg name="respawn" default="true"/>
+
+  <node name="$(var node_name)" pkg="ins_driver" exec="ins_socket_driver" output="screen"
+        respawn="$(var respawn)">
+    <param name="port" value="$(var port)"/>
+    <param name="ip" value="$(var ip)"/>
+    <param name="replay" value="$(var replay)"/>
+  </node>
+</launch>

@@ -60,4 +60,5 @@ fi
 
 ## This is some jankitude to set the pod. I really wanna fix this
 export NODE_HOSTNAME
-export ROS_MASTER_URI="http://${MASTER_HOST}:${_ROS_PORT}/"
+# ROS2: DDS discovery replaces the ROS master; share ROS_DOMAIN_ID instead
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-42}"

@@ -6,7 +6,11 @@ FROM ${GUI_DEPS_IMAGE}
 # Create a non-root user and switch to it. Running X11 applications as root does
 # not always work.
 #RUN adduser --uid 1000 --disabled-password --gecos '' --shell /bin/bash user
-RUN useradd -m --uid=1000 user \
+# Ubuntu 24.04 base images ship a default 'ubuntu' user at uid 1000, which
+# 20.04 did not; drop it so 'user' can keep uid 1000 (the compose save-gui
+# volume and the host X11 session both assume 1000).
+RUN userdel -r ubuntu 2>/dev/null || true; \
+    useradd -m --uid=1000 user \
     && useradd --uid=7777 share \
     && usermod -aG share user
 
@@ -24,7 +28,6 @@ COPY --chown=user:user  .  $REPO_DIR
 RUN rm -rf /entry \
     && ln -sf $REPO_DIR/src/run_scripts/entry /entry \
     && printf "\nsource /entry/project.sh\n" >> /home/user/.bashrc \
-    && touch $REPO_DIR/.catkin_workspace \
     && ln -sf $REPO_DIR/src/run_scripts/aliases.sh /aliases.sh \
     && printf "\nsource /aliases.sh\n" >> /home/user/.bashrc
 
@@ -37,15 +40,18 @@ RUN ln -sv /usr/bin/python3 /usr/bin/python || true
 RUN find /home/user -not -user user -execdir chown user {} \+
 
 # Install kamera for wxpython_gui imports. --no-deps: deps come from the base
-# image (a full install trips on ROS's distutils PyYAML).
-# --ignore-requires-python: ROS Noetic pins python 3.8, below our 3.10 floor.
-RUN pip install --no-cache-dir matplotlib \
-    && pip install --no-cache-dir --no-deps --ignore-requires-python -e $REPO_DIR
+# image (a full install trips on ROS's distutils PyYAML). --break-system-packages:
+# Ubuntu 24.04 marks its python as externally managed. Jazzy's python 3.12 clears
+# our 3.10 floor, so the Noetic-era --ignore-requires-python is gone.
+# "numpy<2" rides along or matplotlib's transitive deps (kiwisolver/contourpy)
+# drag in numpy 2 over the base image's pin and "import cv2" dies on the
+# distro cv2's numpy 1 ABI.
+RUN pip install --break-system-packages --no-cache-dir matplotlib "numpy<2" \
+    && pip install --break-system-packages --no-cache-dir --no-deps -e $REPO_DIR
 
 # use the exec form of run because we need bash syntax
 USER user
-RUN [ "/bin/bash", "-c", "source /entry/project.sh && catkin build wxpython_gui "]
-RUN [ "/bin/bash", "-c", "source /entry/project.sh && catkin build ins_driver "]
+RUN [ "/bin/bash", "-c", "source /opt/ros/${ROS_DISTRO}/setup.bash && colcon build --base-paths src --packages-up-to wxpython_gui ins_driver --cmake-args -DCMAKE_BUILD_TYPE=Release"]
 USER root
 RUN find /home/user -not -user user -execdir chown user {} \+
 USER user

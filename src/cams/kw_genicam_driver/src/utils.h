@@ -6,20 +6,12 @@
 #include <cstdio>
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <mutex>
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 // Local installs
 #include <GenApi/GenApi.h>
 #include <gevapi.h>
-
-#ifndef _GEVAPI_H_
-/// stupid shims for clion IDE
-#include "../../../../../../../github.com/zcpp/DALSA/GigeV/include/gev_linux.h"
-#include "../../../../../../../github.com/zcpp/DALSA/GigeV/include/gevapi.h"
-#include "../../../../../../../github.com/ros/rc_genicam_api/genicam/library/CPP/include/GenApi/GenApi.h"
-#include "../../../../src/core/roskv/include/roskv/envoy.h"
-
-#endif
 
 #include "decode_error.h"
 #include "spec_a6750.h"
@@ -35,9 +27,18 @@ using namespace std::chrono;
 
 extern uint8_t G_INFO_VERBOSITY;
 
+// rclcpp logging shims to keep ROS1-style call sites
+#define ROS_INFO(...) RCLCPP_INFO(rclcpp::get_logger("kw_genicam_driver"), __VA_ARGS__)
+#define ROS_WARN(...) RCLCPP_WARN(rclcpp::get_logger("kw_genicam_driver"), __VA_ARGS__)
+#define ROS_ERROR(...) RCLCPP_ERROR(rclcpp::get_logger("kw_genicam_driver"), __VA_ARGS__)
+#define ROS_DEBUG(...) RCLCPP_DEBUG(rclcpp::get_logger("kw_genicam_driver"), __VA_ARGS__)
+#define ROS_INFO_STREAM(args) RCLCPP_INFO_STREAM(rclcpp::get_logger("kw_genicam_driver"), args)
+#define ROS_WARN_STREAM(args) RCLCPP_WARN_STREAM(rclcpp::get_logger("kw_genicam_driver"), args)
+#define ROS_ERROR_STREAM(args) RCLCPP_ERROR_STREAM(rclcpp::get_logger("kw_genicam_driver"), args)
+
 enum GeniAttributes { GA_MANUFACTURER, GA_MODEL, GA_SERIAL, GA_USERNAME, GA_MAC };
 
-void cb_fail_shutdown(ros::TimerEvent e);
+void cb_fail_shutdown();
 
 // ----------------------------------------------------------------------------
 /** Structure containing the camera image output metadata. */
@@ -90,7 +91,7 @@ public:
     Watchdog(double lookback_period, double health_threshold);
 
 
-    void push_back(ros::Time const &t, double val);
+    void push_back(rclcpp::Time const &t, double val);
 
     int size();
 
@@ -107,19 +108,22 @@ public:
 
     double computeHealth();
 
-    void setFailCallback(ros::TimerCallback callback);
+    void setFailCallback(std::function<void()> callback);
     void callFail();
+
+    rclcpp::Time now();
 
 
 private:
 
     /// lookback period in seconds  to consider events
-    ros::Duration lookback_period_{30};
+    rclcpp::Duration lookback_period_{30, 0};
     /// 0 = balanced 50/50
     double health_threshold{0.0};
+    rclcpp::Clock clock_{RCL_ROS_TIME};
     std::mutex mutex_;
-    std::vector<std::pair<ros::Time, double>> array;
-    ros::TimerCallback failCallback_;
+    std::vector<std::pair<rclcpp::Time, double>> array;
+    std::function<void()> failCallback_;
 
 };
 
@@ -128,10 +132,10 @@ double milliseconds_between(system_clock::time_point const &t1, system_clock::ti
 std::string enum2str(int en, std::map<std::string, int> mymap, std::string errmsg);
 std::string enum2str(int en, std::map<std::string, int> mymap);
 std::string mac2str(uint32_t LOW, uint32_t HIGH);
-std::string parse_validate_arg(ros::NodeHandle const &nh, std::string param, std::map<std::string, int> validmap, bool &failed);
-int parse_pos_int(ros::NodeHandle const &nh, std::string param, bool &failed);
-int parse_pos_int(ros::NodeHandle const &nh, std::string param, bool &failed, int minval);
-float parse_pos_float(ros::NodeHandle const &nh, std::string param, bool &failed);
+std::string parse_validate_arg(rclcpp::Node &nh, std::string param, std::map<std::string, int> validmap, bool &failed);
+int parse_pos_int(rclcpp::Node &nh, std::string param, bool &failed);
+int parse_pos_int(rclcpp::Node &nh, std::string param, bool &failed, int minval);
+float parse_pos_float(rclcpp::Node &nh, std::string param, bool &failed);
 int arg2enum(std::string arg, std::map<std::string, int> validmap);
 bool is_number(std::string entry);
 

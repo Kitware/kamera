@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
-<package format="2">
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
   <name>backend</name>
-  <version>0.5.0</version>
+  <version>1.0.0</version>
   <description>
     High level package to install all the backend dependencies
   </description>
@@ -9,30 +10,22 @@
   <maintainer email="adam.romlein@kitware.com">Adam Romlein</maintainer>
   <license>Apache 2.0</license>
 
+  <buildtool_depend>ament_cmake</buildtool_depend>
 
-
-  <buildtool_depend>catkin</buildtool_depend>
-  <!--<build_depend>roslint</build_depend>-->
-  <exec_depend>rospy</exec_depend>
-  <exec_depend>kamcore</exec_depend>
   <exec_depend>custom_msgs</exec_depend>
-  <exec_depend>kamerahealth</exec_depend>
   <exec_depend>roskv</exec_depend>
-  <exec_depend>phase_one</exec_depend>
-  <exec_depend>prosilica_camera</exec_depend>
-  <exec_depend>kw_genicam_driver</exec_depend>
+  <exec_depend>kamcore</exec_depend>
   <exec_depend>ins_driver</exec_depend>
   <exec_depend>mcc_daq</exec_depend>
+  <exec_depend>ser_daq</exec_depend>
   <exec_depend>nexus</exec_depend>
-  <exec_depend>sysinfo</exec_depend>
   <exec_depend>view_server</exec_depend>
-  <exec_depend>wxpython_gui</exec_depend>
+  <exec_depend>cam_utils</exec_depend>
+  <exec_depend>prosilica_camera</exec_depend>
+  <exec_depend>phase_one</exec_depend>
+  <exec_depend>kw_genicam_driver</exec_depend>
 
-
-  <!--<test_depend>roslint</test_depend>-->
-  <!-- The export tag contains other, unspecified, tags -->
   <export>
-    <!-- This is a pure Python package, so mark it architecture independent -->
-    <architecture_independent/>
+    <build_type>ament_cmake</build_type>
   </export>
 </package>

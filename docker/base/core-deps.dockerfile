@@ -1,24 +1,14 @@
 FROM kamera/base/core-ros:latest
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-        ros-noetic-compressed-image-transport \
-        ros-noetic-camera-info-manager \
-        ros-noetic-image-view \
-        ros-noetic-cv-bridge \
-        ros-noetic-nodelet \
-        ros-noetic-nodelet-topic-tools \
-        ros-noetic-vision-opencv \
-        ros-noetic-diagnostic-updater \
-        ros-noetic-self-test \
-        ros-noetic-polled-camera \
-        ros-noetic-message-generation \
-        ros-noetic-message-runtime \
-        libgtkmm-2.4-1v5 \
-        libglademm-2.4-1v5 \
-        libgtkglextmm-x11-1.2-dev \
-        libgtkglextmm-x11-1.2-0v5 \
-        libglade2-dev \
-        libglademm-2.4-dev \
+        ros-jazzy-compressed-image-transport \
+        ros-jazzy-image-transport \
+        ros-jazzy-camera-info-manager \
+        ros-jazzy-camera-calibration-parsers \
+        ros-jazzy-cv-bridge \
+        ros-jazzy-vision-opencv \
+        ros-jazzy-diagnostic-updater \
+        ros-jazzy-rosidl-default-generators \
     && rm -rf /var/lib/apt/lists/*
 
 ## build deps
@@ -40,7 +30,12 @@ RUN apt-get update -q && apt-get install --no-install-recommends -y \
             usbutils \
     && rm -rf /var/lib/apt/lists/*
 
-RUN     pip install --no-cache-dir \
+# --ignore-installed: scipy/shapely pull numpy, which pip otherwise tries (and
+# fails) to uninstall from the Debian-owned site-packages on Ubuntu 24.04.
+# numpy stays <2: the distro python3-opencv/cv_bridge are built against the
+# numpy 1 ABI and "import cv2" fails under numpy 2.
+RUN     pip install --break-system-packages --no-cache-dir --ignore-installed \
+            "numpy<2" \
             pyserial \
             osrf-pycommon \
             shapely \
@@ -51,15 +46,14 @@ RUN     pip install --no-cache-dir \
 ## ===================  install hid and DAQ drivers  ===================
 
 WORKDIR /src
-RUN curl -fsSL https://github.com/signal11/hidapi/archive/master.zip -o hidapi.zip
+# signal11/hidapi is unmaintained and its autotools setup no longer bootstraps
+# under Ubuntu 24.04's autoconf; the Debian package provides the same
+# libhidapi-libusb + headers the MCC DAQ drivers link against.
+RUN apt-get update && apt-get install -q -y --no-install-recommends \
+        libhidapi-dev libusb-1.0-0-dev \
+    && rm -rf /var/lib/apt/lists/*
 RUN curl -fsSL https://github.com/wjasper/Linux_Drivers/archive/master.zip -o mcc_drivers.zip
-RUN unzip -q hidapi.zip &&\
-    unzip -q mcc_drivers.zip -d mcc
-WORKDIR /src/hidapi-master
-RUN    ./bootstrap &&\
-        ./configure &&\
-        make -j`nproc` &&\
-        make install
+RUN unzip -q mcc_drivers.zip -d mcc
 
 ## ===================  other deps  ===================
 
@@ -71,7 +65,7 @@ RUN :\
     &&  mkdir -p /src/fmt/build \
     &&  git checkout 9c418bc468baf434a848010bff74663e1f820e79 \
     &&  cd /src/fmt/build \
-    &&  cmake -D CMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=TRUE -j .. \
+    &&  cmake -D CMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=TRUE .. \
     &&  make -j && make install \
     &&:
 
@@ -79,16 +73,12 @@ RUN :\
 RUN :\
     &&  curl -sSL https://github.com/sewenew/redis-plus-plus/archive/refs/tags/1.3.7.tar.gz -o 1.3.7.tar.gz \
     &&  tar -xzvf 1.3.7.tar.gz \
+    &&  sed -i '0,/#include/s//#include <cstdint>\n&/' /src/redis-plus-plus-1.3.7/src/sw/redis++/utils.h \
     &&  mkdir -p /src/redis-plus-plus-1.3.7/build \
     &&  cd /src/redis-plus-plus-1.3.7/build \
-    &&  cmake -D CMAKE_BUILD_TYPE=Release -D REDIS_PLUS_PLUS_BUILD_TEST=OFF -j .. \
+    &&  cmake -D CMAKE_BUILD_TYPE=Release -D REDIS_PLUS_PLUS_BUILD_TEST=OFF .. \
     &&  make -j && make install \
     &&:
-
-# Add yq for configu query to work
-RUN  curl -sL https://github.com/mikefarah/yq/releases/download/3.4.1/yq_linux_amd64 \
-     -o /usr/local/bin/yq && \
-     chmod +x /usr/local/bin/yq
 
 ## ===================  install ebus sdk  ===================
 COPY ./artifacts/ebus.deb /ebus.deb

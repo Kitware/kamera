@@ -1,16 +1,29 @@
-#!/usr/bin/env python
-from distutils.core import setup
-from catkin_pkg.python_setup import generate_distutils_setup
+from glob import glob
 
-# this function uses information from package.xml to populate dict
-d = generate_distutils_setup(packages=['kamerahealth'],
-                             package_dir={'': 'src'},
-                             install_requires=['flask', 'redis', 'six'],
-                             scripts=["scripts/y2j", "scripts/check_drop_rate.py"]
-                             # entry_points={'console_scripts': [
-                             #     'redis_arpd=kamerahealth.redis_arpd:main',
-                             #     'y2j=kamerahealth.y2j:main',
-                             # ]},
-                             )
+from setuptools import setup
 
-setup(**d)
+package_name = "kamerahealth"
+
+setup(
+    name=package_name,
+    version="1.0.0",
+    packages=[package_name],
+    package_dir={"": "src"},
+    data_files=[
+        ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
+        ("share/" + package_name, ["package.xml"]),
+        ("share/" + package_name + "/launch", glob("launch/*.launch.xml")),
+    ],
+    install_requires=["setuptools"],
+    zip_safe=True,
+    maintainer="Adam Romlein",
+    maintainer_email="adam.romlein@kitware.com",
+    description="Health monitoring utilities for KAMERA",
+    license="Apache 2.0",
+    entry_points={
+        "console_scripts": [
+            "missed_frame_node = kamerahealth.missed_frame_node:main",
+            "exit_code_node = kamerahealth.exit_code_node:main",
+        ],
+    },
+)

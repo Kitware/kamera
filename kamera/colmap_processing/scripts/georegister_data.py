@@ -11,7 +11,6 @@ point superimposed. These images should be loaded into the
 landmark_registration GUI. The ENU origin should be added as a point with
 latitude and longitude both zero.
 """
-from __future__ import division, print_function, absolute_import
 import numpy as np
 import cv2
 import glob

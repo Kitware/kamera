@@ -106,7 +106,7 @@ check_command W jq
 
 logbold "checking other conditions:"
 
-for VNAME in REDIS_HOST ROS_MASTER_URI
+for VNAME in REDIS_HOST ROS_DOMAIN_ID
 do
   if [[ -z "${!VNAME}" ]]; then
     logyel "UNSET   :\e[1m ${VNAME}="

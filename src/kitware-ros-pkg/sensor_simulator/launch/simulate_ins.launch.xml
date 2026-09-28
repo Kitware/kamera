@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Simulate messages from INS -->
+<launch>
+  <arg name="namespace" default="/"/>
+
+  <arg name="lat" default="42.849649"/>
+  <arg name="lon" default="-73.758830"/>
+  <arg name="height" default="10.0"/>
+  <arg name="nominal_yaw" default="81.20"/>
+  <arg name="nominal_pitch" default="0.0"/>
+  <arg name="nominal_roll" default="0.0"/>
+  <arg name="yaw_range" default="10.0"/>
+  <arg name="pitch_range" default="10.0"/>
+  <arg name="roll_range" default="10.0"/>
+  <arg name="motion_rate" default="0.1"/>
+  <arg name="pub_rate" default="10.0"/>
+  <arg name="topic" default="/ins"/>
+
+  <node name="simulate_ins" pkg="sensor_simulator" exec="simulate_ins"
+        namespace="$(var namespace)" output="screen">
+    <param name="lat" value="$(var lat)"/>
+    <param name="lon" value="$(var lon)"/>
+    <param name="height" value="$(var height)"/>
+    <param name="nominal_yaw" value="$(var nominal_yaw)"/>
+    <param name="nominal_pitch" value="$(var nominal_pitch)"/>
+    <param name="nominal_roll" value="$(var nominal_roll)"/>
+    <param name="yaw_range" value="$(var yaw_range)"/>
+    <param name="pitch_range" value="$(var pitch_range)"/>
+    <param name="roll_range" value="$(var roll_range)"/>
+    <param name="motion_rate" value="$(var motion_rate)"/>
+    <param name="pub_rate" value="$(var pub_rate)"/>
+    <param name="topic" value="$(var topic)"/>
+  </node>
+</launch>

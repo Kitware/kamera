@@ -1,5 +1,5 @@
 import threading
-from collections import Mapping
+from collections.abc import Mapping
 
 
 class _Default(object):

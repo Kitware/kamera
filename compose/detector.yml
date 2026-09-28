@@ -11,7 +11,7 @@ services:
     tty: true
     environment:
       REDIS_HOST: "${REDIS_HOST}"
-      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
       NODE_HOSTNAME: "${NODE_HOSTNAME:-}"
       PRODUCER_HOST: "${PRODUCER_HOST:-}"
       DATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"

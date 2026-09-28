@@ -1,4 +1,4 @@
-Header header
+std_msgs/Header header
 
 # Identifies the camera image stream that the detector operated on.
 # Typically, this is the ROS topic of the source imagery.

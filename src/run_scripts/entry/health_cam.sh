@@ -12,4 +12,4 @@ if [[ -z "${HOSTNAME}" ]]; then
   exit 1
 fi
 
-rosservice call "/${HOSTNAME}/${CAM_MODE}/${CAM_MODE}_driver/health" "{}"
+ros2 service call "/${HOSTNAME}/${CAM_MODE}/${CAM_MODE}_driver/health" std_srvs/srv/Trigger "{}"

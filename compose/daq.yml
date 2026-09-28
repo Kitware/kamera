@@ -10,7 +10,7 @@ services:
       - "${MCC_DAQ}:${MCC_DAQ}"
     environment:
       REDIS_HOST: "${REDIS_HOST}"
-      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
       NODE_HOSTNAME: "${NODE_HOSTNAME}"
       MCC_DAQ: "${MCC_DAQ}"
       SYSTEM_NAME: "${SYSTEM_NAME}"

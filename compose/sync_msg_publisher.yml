@@ -7,7 +7,7 @@ services:
     init: true
     tty: true
     environment:
-      ROS_MASTER_URI: "${ROS_MASTER_URI}"
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
       NODE_HOSTNAME: "${NODE_HOSTNAME:-}"
       ROS_IP: "${ROS_IP:-}"
       SATA_MOUNT_POINT: "${DATA_MOUNT_POINT}"

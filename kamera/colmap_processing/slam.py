@@ -6,7 +6,6 @@ Library handling projection operations of a standard camera model.
 Note: the image coordiante system has its origin at the center of the top left
 pixel.
 """
-from __future__ import division, print_function, absolute_import
 import numpy as np
 import cv2
 import copy

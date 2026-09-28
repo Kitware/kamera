@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <!-- Namespace to publish in - defined by which bank of the camera array the camera belongs to -->
+    <arg name="system_name" default="nuvo0"/>
+    <arg name="cameratype" default="rgb"/> <!-- can be 'rgb' or 'uv' -->
+    <arg name="namespace" default="/$(var system_name)/$(var cameratype)"/>
+
+    <arg name="GainMode" default="Manual"/> <!-- Enum {Auto, Manual} -->
+    <arg name="GainValue" default="0"/>     <!-- Number 0-24ish to set gain intensity -->
+
+    <arg name="guid" default=""/>
+    <arg name="ip" default=""/>
+
+    <!-- Trigger mode: streaming/syncin1/syncin2/fixedrate/software -->
+    <arg name="trigger_mode" default="syncin2"/>
+
+    <!-- Field-of-View (left/right/center) associated with this camera -->
+    <arg name="cam_fov" default="no_fov"/>
+    <arg name="frame_id" default="/$(var cam_fov)/$(var cameratype)"/>
+
+    <arg name="exposure_auto_max" default="0.1"/>
+    <arg name="respawn" default="true"/>
+
+    <node pkg="prosilica_camera" exec="prosilica_node"
+          name="$(var cameratype)_driver"
+          namespace="$(var namespace)"
+          output="screen" respawn="$(var respawn)">
+        <param name="guid" value="$(var guid)"/>
+        <param name="ip_address" value="$(var ip)"/>
+        <param name="trigger_mode" value="$(var trigger_mode)"/>
+        <param name="frame_id" value="$(var frame_id)"/>
+        <param name="cam_chan" value="$(var cameratype)"/>
+        <param name="cam_fov" value="$(var cam_fov)"/>
+
+        <param name="GainMode" value="$(var GainMode)"/>
+        <param name="GainValue" value="$(var GainValue)"/>
+
+        <param name="exposure_auto_max" value="$(var exposure_auto_max)"/>
+    </node>
+</launch>

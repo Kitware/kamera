@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 from typing import Any, List, Optional, Tuple, Union
-from io import BytesIO
 import json
 from hashlib import md5
 from collections.abc import Mapping
@@ -38,11 +37,11 @@ def _unflatten(flat, sep="/"):
     return result
 
 
-def hash_genpy_msg(msg):
-    # type: (genpy.message.Message) -> bytes
-    buf = BytesIO()
-    msg.serialize(buf)
-    return md5(buf.getvalue()).hexdigest()
+def hash_ros_msg(msg):
+    # type: (Any) -> str
+    from rclpy.serialization import serialize_message
+
+    return md5(serialize_message(msg)).hexdigest()
 
 
 def simple_hash_jsonable(obj):
