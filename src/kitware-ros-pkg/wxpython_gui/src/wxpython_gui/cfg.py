@@ -17,11 +17,19 @@ import wxpython_gui
 import wxpython_gui.utils  # bind the submodule for wxpython_gui.utils.make_path()
 
 
-# Figure out relative positions
+# Figure out relative positions.
+# ament_python installs this package into
+# <repo>/install/wxpython_gui/lib/pythonX.Y/site-packages/, so walking up from
+# __file__ reaches the install space, not the repo (under catkin the package
+# ran from the source tree and the walk landed on the repo root). REPO_DIR is
+# set by every kamera image; the walk stays as the source-tree fallback.
 HERE_DIR = os.path.dirname(os.path.realpath(__file__))
 PKG_DIR = os.path.realpath(os.path.join(HERE_DIR, "../.."))
-DOCK_KAM_REPO_DIR = os.path.realpath(os.path.join(PKG_DIR, "../../.."))
-REAL_KAM_REPO_DIR = os.path.realpath(os.path.join(PKG_DIR, "../../.."))
+_REPO_DIR = os.getenv("REPO_DIR") or os.path.realpath(
+    os.path.join(PKG_DIR, "../../..")
+)
+DOCK_KAM_REPO_DIR = _REPO_DIR
+REAL_KAM_REPO_DIR = _REPO_DIR
 
 # =================== LOADING SYS CONFIG =======================
 # This will *always* be loaded from disk and then pushed into redis
