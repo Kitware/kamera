@@ -183,7 +183,7 @@ class MainFrame ( wx.Frame ):
 		gSizer11.Add( bSizer101414, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
 		
 		
-		bSizer8.Add( gSizer11, 0, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL, 5 )
+		bSizer8.Add( gSizer11, 0, wx.EXPAND, 5 )
 		
 		self.m_staticline2 = wx.StaticLine( self.m_panel33, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
 		bSizer8.Add( self.m_staticline2, 0, wx.EXPAND |wx.ALL, 5 )
