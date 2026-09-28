@@ -53,7 +53,7 @@ alias cb-gui="colcon build --packages-up-to wxpython_gui"
 # runtime shortcuts
 # core - only on center
 run-core() {
-    ros2 run kamcore seed_redis_config /cfg/${SYSTEM_NAME}/config.yaml
+    ros2 run kamcore seed_redis_config /cfg/${SYSTEM_NAME}/config.json
 }
 alias run1-core="run-core"
 

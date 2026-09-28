@@ -7,7 +7,7 @@
 
 echo "[ ] [ ] [ ] CORE INIT [ ] [ ] [ ] "
 # dump the global config as a debugging step
-cat /cfg/${SYSTEM_NAME}/config.yaml
+cat /cfg/${SYSTEM_NAME}/config.json
 
 source /entry/project_env.sh
 
@@ -20,7 +20,7 @@ redis-client -h ${REDIS_HOST} incr term
 # Seed Redis with the static system config before anything starts, so kamcore
 # nodes (cam_param_monitor, etc.) read /sys/arch from Redis without depending on
 # the GUI.
-ros2 run kamcore seed_redis_config /cfg/${SYSTEM_NAME}/config.yaml
+ros2 run kamcore seed_redis_config /cfg/${SYSTEM_NAME}/config.json
 
 echo "Redis seeded. Core init complete; idling."
 exec sleep infinity

@@ -36,7 +36,7 @@ REAL_KAM_REPO_DIR = _REPO_DIR
 # These never-changing values are placed under "/sys/arch", and will never
 # have to be backed up
 system_name = os.getenv("SYSTEM_NAME")
-cfg_file = "%s/src/cfg/%s/config.yaml" % (REAL_KAM_REPO_DIR, system_name)
+cfg_file = "%s/src/cfg/%s/config.json" % (REAL_KAM_REPO_DIR, system_name)
 with open(cfg_file, "r") as stream:
     try:
         USER_CFG = yaml.safe_load(stream)
@@ -102,7 +102,7 @@ class Cfg(dict):
 #   1. default_system_state.json        factory defaults
 #   2. <gui_cfg_dir>/system_state.json  last session (the only thing saved back)
 #   3. Redis /sys/*                      live runtime values
-#   4. config.yaml (USER_CFG)            static truth; ALWAYS WINS for its keys
+#   4. config.json (USER_CFG)            static truth; ALWAYS WINS for its keys
 # camera_configurations.json owns SYS_CFG["camera_cfgs"].
 
 
@@ -180,7 +180,7 @@ SYS_ARCH = {}
 deep_merge(SYS_ARCH, DEFAULT_STATE)  # 1. factory defaults
 deep_merge(SYS_ARCH, CACHE_STATE)    # 2. operator's last session
 deep_merge(SYS_ARCH, REDIS_LIVE)     # 3. live runtime values
-# 4. config.yaml OWNS the static keys it declares: replace rather than merge, so
+# 4. config.json OWNS the static keys it declares: replace rather than merge, so
 #    a key removed from the yaml (e.g. a dropped channel) can't survive from a
 #    lower tier. "arch" mixes static + mutable session subkeys, so only its
 #    static subkeys are replaced.
@@ -193,7 +193,7 @@ for sub, val in USER_CFG.get("arch", {}).items():
 SYS_ARCH["camera_cfgs"] = CAMERA_PRESETS
 
 # Publish to Redis under /sys. First drop the static subtrees so keys removed
-# from config.yaml don't linger (put only sets keys, never deletes); the update
+# from config.json don't linger (put only sets keys, never deletes); the update
 # then republishes the authoritative values. arch.hosts is the only static dict
 # under "arch" -- the rest of /sys/arch holds mutable state we must not wipe.
 for key, val in USER_CFG.items():
