@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import division, print_function
 import wx
 from wxpython_gui.RemoteImagePanel import RemoteImagePanel
 from wxpython_gui.UpdateImageThreadFit import UpdateImageThreadFit

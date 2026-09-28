@@ -1,5 +1,4 @@
 #! /usr/bin/python
-from __future__ import division, print_function
 import numpy as np
 import copy, os, cv2, vtk
 from vtk.util import numpy_support
