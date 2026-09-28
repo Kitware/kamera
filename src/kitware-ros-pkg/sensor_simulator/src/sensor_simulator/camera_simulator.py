@@ -2,7 +2,6 @@
 """
 Library handling imagery simulation.
 """
-from __future__ import division, print_function
 import numpy as np
 from numpy import pi
 import cv2

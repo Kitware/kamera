@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from __future__ import division, print_function
 import numpy as np
 np.seterr(all='raise') # Divide by zeros are a BAD SIGN. let's make it error them
 import os

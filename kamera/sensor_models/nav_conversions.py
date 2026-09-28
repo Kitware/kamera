@@ -37,8 +37,6 @@ Some computations require GeographicLib
 - sudo apt-get install geographiclib-tools
 
 """
-
-from __future__ import division, print_function
 import numpy as np
 import subprocess
 from math import cos, sin, sqrt

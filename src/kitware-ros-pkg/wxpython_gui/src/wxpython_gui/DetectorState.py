@@ -1,4 +1,3 @@
-from __future__ import division, print_function
 import time
 from enum import Enum
 from wxpython_gui.cfg import SYS_CFG, kv, get_detector_pipefile
