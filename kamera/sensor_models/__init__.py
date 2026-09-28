@@ -8,6 +8,7 @@ except ImportError:
     # Instead, use the pip installed transformations.py, which isn't compatible
     # with Python 2. However, this requires some modifications to the
     # formatting.
+    import numpy as np
     import transformations
 
     # transformations assumes a (w, x, y, z) quaterion, but the rest of the module

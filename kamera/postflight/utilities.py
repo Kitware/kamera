@@ -33,7 +33,12 @@ from kamera.sensor_models.nav_state import NavStateINSJson
 from kamera.postflight.dat_to_csv import convert_dat_to_csv
 
 # Adjust as necessary
-GEOD_FNAME = "/src/kamera/assets/geods/egm84-15.pgm"
+GEOD_FNAME = os.environ.get("KAMERA_GEOD_FNAME", "/src/kamera/assets/geods/egm84-15.pgm")
+if not os.path.isfile(GEOD_FNAME):
+    # Fall back to the geoid shipped in this repo (two levels up from here).
+    GEOD_FNAME = str(
+        pathlib.Path(__file__).resolve().parents[2] / "assets" / "geods" / "egm84-15.pgm"
+    )
 if not os.path.isfile(GEOD_FNAME):
     raise FileNotFoundError(GEOD_FNAME)
 geod = pygeodesy.geoids.GeoidPGM(GEOD_FNAME)
