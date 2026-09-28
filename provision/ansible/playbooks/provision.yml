@@ -37,14 +37,6 @@
                     ]
 
   pre_tasks:
-    - shell: uname -s
-      ignore_errors: yes
-      register: uname_s
-
-    - shell: uname -m
-      ignore_errors: yes
-      register: uname_m
-
     - name: Fully Update System
       become: True
       become_user: root
@@ -174,13 +166,6 @@
         groups: ['user', 'docker', 'dialout',  'sudo']
 
   tasks:
-    - name: Install yq
-      become: True
-      get_url:
-        url: "https://github.com/mikefarah/yq/releases/download/2.4.0/yq_{{ uname_s.stdout }}_amd64"
-        dest: /usr/local/bin/yq
-        mode: '0755'
-
           #    - name: Reboot system
           #      become: True
           #      reboot:
