@@ -6,7 +6,11 @@ FROM ${GUI_DEPS_IMAGE}
 # Create a non-root user and switch to it. Running X11 applications as root does
 # not always work.
 #RUN adduser --uid 1000 --disabled-password --gecos '' --shell /bin/bash user
-RUN useradd -m --uid=1000 user \
+# Ubuntu 24.04 base images ship a default 'ubuntu' user at uid 1000, which
+# 20.04 did not; drop it so 'user' can keep uid 1000 (the compose save-gui
+# volume and the host X11 session both assume 1000).
+RUN userdel -r ubuntu 2>/dev/null || true; \
+    useradd -m --uid=1000 user \
     && useradd --uid=7777 share \
     && usermod -aG share user
 
@@ -39,7 +43,10 @@ RUN find /home/user -not -user user -execdir chown user {} \+
 # image (a full install trips on ROS's distutils PyYAML). --break-system-packages:
 # Ubuntu 24.04 marks its python as externally managed. Jazzy's python 3.12 clears
 # our 3.10 floor, so the Noetic-era --ignore-requires-python is gone.
-RUN pip install --break-system-packages --no-cache-dir matplotlib \
+# "numpy<2" rides along or matplotlib's transitive deps (kiwisolver/contourpy)
+# drag in numpy 2 over the base image's pin and "import cv2" dies on the
+# distro cv2's numpy 1 ABI.
+RUN pip install --break-system-packages --no-cache-dir matplotlib "numpy<2" \
     && pip install --break-system-packages --no-cache-dir --no-deps -e $REPO_DIR
 
 # use the exec form of run because we need bash syntax

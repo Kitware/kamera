@@ -78,12 +78,13 @@ RUN     apt-get update -q && apt-get install --no-install-recommends -y \
 
 
 ## ipython isn't strictly required (like most things in is kitchen sink image) but it's extremely useful for debugging
-RUN     pip install --break-system-packages --no-cache-dir \
+# typing/pathlib are py2 backports (stdlib since 3.5) and break on 3.12;
+# --ignore-installed keeps pip from trying to uninstall Debian-owned packages
+# (psutil) that overlap with these deps.
+RUN     pip install --break-system-packages --no-cache-dir --ignore-installed \
             ipython \
             ipdb \
             pyserial \
-            typing \
-            pathlib \
             bottle \
             requests \
             profilehooks \

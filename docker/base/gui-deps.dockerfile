@@ -24,12 +24,21 @@ ENV LANG=en_US.UTF-8 \
 # here. The legacy 'PyGeodesy<19.12' pin is gone: the GUI uses
 # pygeodesy.geoids.GeoidPGM, which the unpinned core-deps install provides
 # (shapefile_monitor already runs against it).
+# 'transformations' is the non-ROS fallback that kamera.colmap_processing.rotations
+# imports when tf.transformations is unavailable -- which is always under ROS2,
+# where the ROS1 'tf' package does not exist. gui.dockerfile installs the kamera
+# package with --no-deps, so it has to be provided here.
+# numpy stays <2 for the same reason as core-deps (distro cv2/cv_bridge are
+# built against the numpy 1 ABI); pin it here too or transformations' resolver
+# silently upgrades it and "import cv2" dies.
 RUN pip install --break-system-packages --no-cache-dir \
+        "numpy<2" \
         Pillow \
         exifread \
         ipython \
         psutil \
-        simplekml
+        simplekml \
+        transformations
 
 # roskv is no longer pip-installable (its setup.py was removed in the ROS2
 # port); it is built into the colcon workspace by gui.dockerfile via
