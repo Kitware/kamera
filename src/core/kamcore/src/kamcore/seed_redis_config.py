@@ -14,7 +14,7 @@ keys are authoritative, so overwriting any stale Redis values here is correct.
 import os
 import sys
 
-import yaml
+import json
 
 from roskv.impl.redis_envoy import RedisEnvoy
 
@@ -26,11 +26,11 @@ def main():
         cfg_file = "/cfg/%s/config.json" % os.environ["SYSTEM_NAME"]
 
     with open(cfg_file, "r") as stream:
-        config = yaml.safe_load(stream)
+        config = json.load(stream)
 
     envoy = RedisEnvoy(os.environ["REDIS_HOST"], client_name="config_seeder")
     # config.json is authoritative for its static keys. Clear each static subtree
-    # first so keys removed from the yaml (e.g. a dropped channel) don't linger
+    # first so keys removed from the config (e.g. a dropped channel) don't linger
     # in Redis -- put only sets keys, it never deletes. "arch" also carries the
     # GUI's mutable session state (flight, project, ...), so only its static
     # "hosts" subtree is reset there, never all of /sys/arch.

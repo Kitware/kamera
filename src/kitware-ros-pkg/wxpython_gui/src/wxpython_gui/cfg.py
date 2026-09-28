@@ -5,7 +5,6 @@ import pygeodesy
 import redis
 import re
 import time
-import yaml
 from collections import OrderedDict
 from functools import reduce
 
@@ -39,8 +38,8 @@ system_name = os.getenv("SYSTEM_NAME")
 cfg_file = "%s/src/cfg/%s/config.json" % (REAL_KAM_REPO_DIR, system_name)
 with open(cfg_file, "r") as stream:
     try:
-        USER_CFG = yaml.safe_load(stream)
-    except yaml.YAMLError as exc:
+        USER_CFG = json.load(stream)
+    except json.JSONDecodeError as exc:
         print(exc)
 # Need a redis instance to push/pull from
 kv = ImplEnvoy(host=USER_CFG["redis_host"])
@@ -181,7 +180,7 @@ deep_merge(SYS_ARCH, DEFAULT_STATE)  # 1. factory defaults
 deep_merge(SYS_ARCH, CACHE_STATE)    # 2. operator's last session
 deep_merge(SYS_ARCH, REDIS_LIVE)     # 3. live runtime values
 # 4. config.json OWNS the static keys it declares: replace rather than merge, so
-#    a key removed from the yaml (e.g. a dropped channel) can't survive from a
+#    a key removed from the config (e.g. a dropped channel) can't survive from a
 #    lower tier. "arch" mixes static + mutable session subkeys, so only its
 #    static subkeys are replaced.
 for key, val in USER_CFG.items():
