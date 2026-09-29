@@ -7,13 +7,12 @@ source /entry/project_env.sh
 ## === === === ===  User-set configuration  === === === ===
 
 KAM_REPO_DIR=$(~/.config/kamera/repo_dir.bash)
-source ${KAM_REPO_DIR}/src/cfg/cfg-aliases.sh  # get cq - ConfigQuery
 
 ## tell the system hostname of the node acting as ROS master host
-export MASTER_HOST=$(cq '.master_host')
+export MASTER_HOST=$(kamera-cfg '.master_host')
 
 NODE_HOSTNAME=${NODE_HOSTNAME:-$(hostname)}
-CAM_FOV=$(cq ".arch.hosts[\"${NODE_HOSTNAME}\"].fov")
+CAM_FOV=$(kamera-cfg ".arch.hosts[\"${NODE_HOSTNAME}\"].fov")
 export NODE_HOSTNAME
 export CAM_FOV
 
@@ -28,7 +27,7 @@ WS_KAMERA=/root/kamera_ws
 
 
 
-for VNAME in CFG_ALIAS_SET DATA_MOUNT_POINT
+for VNAME in SYSTEM_NAME DATA_MOUNT_POINT
 do
   if [[ -z "${!VNAME}" ]]
   then

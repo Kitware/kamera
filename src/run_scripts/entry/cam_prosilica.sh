@@ -13,22 +13,17 @@ NODE_HOSTNAME=${NODE_HOSTNAME:-$(hostname)}
 source /entry/project_env.sh
 
 KAM_REPO_DIR=$(~/.config/kamera/repo_dir.bash)
-source ${KAM_REPO_DIR}/src/cfg/cfg-aliases.sh  # get cq - ConfigQuery
 
-if [[ -z "CFG_ALIAS_SET" ]]; then
-    echo "<cam_prosilica.sh> Configuration failed"
-    exit 1
-fi
 
 if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/enable ) == "true" ]]; then
   export KAMERA_DEBUG=true
 fi
 
 
-CAM_FOV=${CAM_FOV:-$(cq ".arch.hosts[\"${NODE_HOSTNAME}\"].fov")}
+CAM_FOV=${CAM_FOV:-$(kamera-cfg ".arch.hosts[\"${NODE_HOSTNAME}\"].fov")}
 
 
-for VNAME in CFG_ALIAS_SET CAM_FOV CAM_MODE
+for VNAME in SYSTEM_NAME CAM_FOV CAM_MODE
 do
   if [[ -z "${!VNAME}" ]]; then
     echo "ERROR: Expected $VNAME environment variable that is missing."
@@ -43,17 +38,17 @@ done
 
 echo "% % % %    CAM-${CAM_MODE}-${CAM_FOV}    % % % %"
 
-DEV_ID=$(cq ".locations.${CAM_FOV}.${CAM_MODE}")
+DEV_ID=$(kamera-cfg ".locations.${CAM_FOV}.${CAM_MODE}")
 if [[ ${DEV_ID} == 'null' ]]; then
     printf "<!> Not a valid camera FOV/ mode: ${CAM_FOV}:${CAM_MODE}. oneof: {ir}"
     exit 1
 fi
 
-CAM_IFACE=$(cq ".interfaces.${CAM_MODE}")
+CAM_IFACE=$(kamera-cfg ".interfaces.${CAM_MODE}")
 if [[ ${CAM_IFACE} == 'null' ]]; then
     printf "<!> Not a valid camera FOV/ mode: ${CAM_FOV}/${CAM_MODE}.
-    CAM_FOV: oneof: `cq '.locations | keys' | tr '\n' ' '`
-    CAM_MODE: oneof: `cq '.channels ' | tr '\n' ' '`\n"
+    CAM_FOV: oneof: `kamera-cfg '.locations | keys' | tr '\n' ' '`
+    CAM_MODE: oneof: `kamera-cfg '.channels ' | tr '\n' ' '`\n"
     exit 1
 fi
 
@@ -64,7 +59,7 @@ if [[ ${CAM_IFACE} == 'null' ]]; then
 fi
 
 #CAM_IP=$(locate-attached.sh "$CAM_IFACE")
-CAM_IP=$(cq ".devices.${DEV_ID}.prefer_ip")
+CAM_IP=$(kamera-cfg ".devices.${DEV_ID}.prefer_ip")
 
 if [[ $? -ne 0 || ${CAM_IP} == 'null' ]]; then
     printf "<!> Unable to find camera IP: ${CAM_FOV}:${CAM_MODE} on interface ${CAM_IFACE}"
@@ -108,8 +103,8 @@ exec roslaunch "${ROSWAIT}" prosilica_camera prosilica.launch \
     cam_fov:=${CAM_FOV} \
     trigger_mode:=${TRIGGER_MODE} \
     norespawn:=${NORESPAWN} \
-    GainMode:=$(cq ".launch.cam.${CAM_MODE}.GainMode") \
-    GainValue:=$(cq ".launch.cam.${CAM_MODE}.GainValue") 2> >(tee -a "${LOGFILE}" >&2) &
+    GainMode:=$(kamera-cfg ".launch.cam.${CAM_MODE}.GainMode") \
+    GainValue:=$(kamera-cfg ".launch.cam.${CAM_MODE}.GainValue") 2> >(tee -a "${LOGFILE}" >&2) &
 
 STAT_ROS=$!
 wait $STAT_ROS

@@ -15,7 +15,6 @@ RUN rm -rf /entry \
     && printf "\nsource /aliases.sh\n" >> /root/.bashrc
 
 RUN ln -sf $REPO_DIR/scripts/activate_ros.bash $REPO_DIR/activate_ros.bash
-RUN ln -sf $REPO_DIR/src/cfg /cfg
 RUN mkdir -p /root/.config/kamera && \
     ln -sf $REPO_DIR/.dir /root/.config/kamera/repo_dir.bash
 

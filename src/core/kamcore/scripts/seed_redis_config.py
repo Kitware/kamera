@@ -23,7 +23,10 @@ def main():
     if len(sys.argv) > 1:
         cfg_file = sys.argv[1]
     else:
-        cfg_file = "/cfg/%s/config.json" % os.environ["SYSTEM_NAME"]
+        cfg_file = "%s/src/cfg/%s/config.json" % (
+            os.environ["REPO_DIR"],
+            os.environ["SYSTEM_NAME"],
+        )
 
     with open(cfg_file, "r") as stream:
         config = json.load(stream)

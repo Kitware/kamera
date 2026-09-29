@@ -6,8 +6,8 @@ handled with compose.yml files and .launch files.
 
 It is read in two ways, both of which expect plain JSON:
 
-- shell: the `cq` helper (`cfg-aliases.sh` / `runtime/env.sh`) runs
-  `src/cfg/get`, which is a plain `jq -r <query> config.json`
+- shell: `kamera-cfg <query>` (`src/run_scripts/inpath/kamera-cfg`), a
+  plain `jq -r <query> config.json`
 - python: `kamcore/scripts/seed_redis_config.py` and `wxpython_gui.cfg`
   load it and seed the static keys into redis (config.json always wins for
   its keys; operator-mutable session state stays owned by the GUI)

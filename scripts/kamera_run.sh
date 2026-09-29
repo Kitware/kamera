@@ -60,7 +60,7 @@ blueprintf "Configuring main KAMERA entrypoint."
 source ${KAM_REPO_DIR}/scripts/set_detector_read_state.sh
 blueprintf "."
 
-MASTER_HOST=$(cq '.master_host')
+MASTER_HOST=$(kamera-cfg '.master_host')
 
 for VNAME in MASTER_HOST KAM_REPO_DIR
 do
@@ -81,7 +81,7 @@ until ping -c1 -W1 ${MASTER_HOST} &>/dev/null; do
 done
 
 SKIP_PING=true
-for host in $(cq '.arch.hosts | keys | join("\n" )') ; do
+for host in $(kamera-cfg '.arch.hosts | keys | join("\n" )') ; do
   hostip=$(dig +short $host)
   if [[ $? != 0 ]]; then
     errcho "FATAL: Cannot resolve IP for necassary host ${host}"
@@ -96,9 +96,9 @@ done
 if [[ -n ${SKIP_PING} ]]; then
   echo "all clients located, yay!"
 else
-  for host in $(cq '.arch.hosts | keys | join("\n" )') ; do
+  for host in $(kamera-cfg '.arch.hosts | keys | join("\n" )') ; do
       echo "Waiting on ping $host."
-      if [[ $(cq ".arch.hosts.${host}.enabled") == 'true' ]]; then
+      if [[ $(kamera-cfg ".arch.hosts.${host}.enabled") == 'true' ]]; then
           until ping -c1 -W1 ${host} &>/dev/null; do
               printf "\b${SP:i++%${#SP}:1}"
           done
@@ -119,8 +119,8 @@ else
     echo "NAS mounted!"
 fi
 declare -A PIDS
-for host in $(cq '.arch.hosts | keys | join("\n" )') ; do
-    if [[ $(cq ".arch.hosts.${host}.enabled") == 'true' ]]; then
+for host in $(kamera-cfg '.arch.hosts | keys | join("\n" )') ; do
+    if [[ $(kamera-cfg ".arch.hosts.${host}.enabled") == 'true' ]]; then
 	python3 ${KAM_REPO_DIR}/scripts/system.py $host restart nas &
         PIDS[${host}]=$!
     else
@@ -135,7 +135,7 @@ done
 
 
 # Bring up master and core nodes
-MASTER_HOST=$(cq '.master_host')
+MASTER_HOST=$(kamera-cfg '.master_host')
 blueprintf "done\nBringing up master $MASTER_HOST..."
 python3 ${KAM_REPO_DIR}/scripts/system.py $MASTER_HOST "${ARGS[@]}" master
 
@@ -163,11 +163,11 @@ blueprintf "done\nLaunching pod nodes...\n"
 # Query list of hosts as line delim array
 declare -A PIDS
 # sort, so hosts are started idempotently
-hosts=$(cq '.arch.hosts | keys | join("\n" )')
+hosts=$(kamera-cfg '.arch.hosts | keys | join("\n" )')
 IFS=$'\n' sorted_hosts=($(sort <<<"${hosts[*]}"))
 unset IFS
 for host in "${sorted_hosts[@]}"; do
-    if [[ $(cq ".arch.hosts.${host}.enabled") == 'true' ]]; then
+    if [[ $(kamera-cfg ".arch.hosts.${host}.enabled") == 'true' ]]; then
         # daemon group (kamerad) is always started and never stopped by normal operations
         python3 ${KAM_REPO_DIR}/scripts/system.py $host start daemon
 	python3 ${KAM_REPO_DIR}/scripts/system.py $host "${ARGS[@]}" pod &

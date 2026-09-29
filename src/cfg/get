@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-
-# Retrieve values from the per-system config.json; queries are plain jq.
-# (Historically this piped config.yaml through a pinned yq v3 binary into
-# jq; the configs are JSON now, so jq alone does the job.)
-
-CFG_FILE="${CFG_FILE}"
-exec jq -r "${1}" "${CFG_FILE}"

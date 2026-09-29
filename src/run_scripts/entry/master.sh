@@ -4,7 +4,7 @@
 
 echo "[ ] [ ] [ ] KAMCORE [ ] [ ] [ ] "
 # dump the global config as a debugging step
-cat /cfg/${SYSTEM_NAME}/config.json
+cat ${REPO_DIR}/src/cfg/${SYSTEM_NAME}/config.json
 
 source /entry/project_env.sh
 
@@ -27,7 +27,7 @@ redis-client -h ${REDIS_HOST} incr term
 # Seed Redis with the static system config before anything starts, so kamcore
 # nodes (cam_param_monitor, etc.) read /sys/arch from Redis without depending on
 # the GUI. Done before roscore so the --wait monitors can't start until it's up.
-rosrun kamcore seed_redis_config.py /cfg/${SYSTEM_NAME}/config.json
+rosrun kamcore seed_redis_config.py ${REPO_DIR}/src/cfg/${SYSTEM_NAME}/config.json
 
 # Start core and block until it's up, then bootstrap parameters
 roscore &
@@ -44,6 +44,6 @@ until /entry/rosnode_list.sh; do
 	fi
 done
 
-rosparam load /cfg/${SYSTEM_NAME}/config.json /cfg
+rosparam load ${REPO_DIR}/src/cfg/${SYSTEM_NAME}/config.json /cfg
 exec roslaunch kamcore kamcore.launch data_mount_point:=$DATA_MOUNT_POINT \
     spoof_rate:="${SPOOF_RATE}"

@@ -3,11 +3,10 @@
 ## === === === ===  User-set configuration  === === === ===
 
 source /entry/project_env.sh
-source ${KAM_REPO_DIR}/src/cfg/cfg-aliases.sh  # get cq - ConfigQuery
 
 ## tell the system hostname of the node acting as ROS master host
-export MASTER_HOST=$(cq '.master_host')
-export REDIS_HOST=$(cq '.redis_host')
+export MASTER_HOST=$(kamera-cfg '.master_host')
+export REDIS_HOST=$(kamera-cfg '.redis_host')
 
 NODE_HOSTNAME=${NODE_HOSTNAME:-$(hostname)}
 CAM_FOV="$(redis-cli -h ${REDIS_HOST} -p 6379 get "/sys/arch/hosts/${NODE_HOSTNAME}/fov")"
@@ -47,7 +46,7 @@ fi
 source "${KAM_REPO_DIR}/src/run_scripts/setup/setup_viame_runtime.sh"
 
 
-for VNAME in CFG_ALIAS_SET CAM_FOV MASTER_HOST WS_DEVEL VIAME_INSTALL
+for VNAME in SYSTEM_NAME CAM_FOV MASTER_HOST WS_DEVEL VIAME_INSTALL
 do
   if [[ -z "${!VNAME}" ]]
   then

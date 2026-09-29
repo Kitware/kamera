@@ -12,7 +12,7 @@ KAM_REPO_DIR=$(/home/user/.config/kamera/repo_dir.bash)
 echo $KAM_REPO_DIR
 source "${KAM_REPO_DIR}/runtime/env.sh"
 
-MASTER_HOST=$(cq '.master_host')
+MASTER_HOST=$(kamera-cfg '.master_host')
 
 if [[ -z "$@" ]] ; then
     ARGS=(start)

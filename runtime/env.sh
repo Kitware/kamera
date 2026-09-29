@@ -3,12 +3,12 @@ SYSTEM_NAME="$(cat ${HOME}/kw/SYSTEM_NAME)"
 export SYSTEM_NAME
 
 export KAMERA_DIR=$(${HOME}/.config/kamera/repo_dir.bash)
-CFG_FILE="${KAMERA_DIR}/src/cfg/${SYSTEM_NAME}/config.json"
-cq () {
-    CFG_FILE=${CFG_FILE} ${KAMERA_DIR}/src/cfg/get "$@"
-}
+case ":${PATH}:" in
+    *":${KAMERA_DIR}/src/run_scripts/inpath:"*) ;;
+    *) export PATH="${KAMERA_DIR}/src/run_scripts/inpath:${PATH}" ;;
+esac
 
-export REDIS_HOST=$(cq ".redis_host")
+export REDIS_HOST=$(kamera-cfg ".redis_host")
 
 # Uncomment this line if you wish to run the GUI in "offline" mode
 # (without center0, left1, etc. hooked up)
@@ -28,12 +28,12 @@ unset _redis_elapsed
 
 echo "Redis successfully connected at ${REDIS_HOST}, starting."
 
-export ROS_HOSTNAME=$(cq ".master_host")
+export ROS_HOSTNAME=$(kamera-cfg ".master_host")
 export NODE_HOSTNAME=$(hostname)
 export ROS_MASTER_URI="http://${ROS_HOSTNAME}:11311"
 export DOCKER_KAMERA_DIR="/root/kamera"
-export DATA_MOUNT_POINT=$(cq .local_ssd_mnt)
-export CAM_FOV=$(cq ".arch.hosts[\"${NODE_HOSTNAME}\"].fov")
+export DATA_MOUNT_POINT=$(kamera-cfg .local_ssd_mnt)
+export CAM_FOV=$(kamera-cfg ".arch.hosts[\"${NODE_HOSTNAME}\"].fov")
 
 export ROS_DISTRO="noetic"
 export KAMERA_DNS_IP="192.168.88.1"
