@@ -11,3 +11,4 @@ provision/ansible/.password
 # model weights are distributed outside git
 *.pt
 *.weights
+*.torchscript
