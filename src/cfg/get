@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-#Retrieve values from user config yaml, basically syntactic sugar for `yq r user-config.yml`
+# Retrieve values from the per-system config.json; queries are plain jq.
+# (Historically this piped config.yaml through a pinned yq v3 binary into
+# jq; the configs are JSON now, so jq alone does the job.)
 
 CFG_FILE="${CFG_FILE}"
-## Gotta pass it into jq cause it's more feature rich
-yq read -j "${CFG_FILE}" | jq -r "${1}"
+exec jq -r "${1}" "${CFG_FILE}"
