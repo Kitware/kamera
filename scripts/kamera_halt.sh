@@ -48,7 +48,7 @@ if [[ -z "${KAM_REPO_DIR}" ]]; then
 fi
 blueprintf "."
 
-MASTER_HOST=$(cq '.master_host')
+MASTER_HOST=$(kamera-cfg '.master_host')
 ## === === === === === ===   End Env setup  === === === === === ===
 
 
@@ -62,8 +62,8 @@ blueprintf "done\nGui down. Killing pods...\n"
 # Bring up all pod systems
 # Query list of hosts as line delim array
 declare -A PIDS
-for host in $(cq '.arch.hosts | keys | join("\n" )') ; do
-    if [[ $(cq ".arch.hosts.${host}.enabled") == 'true' ]]; then
+for host in $(kamera-cfg '.arch.hosts | keys | join("\n" )') ; do
+    if [[ $(kamera-cfg ".arch.hosts.${host}.enabled") == 'true' ]]; then
 	python3 ${KAM_REPO_DIR}/scripts/system.py $host ${ARGS[@]} pod &
         PIDS["${host}_pod"]=$!
 	python3 ${KAM_REPO_DIR}/scripts/system.py $host ${ARGS[@]} detector &

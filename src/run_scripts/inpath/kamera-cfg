@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+# Query this system's config.json with jq, e.g. `kamera-cfg .master_host`.
+# The config is found relative to this script, so it works both on a host and
+# in a container.
+
+CFG_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../../cfg"
+exec jq -r "$1" "${CFG_DIR}/${SYSTEM_NAME}/config.json"

@@ -5,10 +5,7 @@
 echo "~ ~ ~ ~ ~   IR   ~ ~ ~ ~ ~  "
 source /entry/project_env.sh
 
-KAM_REPO_DIR=$(~/.config/kamera/repo_dir.bash)
-source ${KAM_REPO_DIR}/src/cfg/cfg-aliases.sh  # get cq - ConfigQuery
-
-for VNAME in CFG_ALIAS_SET CAM_FOV CAM_MODE
+for VNAME in SYSTEM_NAME CAM_FOV CAM_MODE
 do
   if [[ -z "${!VNAME}" ]]
   then
@@ -20,33 +17,31 @@ do
 done
 
 NODE_HOSTNAME=${NODE_HOSTNAME:-undefined}
-DEV_ID=$(cq ".locations.${CAM_FOV}.${CAM_MODE}")
+DEV_ID=$(kamera-cfg ".locations.${CAM_FOV}.${CAM_MODE}")
 if [[ ${DEV_ID} == 'null' ]]; then
     printf "<!> Not a valid camera FOV/ mode: ${CAM_FOV}:${CAM_MODE}. oneof: {ir}"
     exit 1
 fi
 
-GUID=$(/cfg/get ".devices.${DEV_ID}.mac")
+GUID=$(kamera-cfg ".devices.${DEV_ID}.mac")
 
 if [[ ${GUID} == 'null' ]]; then
     printf "<!> Unable to find camera GUID: ${CAM_FOV}:${CAM_MODE}"
     exit 1
 fi
 
-CAM_IP=$(cq ".devices.${DEV_ID}.prefer_ip")
+CAM_IP=$(kamera-cfg ".devices.${DEV_ID}.prefer_ip")
 
 if [[ ${CAM_IP} == 'null' ]]; then
     printf "<!> Unable to find camera prefer_ip: ${CAM_FOV}:${CAM_MODE}"
     exit 1
 fi
 
-
-
 ROSWAIT="--wait"
 CAM_PIXEL_FORMAT=${CAM_PIXEL_FORMAT:-mono16}
 CAM_TRIGGER_SOURCE=${CAM_TRIGGER_SOURCE:-External}
 CAM_TIMEOUT=${CAM_TIMEOUT:-3333}
-DRIVER=$(cq ".devices.${DEV_ID}.model").launch
+DRIVER=$(kamera-cfg ".devices.${DEV_ID}.model").launch
 # extra arguments to pass to roslaunch in the form of `argname1:=val argname2:=val`
 CAM_EXTRA_ARGS=${CAM_EXTRA_ARGS:-}
 LOGFILE="/tmp/roslaunch_err_${CAM_FOV}_${CAM_MODE}.log"
@@ -78,7 +73,7 @@ exec roslaunch "${ROSWAIT}" kw_genicam_driver ${DRIVER} \
     camera_manufacturer:=FLIR \
     firmware_mode:=${CAM_PIXEL_FORMAT} \
     nextImage_timeout:=${CAM_TIMEOUT} \
-    info_verbosity:=$(/cfg/get ".verbosity") \
+    info_verbosity:=$(kamera-cfg ".verbosity") \
     ${CAM_EXTRA_ARGS} 2> >(tee -a "${LOGFILE}" >&2) &
 
 STAT_ROS=$!
