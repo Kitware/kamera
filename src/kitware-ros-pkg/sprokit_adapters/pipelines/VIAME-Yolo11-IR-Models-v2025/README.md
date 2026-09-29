@@ -26,7 +26,7 @@ the validation PR curve.
 Scored on the 2025 validation set (2,592 images, 2,900 GT hotspots, 882
 negatives); eval code + plots in /data2/code/kamera_work/ir_eval/.
 GT boxes are tight ~8x8 px; the 2021 model emits ~18x18 px boxes, so
-IoU-only scoring misreads it — center-hit (det centre inside GT dilated
+IoU-only scoring misreads it — center-hit (det center inside GT dilated
 to >=20x20 px) measures detection, IoU measures localization.
 
 | metric                    | 2021 darknet | 2025 YOLO11s |

@@ -8,3 +8,6 @@ devel
 provision/ansible/.password
 .catkin_tools
 .venv
+# model weights are distributed outside git
+*.pt
+*.weights
