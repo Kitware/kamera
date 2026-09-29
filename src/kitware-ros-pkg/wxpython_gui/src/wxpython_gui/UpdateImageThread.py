@@ -74,15 +74,15 @@ class UpdateImageThread(threading.Thread):
         self.sub = False
         if chan == "ir":
             self.apply_clahe = True
-            model = "flir_a6750"
         elif chan == "uv":
             self.apply_clahe = True
-            model = "allied_gt4907_uv"
         elif chan == "rgb":
             self.apply_clahe = False
-            model = "gsm_ix120"
-            # model = "allied_gt6600_rgb"
             self.sub = True
+        # Resolve the camera model through the config, so swapping a device in
+        # .locations is enough to pick up its resolution.
+        dev_id = SYS_CFG["locations"][fov][chan]
+        model = SYS_CFG["devices"][dev_id]["model"]
         self._raw_image_height = SYS_CFG["models"][model]["specs"]["height"]
         self._raw_image_width = SYS_CFG["models"][model]["specs"]["width"]
         self._last_header = std_msgs.msg.Header()  # header of last received image

@@ -47,11 +47,12 @@ swap which physical cameras map to a software FOV.
 to FOV; that indirection makes it easy and less error-prone to reroute
 camera defs. Device blocks appear in groups: cooled FLIR cameras, IR
 "backup" cameras, rgb prosilica backup cameras, rgb phase one cameras, uv
-prosilica cameras. For prosilica GUIDs: the last 3 nybbles of the MAC are
-the GUID, i.e. `02:c2:8c` = 0x02c28c = 180876.
+prosilica cameras. `model` names an entry in `.models`, `prefer_ip` is the
+address the camera driver connects to, and `mac` identifies the physical
+unit.
 
-**`.camera_models`** — information about the actual camera devices, keyed
-by model name.
+**`.models`** — the sensor resolution (`specs`) of each camera model, keyed
+by model name. The GUI sizes its image panels from it.
 
 **`.launch`** — expert configs; launch params passed through to the camera
 launch files.
