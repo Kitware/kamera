@@ -8,11 +8,32 @@ Received 2026-09-24 alongside the 2025 validation set
 test_* + ice_seals_2025 fl102/fl207 frames, single class `hotspot`,
 YOLO-format labels).
 
-- `models/yolo11s_IR_2025_best.pt` — weights (19 MB; keep out of git like
-  the JoBBS `.weights` files)
-- `scripts/2025_IR_batch_norm_yolo11s.py` — original batch inference
-  wrapper (16-bit tif -> despeckle -> percentile norm -> YOLO -> VIAME CSV)
-- `scripts/despeckle_and_norm_001.py` — standalone preprocessor
+- `models/yolo11s_IR_2025_best.pt` — training checkpoint (19 MB; keep out
+  of git like the JoBBS `.weights` files)
+- `models/yolo11s_IR_2025_best.torchscript` — the same model exported to
+  TorchScript, which is what inference runs (also kept out of git)
+- `scripts/2025_IR_batch_norm_yolo11s.py` — batch inference with plain
+  PyTorch (16-bit tif -> despeckle -> percentile norm -> YOLO -> VIAME CSV)
+- `scripts/despeckle_and_norm_001.py` — standalone preprocessor; the
+  inference script imports its functions, so both stay in sync
+
+The checkpoint is a pickled ultralytics object, so it only loads with
+ultralytics installed. Export it to TorchScript once, on any machine that
+has ultralytics; the image size and class names travel with the export:
+
+```
+python -c "from ultralytics import YOLO; YOLO('models/yolo11s_IR_2025_best.pt').export(format='torchscript')"
+```
+
+Inference then needs only torch, torchvision and opencv (all in the VIAME
+image):
+
+```
+python scripts/2025_IR_batch_norm_yolo11s.py models/yolo11s_IR_2025_best.torchscript \
+    <tif_folder> [<tif_folder> ...] -o detections.csv --conf 0.01
+```
+
+Folders can also come from `--manifest <file>` (one path per line).
 
 Preprocessing contract (must match training):
 despeckle_16bit(median-3 diff > 500) then percentile normalize
