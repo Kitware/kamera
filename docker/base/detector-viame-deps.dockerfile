@@ -37,11 +37,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Build tools necessary for catkin and roskv
 
-# Add yq to make config query work
-RUN curl -sL https://github.com/mikefarah/yq/releases/download/2.4.0/yq_linux_amd64 \
-    -o /usr/local/bin/yq && \
-    chmod +x /usr/local/bin/yq
-
 ## === === === === === === === === === === === === === === ===
 # Clone in C++ Deps for Redis
 RUN mkdir /src

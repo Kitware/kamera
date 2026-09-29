@@ -85,11 +85,6 @@ RUN :\
     &&  make -j && make install \
     &&:
 
-# Add yq for configu query to work
-RUN  curl -sL https://github.com/mikefarah/yq/releases/download/3.4.1/yq_linux_amd64 \
-     -o /usr/local/bin/yq && \
-     chmod +x /usr/local/bin/yq
-
 ## ===================  install ebus sdk  ===================
 COPY ./artifacts/ebus.deb /ebus.deb
 COPY ./artifacts/GigE-V-Framework_x86_2.02.0.0132.tar.gz /gigev.tar.gz
