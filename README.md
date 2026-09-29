@@ -23,7 +23,7 @@ KAMERA, or the **K**nowledge-guided Image **A**cquisition **M**anag**ER** and **
 ## Layout
 
 - `src/` is the onboard software: ROS packages for the cameras, INS, DAQ and processing, under `src/core`, `src/cams` and `src/process`.
-- `src/cfg/` is the per-system configuration. `nayak/` and `taiga/` each hold a `config.yaml`, the default system state, and one folder per host with its network and clock settings. Files shared by every system sit at the top level. The file `~/kw/SYSTEM_NAME` on a host picks which folder applies.
+- `src/cfg/` is the per-system configuration. `nayak/` and `taiga/` each hold a `config.json`, the default system state, and one folder per host with its network and clock settings. Files shared by every system sit at the top level. The file `~/kw/SYSTEM_NAME` on a host picks which folder applies.
 - `runtime/` is how a host runs the system: the env script, the supervisor program definitions for the leader and the followers, and the scripts supervisor calls (tmux startup). It is the same on every system.
 - `compose/` runs and `docker/` defines the images built for the containers those programs start.
 - `provision/` sets up a host from a fresh install with Ansible, plus the desktop shortcuts and dotfiles it installs.
