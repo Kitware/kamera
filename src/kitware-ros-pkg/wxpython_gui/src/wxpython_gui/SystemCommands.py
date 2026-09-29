@@ -1,4 +1,3 @@
-from wxpython_gui.cfg import kv, DOCK_KAM_REPO_DIR, REAL_KAM_REPO_DIR
 from roskv.util import filter_hosts_by_system
 import time
 import xmlrpc.client as xmlrpclib
@@ -20,7 +19,6 @@ class SystemCommandsCall(object):
         self.commands = ["up", "down", "restart"]
         self.cams = ["ir", "rgb", "uv"]
         self.devices = ["ins", "daq"]
-        self.halt = "%s/src/run_scripts/inpath/kamera.halt" % REAL_KAM_REPO_DIR
         self.processes = ""
         self.cmd = ""
 
@@ -102,21 +100,11 @@ class SystemCommandsCall(object):
             devices = [devices]
         self.processes = devices
 
-    def command_halt(self):
-        # WARNING will kill the GUI (itself)
-        self.bash = [self.halt]
-        self.run_bash()
-
     def command_postproc(self, host, command, postproc):
         print("Final command: (%s %s)" % (command, postproc))
         self.host = host
         self.cmd = command
         self.processes = ["postproc:%s" % postproc]
-
-    def run_bash(self):
-        bash_cmd = " ".join(self.bash)
-        if len(self.bash) > 0:
-            return_code = subprocess.Popen(bash_cmd, shell=True)
 
 
 class SystemCommands(object):
@@ -141,9 +129,6 @@ class SystemCommands(object):
             self.scc.run()
         elif target == "central":
             self.scc.command_central(host, command, containers)
-            self.scc.run()
-        elif target == "halt":
-            self.scc.command_halt()
             self.scc.run()
         elif target == "postproc":
             self.scc.command_postproc(host, command, postproc)
