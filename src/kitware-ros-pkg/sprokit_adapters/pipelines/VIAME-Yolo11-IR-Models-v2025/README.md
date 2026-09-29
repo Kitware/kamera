@@ -3,10 +3,9 @@
 2025-generation IR hotspot detector (ultralytics YOLO11s), successor to the
 darknet `arctic_seal_ir` model in VIAME-JoBBS-Models-v2021.01.20.
 
-Received 2026-09-24 alongside the 2025 validation set
-(`/data2/datasets/2025_validation_data`: CHESS2016 + polar_bear_2019 +
-test_* + ice_seals_2025 fl102/fl207 frames, single class `hotspot`,
-YOLO-format labels).
+Received 2026-09-24 alongside the 2025 validation set (CHESS2016 +
+polar_bear_2019 + test_* + ice_seals_2025 fl102/fl207 frames, single class
+`hotspot`, YOLO-format labels).
 
 - `models/yolo11s_IR_2025_best.pt` — training checkpoint (19 MB; keep out
   of git like the JoBBS `.weights` files)
@@ -45,7 +44,7 @@ the validation PR curve.
 ## Evaluation vs the 2021 darknet model (2026-09-24)
 
 Scored on the 2025 validation set (2,592 images, 2,900 GT hotspots, 882
-negatives); eval code + plots in /data2/code/kamera_work/ir_eval/.
+negatives).
 GT boxes are tight ~8x8 px; the 2021 model emits ~18x18 px boxes, so
 IoU-only scoring misreads it — center-hit (det center inside GT dilated
 to >=20x20 px) measures detection, IoU measures localization.
@@ -69,5 +68,4 @@ of the 2025 set is unverified upstream.
 
 Fusion regression (Image_sequence_ice_seals, 14 frames): finds the same
 3 hotspots as the 2021 model — no new false cues at conf 0.166 — with
-tighter boxes; all 3 EO-corroborated within 0.3 m of the registered cue
-(run in /data2/code/kamera_work/seal_detect/fusion_v2025/).
+tighter boxes; all 3 EO-corroborated within 0.3 m of the registered cue.
