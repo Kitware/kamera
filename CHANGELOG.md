@@ -13,9 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`kamera/calibration`). One COLMAP model with trigger-synchronized frames, INS
   position priors, rig bundle adjustment; writes camera model yamls, `rig.yaml`,
   DIVE v2 registration JSON, GIFs and a PDF report.
+- The 2025 YOLO11s IR hotspot model package
+  (`sprokit_adapters/pipelines/VIAME-Yolo11-IR-Models-v2025`), successor to the 2021
+  darknet `arctic_seal_ir` model. Inference runs a TorchScript export with plain
+  PyTorch, not ultralytics; paths are command-line arguments.
+- `kamera-cfg` queries the system `config.json` on the host and in the containers.
 
 ### Changed
 
+- Packaging moves from poetry to uv with PEP 621 metadata (hatchling backend,
+  Python >= 3.10). `poetry.lock`, `setup.py` and `requirements.txt` are gone.
 - Post-processing env moves to Python 3.13 and pycolmap 4.2 (conda-forge, CUDA build).
 - `bootstrap.py` builds the conda env and `.venv` in one step on Linux, macOS and
   Windows; `make install` calls it. `.venv` is recreated instead of failing when it exists.
@@ -33,6 +40,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   helpers are `kamera_provision`, `kamera_configure`, `kamera_build` and `kamera_all`.
 - fstab entries in the configure playbook are keyed on the mount point, so a changed
   option or disk id replaces the line instead of appending another.
+- The taiga and nayak `config.yaml` files are now `config.json`, read with jq and
+  `json.load`. `kamera-cfg` replaces the `cq` shell function, the `get` wrapper and
+  the `/cfg` symlink, and yq is no longer installed.
+- The GUI sizes its image panels from `.models` in the config instead of hardcoded
+  values; unused config options are removed.
+- The wxPython GUI runs on wxWidgets 3.2 (Ubuntu 24).
+- The `kamera` Python package imports outside the containers.
+- Code no longer uses APIs removed since Python 2 (`collections.Mapping`,
+  `np.fromstring`); incoming image messages are no longer copied. The py2-only
+  `__future__` imports are dropped.
+
+### Fixed
+
+- Hostname lookup in the Phase One, Prosilica and postproc entry scripts.
+- taiga's default effort is `default_effort`, not the nonexistent `ON`.
 
 ### Removed
 
@@ -42,6 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tag, and `docs/uas_time_sync.md` explains its PPS and PTP clock chain.
 - The old `nuvo` and `cas` host names from the hosts files and scripts, and the unused
   `spoof_ins.json` and `spoof_events.sh`.
+- Unused scripts: `install_extras`, `check_system`, `setup_kamera_env`,
+  `make_cameras_ip_static`, the `nexus` and `syscall` entry scripts, the dead
+  `inpath` symlinks, `kamera.desktop`, and the GUI's unused halt command.
 
 ## [0.5.0] - 2026-07-21
 
