@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `kamera-calibrate`: multi-sensor rig calibration from a calibration flight
+- `kamera calibrate`: multi-sensor rig calibration from a calibration flight
   (`kamera/calibration`). One COLMAP model with trigger-synchronized frames, INS
   position priors, rig bundle adjustment; writes camera model yamls, `rig.yaml`,
   DIVE v2 registration JSON, GIFs and a PDF report.
@@ -17,7 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`sprokit_adapters/pipelines/VIAME-Yolo11-IR-Models-v2025`), successor to the 2021
   darknet `arctic_seal_ir` model. Inference runs a TorchScript export with plain
   PyTorch, not ultralytics; paths are command-line arguments.
-- `kamera-cfg` queries the system `config.json` on the host and in the containers.
+- The `kamera` command (`kamera/cli.py`) is the one entry point for operator tools:
+  `kamera system {start,stop,restart,status}`, `kamera gui`, `kamera cfg <jq query>`
+  and `kamera calibrate`, which runs on Windows too. It replaces
+  `scripts/kamera_run.sh` and `scripts/kamera_halt.sh`. The configure playbook
+  installs it on the flight hosts in a CLI-only venv linked into `~/.local/bin`.
+- `$KAMERA_CFG` points at the system `config.json` on the host and in the
+  containers; scripts read it with `jq -r <query> "$KAMERA_CFG"`.
+- `kamera system status` shows whether the ROS master answers, whether the GUI is
+  running, and every host's supervisor process states.
 
 ### Changed
 
@@ -41,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fstab entries in the configure playbook are keyed on the mount point, so a changed
   option or disk id replaces the line instead of appending another.
 - The taiga and nayak `config.yaml` files are now `config.json`, read with jq and
-  `json.load`. `kamera-cfg` replaces the `cq` shell function, the `get` wrapper and
+  `json.load`. `$KAMERA_CFG` and jq replace the `cq` shell function, the `get` wrapper and
   the `/cfg` symlink, and yq is no longer installed.
 - The GUI sizes its image panels from `.models` in the config instead of hardcoded
   values; unused config options are removed.
@@ -50,11 +58,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Code no longer uses APIs removed since Python 2 (`collections.Mapping`,
   `np.fromstring`); incoming image messages are no longer copied. The py2-only
   `__future__` imports are dropped.
+- `kamera system start` does nothing when the system is already up, and no longer
+  opens the GUI; `kamera gui` does. The Launch desktop shortcut runs both, so it
+  still opens the control panel in one click. `kamera system stop` removes the GUI
+  container instead of only stopping it. Start and stop take no compose modes.
 
 ### Fixed
 
 - Hostname lookup in the Phase One, Prosilica and postproc entry scripts.
 - taiga's default effort is `default_effort`, not the nonexistent `ON`.
+- `scripts/system.py restart` only started a process when stopping it failed, so
+  restarting a running process left it stopped. It now stops, then starts.
+- `kamera_halt.sh down` (and `kill`, `rm`) left every ROS process running: only the
+  GUI understood those modes, and `system.py` skipped them as invalid.
 
 ### Removed
 

@@ -1,5 +1,5 @@
 [Desktop Entry]
-Exec=gnome-terminal -e '/home/user/kw/kamera/scripts/kamera_run.sh'
+Exec=gnome-terminal -- bash -c '/home/user/.local/bin/kamera system start && /home/user/.local/bin/kamera gui'
 Name=kamera_gui
 Terminal=true
 Icon=applications-science

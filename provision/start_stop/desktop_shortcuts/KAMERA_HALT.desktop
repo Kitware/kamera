@@ -1,5 +1,5 @@
 [Desktop Entry]
-Exec=gnome-terminal -e '/home/user/kw/kamera/scripts/kamera_halt.sh'
+Exec=gnome-terminal -- /home/user/.local/bin/kamera system stop
 Name=kamera_gui
 Terminal=true
 Icon=process-stop

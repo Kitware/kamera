@@ -5,8 +5,8 @@
 source /entry/project_env.sh
 
 ## tell the system hostname of the node acting as ROS master host
-export MASTER_HOST=$(kamera-cfg '.master_host')
-export REDIS_HOST=$(kamera-cfg '.redis_host')
+export MASTER_HOST=$(jq -r '.master_host' "$KAMERA_CFG")
+export REDIS_HOST=$(jq -r '.redis_host' "$KAMERA_CFG")
 
 NODE_HOSTNAME=${NODE_HOSTNAME:-$(hostname)}
 CAM_FOV="$(redis-cli -h ${REDIS_HOST} -p 6379 get "/sys/arch/hosts/${NODE_HOSTNAME}/fov")"

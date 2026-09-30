@@ -47,3 +47,5 @@ errcho() {
 }
 
 export KAM_REPO_DIR=/root/kamera
+# This system's config.json; read it with `jq -r <query> "$KAMERA_CFG"`.
+export KAMERA_CFG="${REPO_DIR}/src/cfg/${SYSTEM_NAME}/config.json"

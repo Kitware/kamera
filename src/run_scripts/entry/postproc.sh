@@ -9,10 +9,10 @@ source /entry/project_env.sh
 KAM_REPO_DIR=$(~/.config/kamera/repo_dir.bash)
 
 ## tell the system hostname of the node acting as ROS master host
-export MASTER_HOST=$(kamera-cfg '.master_host')
+export MASTER_HOST=$(jq -r '.master_host' "$KAMERA_CFG")
 
 NODE_HOSTNAME=${NODE_HOSTNAME:-$(hostname)}
-CAM_FOV=$(kamera-cfg ".arch.hosts[\"${NODE_HOSTNAME}\"].fov")
+CAM_FOV=$(jq -r ".arch.hosts[\"${NODE_HOSTNAME}\"].fov" "$KAMERA_CFG")
 export NODE_HOSTNAME
 export CAM_FOV
 

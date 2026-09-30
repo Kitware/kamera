@@ -27,7 +27,7 @@ KAMERA, or the **K**nowledge-guided Image **A**cquisition **M**anag**ER** and **
 - `runtime/` is how a host runs the system: the env script, the supervisor program definitions for the leader and the followers, and the scripts supervisor calls (tmux startup). It is the same on every system.
 - `compose/` runs and `docker/` defines the images built for the containers those programs start.
 - `provision/` sets up a host from a fresh install with Ansible, plus the desktop shortcuts and dotfiles it installs.
-- `scripts/` holds operator tools such as `kamera_run.sh` and `kamera_halt.sh`.
+- `scripts/` holds operator tools, including the bash behind `kamera system` and `kamera gui` (the `kamera` command is `kamera/cli.py`).
 - `kamera/` is the Python package for post-processing, including the rig calibration.
 - `docs/` holds notes that do not belong next to code.
 
@@ -60,9 +60,26 @@ GPU only matters for full camera model calibration.
 
 ### Rig calibration
 
-`kamera-calibrate <flight_dir>` calibrates every camera on the rig from a calibration
+`kamera calibrate <flight_dir>` calibrates every camera on the rig from a calibration
 flight and writes camera models, the rig geometry, DIVE registration files and a PDF
-report. See [kamera/calibration/README.md](kamera/calibration/README.md).
+report. It works the same on Windows, Linux and macOS from the activated `.venv`. See
+[kamera/calibration/README.md](kamera/calibration/README.md).
+
+### Flight hosts
+
+The configure playbook installs the `kamera` command into a small venv and links it
+into `~/.local/bin`:
+
+```bash
+kamera system start      # bring the system up; does nothing if it is already up
+kamera gui               # open the control panel
+kamera system status     # ROS master, GUI, and every host's process states
+kamera system restart    # stop, then start; reopens the GUI if it was open
+kamera system stop       # stop every host's processes and remove the GUI container
+kamera cfg .master_host  # query this system's config.json with jq
+```
+
+Scripts and containers read the config directly with `jq -r <query> "$KAMERA_CFG"`.
 
 ### Docker images
 

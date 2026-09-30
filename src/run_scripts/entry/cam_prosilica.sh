@@ -20,7 +20,7 @@ if [[ $(redis-cli --raw -h $REDIS_HOST get /debug/enable ) == "true" ]]; then
 fi
 
 
-CAM_FOV=${CAM_FOV:-$(kamera-cfg ".arch.hosts[\"${NODE_HOSTNAME}\"].fov")}
+CAM_FOV=${CAM_FOV:-$(jq -r ".arch.hosts[\"${NODE_HOSTNAME}\"].fov" "$KAMERA_CFG")}
 
 
 for VNAME in SYSTEM_NAME CAM_FOV CAM_MODE
@@ -38,17 +38,17 @@ done
 
 echo "% % % %    CAM-${CAM_MODE}-${CAM_FOV}    % % % %"
 
-DEV_ID=$(kamera-cfg ".locations.${CAM_FOV}.${CAM_MODE}")
+DEV_ID=$(jq -r ".locations.${CAM_FOV}.${CAM_MODE}" "$KAMERA_CFG")
 if [[ ${DEV_ID} == 'null' ]]; then
     printf "<!> Not a valid camera FOV/ mode: ${CAM_FOV}:${CAM_MODE}. oneof: {ir}"
     exit 1
 fi
 
-CAM_IFACE=$(kamera-cfg ".interfaces.${CAM_MODE}")
+CAM_IFACE=$(jq -r ".interfaces.${CAM_MODE}" "$KAMERA_CFG")
 if [[ ${CAM_IFACE} == 'null' ]]; then
     printf "<!> Not a valid camera FOV/ mode: ${CAM_FOV}/${CAM_MODE}.
-    CAM_FOV: oneof: `kamera-cfg '.locations | keys' | tr '\n' ' '`
-    CAM_MODE: oneof: `kamera-cfg '.channels ' | tr '\n' ' '`\n"
+    CAM_FOV: oneof: `jq -r '.locations | keys' "$KAMERA_CFG" | tr '\n' ' '`
+    CAM_MODE: oneof: `jq -r '.channels ' "$KAMERA_CFG" | tr '\n' ' '`\n"
     exit 1
 fi
 
@@ -59,7 +59,7 @@ if [[ ${CAM_IFACE} == 'null' ]]; then
 fi
 
 #CAM_IP=$(locate-attached.sh "$CAM_IFACE")
-CAM_IP=$(kamera-cfg ".devices.${DEV_ID}.prefer_ip")
+CAM_IP=$(jq -r ".devices.${DEV_ID}.prefer_ip" "$KAMERA_CFG")
 
 if [[ $? -ne 0 || ${CAM_IP} == 'null' ]]; then
     printf "<!> Unable to find camera IP: ${CAM_FOV}:${CAM_MODE} on interface ${CAM_IFACE}"
@@ -103,8 +103,8 @@ exec roslaunch "${ROSWAIT}" prosilica_camera prosilica.launch \
     cam_fov:=${CAM_FOV} \
     trigger_mode:=${TRIGGER_MODE} \
     norespawn:=${NORESPAWN} \
-    GainMode:=$(kamera-cfg ".launch.cam.${CAM_MODE}.GainMode") \
-    GainValue:=$(kamera-cfg ".launch.cam.${CAM_MODE}.GainValue") 2> >(tee -a "${LOGFILE}" >&2) &
+    GainMode:=$(jq -r ".launch.cam.${CAM_MODE}.GainMode" "$KAMERA_CFG") \
+    GainValue:=$(jq -r ".launch.cam.${CAM_MODE}.GainValue" "$KAMERA_CFG") 2> >(tee -a "${LOGFILE}" >&2) &
 
 STAT_ROS=$!
 wait $STAT_ROS
