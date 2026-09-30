@@ -104,7 +104,19 @@ class KameraCLI(scfg.ModalCLI):
     calibrate = CalibrateConfig
 
 
+def _set_conda_data_paths() -> None:
+    """Point PROJ and GDAL at the conda env's data, as ``conda activate`` does. The
+    flight hosts run ``.venv/bin/kamera`` without activating anything."""
+    prefix = Path(sys.base_prefix)
+    for var, sub in (("PROJ_DATA", "share/proj"), ("GDAL_DATA", "share/gdal")):
+        for path in (prefix / sub, prefix / "Library" / sub):  # Library/: Windows
+            if path.is_dir():
+                os.environ.setdefault(var, str(path))
+                break
+
+
 def main(argv: list[str] | None = None) -> None:
+    _set_conda_data_paths()
     KameraCLI.main(argv=argv)
 
 
