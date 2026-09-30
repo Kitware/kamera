@@ -103,7 +103,7 @@
       # The full post-processing install (conda env + .venv, ~5 GB with CUDA
       # pycolmap), the same as a workstation's `make install`, so `kamera calibrate`
       # runs on board. No `conda init`: an auto-activated base env would shadow the
-      # system python3 that supervisor and the start/stop scripts use.
+      # system python3 for everything that calls it by name.
       - name: Install Miniforge
         shell: |
           curl -fsSL -o /tmp/miniforge.sh \

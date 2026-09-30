@@ -2,10 +2,9 @@
 
 ## Behind `kamera system {start,stop,restart,status}` and `kamera gui`: bring the
 ## whole system up or down across every enabled host, through each host's
-## supervisor (scripts/system.py), or open the GUI.
+## supervisor, or open the GUI.
 export COMPOSE_IGNORE_ORPHANS=True # make compose quieter
 KAM_REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
-SYSTEM_PY="${KAM_REPO_DIR}/scripts/system.py"
 GUI_COMPOSE="${KAM_REPO_DIR}/compose/gui.yml"
 
 errcho() {
@@ -14,6 +13,19 @@ errcho() {
 
 blueprintf() {
     (printf "\e[34m$@\e[0m")
+}
+
+# Supervisor programs by role; see runtime/{leader,follower}/supervisor.conf.
+# kamerad (the daemon) is always started and never stopped by normal operations.
+POD=(image_manager kamera:cam_ir kamera:cam_rgb kamera:cam_uv kamera:fps_monitor kamera:imageview)
+CENTRAL=(kamera:daq kamera:ins)
+MONITOR=(kamera:cam_param_monitor kamera:shapefile_monitor)
+
+# sup <host> <supervisorctl args...>: run supervisorctl against <host>'s supervisor.
+sup() {
+    local host=$1
+    shift
+    supervisorctl -s "http://${host}:9001" "$@"
 }
 
 # Enabled hosts from the config, sorted so hosts are started idempotently.
@@ -91,14 +103,14 @@ do_start() {
     fi
     local pids=()
     for host in $(enabled_hosts); do
-        python3 "${SYSTEM_PY}" "${host}" restart nas &
+        sup "${host}" restart mount_nas &
         pids+=($!)
     done
     wait "${pids[@]}"
 
     # Bring up master and core nodes
     blueprintf "Bringing up master ${MASTER_HOST}..."
-    python3 "${SYSTEM_PY}" "${MASTER_HOST}" start master
+    sup "${MASTER_HOST}" start roscore
 
     # check that master is in fact up
     local FAIL_COUNT=0
@@ -114,19 +126,18 @@ do_start() {
     # === === === === Checks have passed === === === ===
     blueprintf "done. Init checks are good! \nBringing up central..."
     pids=()
-    python3 "${SYSTEM_PY}" "${MASTER_HOST}" start central &
+    sup "${MASTER_HOST}" start "${CENTRAL[@]}" &
     pids+=($!)
 
     blueprintf "done\nLaunching pod nodes...\n"
     for host in $(enabled_hosts); do
-        # daemon group (kamerad) is always started and never stopped by normal operations
-        python3 "${SYSTEM_PY}" "${host}" start daemon
-        python3 "${SYSTEM_PY}" "${host}" start pod &
+        sup "${host}" start kamerad
+        sup "${host}" start "${POD[@]}" &
         pids+=($!)
     done
 
     blueprintf "Bringing up monitor..."
-    python3 "${SYSTEM_PY}" "${MASTER_HOST}" start monitor &
+    sup "${MASTER_HOST}" start "${MONITOR[@]}" &
     pids+=($!)
     wait "${pids[@]}"
     blueprintf "done. System is up; \`kamera gui\` opens the control panel.\n"
@@ -140,20 +151,16 @@ do_stop() {
     blueprintf "done\nStopping pods...\n"
     local host
     for host in $(enabled_hosts); do
-        python3 "${SYSTEM_PY}" "${host}" stop pod &
-        pids+=($!)
-        python3 "${SYSTEM_PY}" "${host}" stop detector &
+        sup "${host}" stop "${POD[@]}" kamera:detector &
         pids+=($!)
     done
-    blueprintf "done\nBringing down central..."
-    python3 "${SYSTEM_PY}" "${MASTER_HOST}" stop central &
-    pids+=($!)
-    python3 "${SYSTEM_PY}" "${MASTER_HOST}" stop monitor &
+    blueprintf "done\nBringing down central and monitor..."
+    sup "${MASTER_HOST}" stop "${CENTRAL[@]}" "${MONITOR[@]}" &
     pids+=($!)
     wait "${pids[@]}"
 
     blueprintf "done\nBringing down master..."
-    python3 "${SYSTEM_PY}" "${MASTER_HOST}" stop master
+    sup "${MASTER_HOST}" stop roscore
     blueprintf "done. ROS should be down\n"
     docker ps
 }
@@ -171,7 +178,8 @@ do_status() {
     fi
     local host
     for host in $( (echo "${MASTER_HOST}"; enabled_hosts) | sort -u); do
-        python3 "${SYSTEM_PY}" "${host}" status
+        blueprintf "== ${host}\n"
+        sup "${host}" status
     done
 }
 

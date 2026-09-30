@@ -64,13 +64,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   opens the GUI; `kamera gui` does. The Launch desktop shortcut runs both, so it
   still opens the control panel in one click. `kamera system stop` removes the GUI
   container instead of only stopping it. Start and stop take no compose modes.
+- `scripts/system.sh` drives each host's supervisor with
+  `supervisorctl -s http://<host>:9001`, replacing `scripts/system.py` and its
+  hardcoded host list; hosts come from `.arch.hosts` in the config.
 
 ### Fixed
 
 - Hostname lookup in the Phase One, Prosilica and postproc entry scripts.
 - taiga's default effort is `default_effort`, not the nonexistent `ON`.
-- `scripts/system.py restart` only started a process when stopping it failed, so
-  restarting a running process left it stopped. It now stops, then starts.
+- Restarts at startup (the NAS mount on every host) used `system.py restart`, which
+  only started a process when stopping it failed, so a running process was left
+  stopped. `supervisorctl restart` stops, then starts.
 - `kamera_halt.sh down` (and `kill`, `rm`) left every ROS process running: only the
   GUI understood those modes, and `system.py` skipped them as invalid.
 
