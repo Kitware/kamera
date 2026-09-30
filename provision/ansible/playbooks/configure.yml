@@ -14,6 +14,7 @@
           accept_hostkey: True
           update: True
           force: True
+        register: kamera_repo
 
       - name: "Set redis configuration to {{ kamera_dir }}/src/cfg/{{ config_dir }}redis.conf"
         become: True
@@ -99,16 +100,32 @@
           owner: "{{ ansible_user }}"
           state: link
 
-      # A CLI-only venv: scriptconfig for the command line, and --no-deps keeps the
-      # post-processing stack (OpenCV, pycolmap) off the flight hosts. The install is
-      # editable, so pulling the repo updates the command.
-      - name: Install the kamera command
+      # The full post-processing install (conda env + .venv, ~5 GB with CUDA
+      # pycolmap), the same as a workstation's `make install`, so `kamera calibrate`
+      # runs on board. No `conda init`: an auto-activated base env would shadow the
+      # system python3 that supervisor and the start/stop scripts use.
+      - name: Install Miniforge
         shell: |
-          python3 -m venv /home/{{ ansible_user }}/.local/share/kamera/venv
-          /home/{{ ansible_user }}/.local/share/kamera/venv/bin/pip install --quiet 'scriptconfig>=0.8.0'
-          /home/{{ ansible_user }}/.local/share/kamera/venv/bin/pip install --quiet --no-deps -e {{ kamera_dir }}
+          curl -fsSL -o /tmp/miniforge.sh \
+            https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-{{ ansible_architecture }}.sh
+          bash /tmp/miniforge.sh -b -p /home/{{ ansible_user }}/miniforge3
+          rm /tmp/miniforge.sh
         args:
-          creates: /home/{{ ansible_user }}/.local/share/kamera/venv/bin/kamera
+          creates: /home/{{ ansible_user }}/miniforge3/bin/conda
+
+      - name: Check for the kamera venv
+        stat:
+          path: "{{ kamera_dir }}/.venv/bin/kamera"
+        register: kamera_venv
+
+      # Rebuilt whenever the pull changed the repo, so lockfile updates land.
+      - name: Install kamera (conda env and .venv)
+        command: python3 bootstrap.py --name kamera
+        args:
+          chdir: "{{ kamera_dir }}"
+        environment:
+          CONDA_EXE: /home/{{ ansible_user }}/miniforge3/bin/conda
+        when: kamera_repo.changed or not kamera_venv.stat.exists
 
       - name: Create ~/.local/bin if it does not exist
         file:
@@ -118,7 +135,7 @@
 
       - name: Put kamera on PATH
         file:
-          src: /home/{{ ansible_user }}/.local/share/kamera/venv/bin/kamera
+          src: "{{ kamera_dir }}/.venv/bin/kamera"
           dest: /home/{{ ansible_user }}/.local/bin/kamera
           state: link
 

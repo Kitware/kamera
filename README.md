@@ -67,8 +67,11 @@ report. It works the same on Windows, Linux and macOS from the activated `.venv`
 
 ### Flight hosts
 
-The configure playbook installs the `kamera` command into a small venv and links it
-into `~/.local/bin`:
+The configure playbook does the full install on every host: Miniforge in
+`~/miniforge3` (no `conda init`), then `bootstrap.py`, the same as `make install`
+(~5 GB with CUDA pycolmap), rerun whenever the pull changes the repo. It links
+`.venv/bin/kamera` into `~/.local/bin`, so nothing needs activating, and
+`kamera calibrate` runs on board:
 
 ```bash
 kamera system start      # bring the system up; does nothing if it is already up

@@ -20,8 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `kamera` command (`kamera/cli.py`) is the one entry point for operator tools:
   `kamera system {start,stop,restart,status}`, `kamera gui`, `kamera cfg <jq query>`
   and `kamera calibrate`, which runs on Windows too. It replaces
-  `scripts/kamera_run.sh` and `scripts/kamera_halt.sh`. The configure playbook
-  installs it on the flight hosts in a CLI-only venv linked into `~/.local/bin`.
+  `scripts/kamera_run.sh` and `scripts/kamera_halt.sh`.
+- The configure playbook does the full post-processing install on the flight hosts
+  (Miniforge, then `bootstrap.py`) and links `kamera` into `~/.local/bin`, so the
+  rig can be calibrated on board.
 - `$KAMERA_CFG` points at the system `config.json` on the host and in the
   containers; scripts read it with `jq -r <query> "$KAMERA_CFG"`.
 - `kamera system status` shows whether the ROS master answers, whether the GUI is
