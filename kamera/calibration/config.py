@@ -6,7 +6,10 @@ import scriptconfig as scfg
 
 
 class CalibrateConfig(scfg.DataConfig):
-    __command__ = "kamera-calibrate"
+    """Calibrate the rig from a calibration flight."""
+
+    __command__ = "calibrate"
+    __prog__ = "kamera calibrate"
     flight_dir = scfg.Value(
         None,
         position=1,
@@ -67,3 +70,11 @@ class CalibrateConfig(scfg.DataConfig):
     force = scfg.Value(
         False, isflag=True, help="Rerun stages whose outputs already exist"
     )
+
+    @classmethod
+    def main(cls, argv=1, **kwargs):
+        # Imported here: the pipeline pulls in pycolmap and OpenCV, which the other
+        # kamera commands do not need.
+        from kamera.calibration.cli import run
+
+        run(cls.cli(argv=argv, data=kwargs, strict=True))

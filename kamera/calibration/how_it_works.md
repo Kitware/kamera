@@ -1,6 +1,6 @@
 # Rig Calibration
 
-This follows one run of `kamera-calibrate <flight_dir>` from the raw KAMERA flight folder to the camera models. File names in `kamera/calibration/`
+This follows one run of `kamera calibrate <flight_dir>` from the raw KAMERA flight folder to the camera models. File names in `kamera/calibration/`
 are given so you can read along in the code.
 
 ## Inputs

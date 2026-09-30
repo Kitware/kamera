@@ -33,6 +33,7 @@
                     'redis-server', 'redis-tools', # Redis tools
                     'ubuntu-drivers-common', # For hardware drivers
                     'python3-pip', # Pip goodness
+                    'python3-venv', # venv for the kamera command
                     'python3-redis',
                     ]
 

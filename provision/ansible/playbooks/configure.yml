@@ -99,6 +99,29 @@
           owner: "{{ ansible_user }}"
           state: link
 
+      # A CLI-only venv: scriptconfig for the command line, and --no-deps keeps the
+      # post-processing stack (OpenCV, pycolmap) off the flight hosts. The install is
+      # editable, so pulling the repo updates the command.
+      - name: Install the kamera command
+        shell: |
+          python3 -m venv /home/{{ ansible_user }}/.local/share/kamera/venv
+          /home/{{ ansible_user }}/.local/share/kamera/venv/bin/pip install --quiet 'scriptconfig>=0.8.0'
+          /home/{{ ansible_user }}/.local/share/kamera/venv/bin/pip install --quiet --no-deps -e {{ kamera_dir }}
+        args:
+          creates: /home/{{ ansible_user }}/.local/share/kamera/venv/bin/kamera
+
+      - name: Create ~/.local/bin if it does not exist
+        file:
+          path: /home/{{ ansible_user }}/.local/bin
+          state: directory
+          mode: '0755'
+
+      - name: Put kamera on PATH
+        file:
+          src: /home/{{ ansible_user }}/.local/share/kamera/venv/bin/kamera
+          dest: /home/{{ ansible_user }}/.local/bin/kamera
+          state: link
+
         # Overwrite default
       - name: Setup netplan configuration.
         become: True

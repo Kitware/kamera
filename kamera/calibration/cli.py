@@ -1,11 +1,10 @@
-"""``kamera-calibrate``: run the calibration pipeline stage by stage, resumable."""
+"""``kamera calibrate``: run the calibration pipeline stage by stage, resumable."""
 
 from __future__ import annotations
 
 import json
 import os
 import shutil
-import sys
 from collections import Counter
 
 import cv2
@@ -59,8 +58,7 @@ def write_gifs(frames, names, image_dir, left, right, h, gif_dir, count) -> dict
     return out
 
 
-def main(argv=None) -> None:
-    cfg = CalibrateConfig.cli(argv=argv, strict=True)
+def run(cfg: CalibrateConfig) -> None:
     work = cfg.work_dir or os.path.join(cfg.flight_dir, "calibration")
     image_dir, db_path = os.path.join(work, "images"), os.path.join(work, "database.db")
     pass1_dir, rig_dir, camera_model_dir = (
@@ -262,4 +260,4 @@ def main(argv=None) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    CalibrateConfig.main()

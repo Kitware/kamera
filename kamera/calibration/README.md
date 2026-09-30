@@ -4,9 +4,9 @@ Calibrates every camera on a KAMERA rig from one calibration flight (figure eigh
 
 ```bash
 conda activate kamera
-kamera-calibrate /data/052025_Calibration                 # everything
-kamera-calibrate /data/052025_Calibration --max_frames 150 --frame_stride 3   # quick look
-kamera-calibrate --help
+kamera calibrate /data/052025_Calibration                 # everything
+kamera calibrate /data/052025_Calibration --max_frames 150 --frame_stride 3   # quick look
+kamera calibrate --help
 ```
 
 For a walkthrough of every stage, see [how_it_works.md](how_it_works.md).
