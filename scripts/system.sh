@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
-## `kamera system {start,stop,restart,status}`: bring the whole system up or down
-## across every enabled host, through each host's supervisor (scripts/system.py).
+## Behind `kamera system {start,stop,restart,status}` and `kamera gui`: bring the
+## whole system up or down across every enabled host, through each host's
+## supervisor (scripts/system.py), or open the GUI.
 export COMPOSE_IGNORE_ORPHANS=True # make compose quieter
-KAM_REPO_DIR=${KAM_REPO_DIR:-$(/home/user/.config/kamera/repo_dir.bash)}
+KAM_REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 SYSTEM_PY="${KAM_REPO_DIR}/scripts/system.py"
 GUI_COMPOSE="${KAM_REPO_DIR}/compose/gui.yml"
 
@@ -13,10 +14,6 @@ errcho() {
 
 blueprintf() {
     (printf "\e[34m$@\e[0m")
-}
-
-usage() {
-    echo "usage: kamera system {start,stop,restart,status}"
 }
 
 # Enabled hosts from the config, sorted so hosts are started idempotently.
@@ -178,22 +175,12 @@ do_status() {
     done
 }
 
-case "$1" in
-    start | stop | restart | status) ;;
-    -h | --help | help | "")
-        usage
-        exit 0
-        ;;
-    *)
-        errcho "kamera system: unknown action '$1'"
-        usage >&2
-        exit 2
-        ;;
-esac
-if [[ $# -gt 1 ]]; then
-    usage >&2
-    exit 2
-fi
+# Stays in the foreground until the GUI closes.
+do_gui() {
+    notify-send -t 5000 "KAMERA" "Starting KAMERA Control Panel, please wait" || true
+    xhost +local:root
+    exec docker compose -f "${GUI_COMPOSE}" up
+}
 
 ## === === === === === ===   Env setup  === === === === === === ===
 source "${KAM_REPO_DIR}/runtime/env.sh"
@@ -218,10 +205,17 @@ case "$1" in
         do_stop
         do_start
         if [[ -n ${reopen_gui} ]]; then
-            exec "${KAM_REPO_DIR}/scripts/gui.sh"
+            do_gui
         fi
         ;;
     status)
         do_status
+        ;;
+    gui)
+        do_gui
+        ;;
+    *)
+        errcho "usage: system.sh {start,stop,restart,status,gui}"
+        exit 2
         ;;
 esac
